@@ -174,7 +174,7 @@ def build_object(img, bbox, size):
 
 
 def main(src, dst):
-    if os.path.realpath(src) == os.path.realpath(dst):
+    if os.path.realpath(src) == os.path.realpath(dst) or (os.path.exists(dst) and os.path.samefile(src, dst)):
         raise SystemExit("output path must differ from the source image")
     with open(src, "rb") as f:
         digest = hashlib.sha256(f.read()).hexdigest()
