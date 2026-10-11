@@ -16,6 +16,9 @@ export interface MessageQueue {
   next(): void;
   /** Cancels the hold timer. */
   dispose(): void;
+  /** Holds the head message (no timer) until resume(), e.g. while the screen is halted. */
+  pause(): void;
+  resume(): void;
 }
 
 /**
@@ -31,6 +34,7 @@ export function createMessageQueue(
   let messages: readonly GuildMessage[] = [];
   let cancelHold: Cancel | null = null;
   let nextId = 1;
+  let paused = false;
 
   function set(next: readonly GuildMessage[]): void {
     messages = next;
@@ -43,7 +47,7 @@ export function createMessageQueue(
   }
 
   function scheduleHold(): void {
-    if (cancelHold !== null || messages.length < 2) return;
+    if (paused || cancelHold !== null || messages.length < 2) return;
     cancelHold = scheduler.after(holdMs, () => {
       cancelHold = null;
       next();
@@ -64,5 +68,13 @@ export function createMessageQueue(
     },
     next,
     dispose,
+    pause() {
+      paused = true;
+      dispose();
+    },
+    resume() {
+      paused = false;
+      scheduleHold();
+    },
   };
 }

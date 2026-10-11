@@ -139,7 +139,11 @@ export function createGuildStore(options: GuildStoreOptions = {}): GuildStore {
       const result = await load();
       if (started !== generation) return;
       state.checkedAt = now();
-      queue.push(applyResult(state, storage, result));
+      const entries = applyResult(state, storage, result);
+      // While halted the window is hidden: hold the messages (and their scenes) until it is back.
+      if (state.halted) queue.pause();
+      else queue.resume();
+      queue.push(entries);
     } finally {
       inFlight = false;
     }

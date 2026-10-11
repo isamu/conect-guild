@@ -129,6 +129,43 @@ describe('createGuildStore: events for the canvas', () => {
   });
 });
 
+describe('createGuildStore: halted screen', () => {
+  const later = snapshot({ ...busy, fetchedAt: minutesAfter(T0, 2) });
+  const halt = { ok: false, reason: 'schema-version' } as const;
+  const heads = (store: ReturnType<typeof setup>) => store.state.messages[0]?.event?.id;
+
+  it('holds the messages and their scenes while halted, and goes on once it is back', async () => {
+    const store = setup([ok(first), ok(busy), halt, ok(later)]);
+    store.start();
+    await settle();
+    await vi.advanceTimersByTimeAsync(REFRESH_INTERVAL_MS);
+    expect(heads(store)).toBe('issue-opened#103');
+    await store.refresh();
+    expect(store.state.halted).toBe(true);
+    await vi.advanceTimersByTimeAsync(MESSAGE_HOLD_MS * 3);
+    expect(heads(store)).toBe('issue-opened#103');
+    expect(store.state.messages).toHaveLength(3);
+    await store.refresh();
+    expect(store.state.halted).toBe(false);
+    await vi.advanceTimersByTimeAsync(MESSAGE_HOLD_MS);
+    expect(heads(store)).toBe('pr-merged#110');
+    store.stop();
+  });
+
+  it('keeps holding when a later fetch fails for another reason', async () => {
+    const store = setup([ok(first), ok(busy), halt, { ok: false, reason: 'network' }]);
+    store.start();
+    await settle();
+    await vi.advanceTimersByTimeAsync(REFRESH_INTERVAL_MS);
+    await store.refresh();
+    await store.refresh();
+    expect(store.state.halted).toBe(true);
+    await vi.advanceTimersByTimeAsync(MESSAGE_HOLD_MS * 3);
+    expect(heads(store)).toBe('issue-opened#103');
+    store.stop();
+  });
+});
+
 describe('createGuildStore: no repeated or missing events', () => {
   it('does not send the same events again on the next fetches', async () => {
     const again = { ...busy, fetchedAt: minutesAfter(T0, 2) };
