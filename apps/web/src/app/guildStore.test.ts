@@ -197,6 +197,24 @@ describe('createGuildStore: failed fetches', () => {
     store.stop();
   });
 
+  it('stays halted when a later fetch fails for another reason', async () => {
+    const { store } = setup([
+      ok(first),
+      { ok: false, reason: 'schema-version' },
+      { ok: false, reason: 'network' },
+      ok(first),
+    ]);
+    store.start();
+    await settle();
+    await nextTick();
+    await nextTick();
+    expect(store.state.halted).toBe(true);
+    expect(store.state.failure).toBe('network');
+    await nextTick();
+    expect(store.state.halted).toBe(false);
+    store.stop();
+  });
+
   it('halts on a schema-version mismatch and recovers once the collector is updated', async () => {
     const { store, storage } = setup([
       ok(first),
