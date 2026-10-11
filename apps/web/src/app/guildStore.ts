@@ -10,7 +10,7 @@ import { createKeyValueStore, type KeyValueStore } from '../adapters/storage';
 import { parseBaseline } from '../domain/baseline';
 import { diffSnapshot } from '../domain/events';
 import { diffEntries, type MessageEntry } from '../domain/message';
-import { createMessageQueue, type GuildMessage } from './messageQueue';
+import { createMessageQueue, type GuildMessage, type MessageQueue } from './messageQueue';
 import { globalScheduler, type Cancel, type Scheduler } from './scheduler';
 
 export type { GuildMessage } from './messageQueue';
@@ -18,7 +18,10 @@ export type { GuildMessage } from './messageQueue';
 /** localStorage key of the diff baseline (numbers, states and times only). */
 export const BASELINE_STORAGE_KEY = 'conect-guild:baseline';
 export const REFRESH_INTERVAL_MS = 30_000;
-/** How long a message stays before the next queued one replaces it. The last one stays. */
+/**
+ * How long a message stays at least before the next queued one replaces it; longer when the next
+ * one's scene has to wait for its cast (app/messageQueue.ts). The last one stays.
+ */
 export const MESSAGE_HOLD_MS = 8_000;
 
 export interface GuildState {
@@ -60,6 +63,8 @@ export interface GuildStore {
   refresh(): Promise<void>;
   /** Removes the head message (the ▼ button). */
   nextMessage(): void;
+  /** Stops the messages (and the scenes they start) while the page is hidden. */
+  setHidden(hidden: boolean): void;
   /** Removes the stored baseline; the next fetch counts as the first one (no events). */
   clearBaseline(): void;
 }
@@ -117,15 +122,28 @@ function applyResult(
   return outcome.entries;
 }
 
+/** The message queue that publishes into `state.messages`. */
+function queueInto(
+  state: GuildState,
+  options: { scheduler: Scheduler; now: () => number; holdMs: number | undefined },
+): MessageQueue {
+  return createMessageQueue({
+    scheduler: options.scheduler,
+    now: options.now,
+    holdMs: options.holdMs ?? MESSAGE_HOLD_MS,
+    publish: (list) => {
+      state.messages = list;
+    },
+  });
+}
+
 export function createGuildStore(options: GuildStoreOptions = {}): GuildStore {
   const load = options.loadSnapshot ?? (() => loadSnapshot());
   const storage = options.storage ?? createKeyValueStore();
   const now = options.now ?? Date.now;
   const scheduler = options.scheduler ?? globalScheduler;
   const state = shallowReactive<GuildState>(initialState());
-  const queue = createMessageQueue(scheduler, options.messageHoldMs ?? MESSAGE_HOLD_MS, (list) => {
-    state.messages = list;
-  });
+  const queue = queueInto(state, { scheduler, now, holdMs: options.messageHoldMs });
   let cancelRefresh: Cancel | null = null;
   let inFlight = false;
   // Bumped by stop(), so a fetch that started before it cannot touch the state.
@@ -167,6 +185,9 @@ export function createGuildStore(options: GuildStoreOptions = {}): GuildStore {
     refresh,
     nextMessage() {
       queue.next();
+    },
+    setHidden(hidden) {
+      queue.setHidden(hidden);
     },
     clearBaseline() {
       const removed = storage.remove(BASELINE_STORAGE_KEY);

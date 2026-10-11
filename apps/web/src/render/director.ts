@@ -58,11 +58,16 @@ export function trackEnd(track: Track): number {
   return track.segments.at(-1)?.end ?? Number.NEGATIVE_INFINITY;
 }
 
+/** When the cast of an event's scene is free: `now`, or when the last of them is back. */
+export function castFreeAt(director: Director, event: GuildEvent, now: number): number {
+  return Math.max(now, ...castOf(event).map((id) => director.busyUntil[id] ?? now));
+}
+
 /**
  * Adds the scene for an event, starting at `now` or when its cast is free, whichever is later.
- * Trade-off (kept on purpose): when the same member has several events in a row, a later scene
- * starts after their message has already appeared, so the stage may lag the message window.
- * Starting it on time would make the member jump from wherever they are; members never teleport.
+ * The message queue (app/messageQueue.ts) shows a message only once its cast is free, so the scene
+ * starts with the message. The wait stays for when they part (the ▼ button skips ahead, or cues
+ * that arrived while the pictures loaded play together): members never teleport.
  */
 export function scheduleEvent(
   director: Director,
@@ -70,7 +75,7 @@ export function scheduleEvent(
   now: number,
   context: SceneContext,
 ): Director {
-  const start = Math.max(now, ...castOf(event).map((id) => director.busyUntil[id] ?? now));
+  const start = castFreeAt(director, event, now);
   const scene = planScene(event, start, context);
   const busyUntil = { ...director.busyUntil };
   for (const track of scene.tracks) busyUntil[track.actor] = trackEnd(track);

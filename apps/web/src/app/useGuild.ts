@@ -1,4 +1,5 @@
 import { computed, onBeforeUnmount, onMounted } from 'vue';
+import { documentVisibility } from '../adapters/visibility';
 import { createGuildStore, type GuildStoreOptions } from './guildStore';
 import { buildBoard, buildFetchStatus, buildKingBubble, buildParty, sceneCue } from './guildView';
 
@@ -6,10 +7,18 @@ import { buildBoard, buildFetchStatus, buildKingBubble, buildParty, sceneCue } f
 export function useGuild(options: GuildStoreOptions = {}) {
   const store = createGuildStore(options);
   const { state } = store;
+  // The same signal stops the canvas (render/loop.ts): messages and scenes stop and go together.
+  const syncHidden = () => {
+    store.setHidden(documentVisibility.isHidden());
+  };
+  let unsubscribe: (() => void) | null = null;
   onMounted(() => {
+    syncHidden();
+    unsubscribe = documentVisibility.subscribe(syncHidden);
     store.start();
   });
   onBeforeUnmount(() => {
+    unsubscribe?.();
     store.stop();
   });
 
@@ -24,7 +33,8 @@ export function useGuild(options: GuildStoreOptions = {}) {
     buildFetchStatus(state.snapshot, state.failure, checkedAt.value),
   );
   const message = computed(() => state.messages[0] ?? null);
-  // The canvas starts a scene when its message reaches the window (8 s apart, in queue order).
+  // The canvas starts a scene when its message reaches the window (in queue order; a message
+  // waits until its scene's cast is free, so the scene starts with it).
   const cue = computed(() => sceneCue(message.value));
 
   return {
