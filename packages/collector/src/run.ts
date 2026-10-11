@@ -11,7 +11,7 @@ export interface RunDeps {
   readonly log: (line: string) => void;
   readonly error: (line: string) => void;
   readonly gh: GhRunner;
-  /** Reads the company sessions from MulmoTerminal's files. Never throws. */
+  /** Reads the company sessions from MulmoTerminal's files. Never throws; ends on `signal`. */
   readonly readSessions: () => Promise<SessionsReading>;
   readonly writeSnapshot: (content: string) => Promise<void>;
   /** Waits between cycles; resolves early when `signal` aborts. */
@@ -163,16 +163,17 @@ function startGithub(deps: RunDeps, state: LoopState, now: Date): Promise<void> 
 
 /**
  * One tick of the loop: start GitHub when its interval has passed, read the sessions, and write
- * both atomically. Until GitHub has succeeded once there is nothing to write, so the tick waits
- * for that fetch instead.
+ * both atomically. Only the very first fetch is waited for (there is nothing to write before it);
+ * retries run in the background like every later fetch.
  */
 async function tick(deps: RunDeps, state: LoopState): Promise<void> {
   // A function call keeps TypeScript from narrowing `aborted` across awaits.
   const stopped = (): boolean => deps.signal.aborted;
   const now = deps.now();
   if (state.githubInFlight === null && isGithubDue(state.githubAttemptAt, now.getTime())) {
+    const first = state.githubAttemptAt === null;
     const running = startGithub(deps, state, now);
-    if (state.github === null) await running;
+    if (first) await running;
   }
   if (stopped()) return;
   const reading = await readSessionsSafely(deps);

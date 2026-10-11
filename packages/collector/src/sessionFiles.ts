@@ -22,8 +22,8 @@ class TooLargeError extends Error {}
  * A read-only stream of at most `maxBytes + 1` bytes, so a file that grows while it is read is
  * still capped. {@link assertWithin} then tells whether the limit was passed.
  */
-function cappedStream(path: string, maxBytes: number): ReadStream {
-  return createReadStream(path, { encoding: 'utf8', flags: 'r', start: 0, end: maxBytes });
+function cappedStream(path: string, maxBytes: number, signal?: AbortSignal): ReadStream {
+  return createReadStream(path, { encoding: 'utf8', flags: 'r', start: 0, end: maxBytes, signal });
 }
 
 function assertWithin(stream: ReadStream, maxBytes: number): void {
@@ -47,16 +47,19 @@ function failureKindOf(error: unknown): SessionsFailureKind {
  * The company session ids from the cwd log, streamed: each line is handed over and dropped, so the
  * lines of other directories are never held together.
  */
-async function readCwdLog(paths: SessionFilePaths): Promise<ReadonlyMap<string, string>> {
-  const stream = cappedStream(paths.cwdLogPath, MAX_CWD_LOG_BYTES);
+async function readCwdLog(
+  paths: SessionFilePaths,
+  signal: AbortSignal | undefined,
+): Promise<ReadonlyMap<string, string>> {
+  const stream = cappedStream(paths.cwdLogPath, MAX_CWD_LOG_BYTES, signal);
   const lines = createInterface({ input: stream, crlfDelay: Infinity });
   const ids = await latestCompanySessionIds(lines, paths.seats);
   assertWithin(stream, MAX_CWD_LOG_BYTES);
   return ids;
 }
 
-async function readActivityState(path: string): Promise<string> {
-  const stream = cappedStream(path, MAX_ACTIVITY_STATE_BYTES);
+async function readActivityState(path: string, signal: AbortSignal | undefined): Promise<string> {
+  const stream = cappedStream(path, MAX_ACTIVITY_STATE_BYTES, signal);
   let text = '';
   for await (const chunk of stream) text += String(chunk);
   assertWithin(stream, MAX_ACTIVITY_STATE_BYTES);
@@ -64,13 +67,17 @@ async function readActivityState(path: string): Promise<string> {
 }
 
 /**
- * Reads MulmoTerminal's two files and returns the company seats' states. Never throws. Both are
+ * Reads MulmoTerminal's two files and returns the company seats' states. Never throws; an abort
+ * of `signal` ends the reading (read-failed). Both are
  * opened read-only; MulmoTerminal's files are never written or locked.
  */
-export async function readCompanySessions(paths: SessionFilePaths): Promise<SessionsReading> {
+export async function readCompanySessions(
+  paths: SessionFilePaths,
+  signal?: AbortSignal,
+): Promise<SessionsReading> {
   try {
-    const ids = await readCwdLog(paths);
-    const activity = await readActivityState(paths.activityStatePath);
+    const ids = await readCwdLog(paths, signal);
+    const activity = await readActivityState(paths.activityStatePath, signal);
     return readSeatStates(activity, paths.seats, ids);
   } catch (error) {
     return { ok: false, kind: failureKindOf(error) };

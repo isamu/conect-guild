@@ -27,7 +27,7 @@ process.exitCode = await runCollector(process.argv.slice(2), {
     console.error(line);
   },
   gh: createGhRunner(controller.signal),
-  readSessions: () => readCompanySessions(COLLECTOR_CONFIG.sessions),
+  readSessions: () => readCompanySessions(COLLECTOR_CONFIG.sessions, controller.signal),
   writeSnapshot: (content) => writeFileAtomic(COLLECTOR_CONFIG.snapshotPath, content),
   sleep: sleepUnlessAborted,
   signal: controller.signal,
