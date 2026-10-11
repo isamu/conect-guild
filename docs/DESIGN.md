@@ -104,11 +104,11 @@ packages/collector ──検証して一時ファイルに書き rename──▶
 
 - **対象リポジトリ**: `collector.config.ts` に固定する（既定 `yukihiroyamaguchi569/conect-management`）。コマンドライン引数や環境変数では変えられない
 - **`gh` の呼び方**: `child_process.execFile('gh', [引数の配列])`。シェル文字列は組まない。認証はユーザーの `gh` のものをそのまま使う
-- **ページ送り**: `gh api --paginate --slurp` でページごとの配列をまとめた 1 つの JSON として受け、平坦化してから zod で検証する。`execFile` の `maxBuffer` は 64 MB にし、超えたら失敗として扱う。テストは複数ページの出力で行う
+- **ページ送り**: `gh api --paginate --jq '<射影> | @json'` で、要るフィールドだけに絞った要素を 1 行 1 JSON で受け、行ごとに zod で検証する（`--slurp` は `--jq` と併用できない）。差分の中身や Issue の本文は gh の段階で落とす。ページが配列でなければ jq でエラーにし、空の一覧と取り違えない。`execFile` の `maxBuffer` は 64 MB にし、超えたら失敗として扱う。テストは複数ページの出力で行う
 - **Issue**: 全ページ取る。open は全部、closed は直近 7 日（`since` で絞り、`closed_at` で確かめる）。GitHub の Issue 一覧には PR が混ざるので、`pull_request` キーを持つものは除く
 - **PR**: open は全部、closed / merged は直近 7 日のもの。全ページ取る
 - **PR と Issue の結び付け**: PR の題名と本文から、同じリポジトリを指す参照（`#番号` と `<対象リポジトリ>#番号`）を正規表現で拾い、`linkedIssues: number[]` として持つ。別リポジトリの参照（`owner/other#番号`）は拾わない。`Closes`・`Fixes`・`Resolves` の後の参照が 1 つでもあれば、それだけを使う。本文そのものは保存しない
-- **変更ファイル**: open PR だけ、`gh api --paginate --slurp repos/<r>/pulls/<n>/files` で変更ファイルのパスを取り、`changedFiles: string[]` として持つ（差分の中身は取らない）
+- **変更ファイル**: open PR だけ、`gh api --paginate --jq` で `repos/<r>/pulls/<n>/files` の `filename` だけを取り、`changedFiles: string[]` として持つ（差分の中身は取らない）
 - **間隔**: 既定 60 秒（`gh` のレート制限に十分収まる）。`--once` で 1 回だけ実行もできる
 - **書き込み**: 取得した結果を zod で検証してから、同じディレクトリの一時ファイルに 0600 で書き、`rename` で `apps/web/.data/snapshot.json` を原子的に置き換える。画面が書きかけの JSON を読むことはない
 - **失敗したとき**: 取得や検証に 1 つでも失敗したら snapshot を書き換えず、直前の正常なものを残す（空の配列で上書きしない）
@@ -251,6 +251,7 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 
 ## 変更履歴
 
+- **M1（2026-10-12）** collector の実装に合わせ、ページ送りを `--paginate --slurp` から `--paginate --jq`（要るフィールドだけに絞る）に改めた（4.1）
 - **v0.2（2026-10-12）** codex レビュー 1 周目を反映
   - 実データを `public/` から `apps/web/.data/`（gitignore、0600、原子的な置き換え）に移し、開発時だけの自作 Vite プラグインで配信。`server.host` を `127.0.0.1` に固定し、build・CI はダミーだけにした（5 章を新設）
   - 収集の範囲を定義: 対象リポジトリの固定、全ページ取得、closed / merged は直近 7 日、Issue から PR を除く、失敗時は書き換えない（4.1）
