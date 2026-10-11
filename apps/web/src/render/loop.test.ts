@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AMBIENT } from './metrics';
-import { createScheduler, isPaused, nextDraw } from './loop';
+import { EMPTY_DIRECTOR, scheduleEvent } from './director';
+import { createScheduler, isPaused, isShown, nextDraw, scenesShown } from './loop';
+import { DEFAULT_SEATS } from './scenes';
 
 describe('nextDraw', () => {
   it('draws every frame while a scene plays', () => {
@@ -120,5 +122,24 @@ describe('createScheduler: pausing and stopping', () => {
     schedule.refresh();
     vi.advanceTimersByTime(2_000);
     expect(counter.draws).toBe(before);
+  });
+});
+
+describe('scenes while the canvas is out of sight', () => {
+  const scene = scheduleEvent(
+    EMPTY_DIRECTOR,
+    { id: 'issue-opened#1', kind: 'issue-opened', number: 1, department: '企画' },
+    0,
+    { seats: DEFAULT_SEATS, random: () => 0.5 },
+  );
+
+  it('counts a canvas with no width as out of sight', () => {
+    expect(isShown(0)).toBe(false);
+    expect(isShown(320)).toBe(true);
+  });
+
+  it('drops the scenes while the canvas has no width, so they never play late', () => {
+    expect(scenesShown(scene, 0)).toBe(EMPTY_DIRECTOR);
+    expect(scenesShown(scene, 320)).toBe(scene);
   });
 });
