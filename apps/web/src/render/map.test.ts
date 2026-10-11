@@ -50,8 +50,22 @@ describe('map: size and contents', () => {
     expect(groundAt({ col: 0, row: 5 })).toBe('wall');
     expect(groundAt({ col: 31, row: 5 })).toBe('wall');
     expect(groundAt({ col: 5, row: 0 })).toBe('wall-top');
-    expect(groundAt(PLACES.door)).toBe('door');
+    // A doorway (floor) in the bottom wall, with the door drawn over it.
+    expect(groundAt(PLACES.door)).toBe('floor');
+    expect(groundAt({ col: PLACES.door.col - 1, row: PLACES.door.row })).toBe('wall');
     expect(PLACES.door.row).toBe(MAP_ROWS - 1);
+    const door = MAP_OBJECTS.find((o) => o.tile === 'door');
+    expect(door !== undefined && contains(door, PLACES.door) && !door.solid).toBe(true);
+  });
+
+  it('draws windows and the door over the wall, not in place of it (they are see-through)', () => {
+    for (const tile of ['window', 'door'] as const) {
+      expect(GROUND.flat().includes(tile)).toBe(false);
+      expect(MAP_OBJECTS.some((o) => o.tile === tile)).toBe(true);
+    }
+    for (const window of MAP_OBJECTS.filter((o) => o.tile === 'window')) {
+      expect(groundAt(window)).toBe('wall');
+    }
   });
 
   it('has nothing outside the map', () => {

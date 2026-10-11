@@ -139,11 +139,8 @@ const GROUND_FILLS: readonly GroundFill[] = [
   { tile: 'wall', ...rect(MAP_COLS - 1, 1, 1, MAP_ROWS - 1) },
   { tile: 'wall', ...rect(0, MAP_ROWS - 1, MAP_COLS, 1) },
   { tile: 'wall-top', ...rect(0, 0, MAP_COLS, 1) },
-  { tile: 'window', ...rect(14, 1, 1, 1) },
-  { tile: 'window', ...rect(18, 1, 1, 1) },
-  { tile: 'window', ...rect(4, 1, 1, 1) },
-  { tile: 'window', ...rect(26, 1, 1, 1) },
-  { tile: 'door', ...PLACES.door, w: 1, h: 1 },
+  // The doorway in the bottom wall; the door itself is drawn over it (MAP_OBJECTS).
+  { tile: 'floor', ...PLACES.door, w: 1, h: 1 },
 ];
 
 const solid = (tile: TileName, area: TileRect): MapObject => ({ tile, solid: true, ...area });
@@ -152,8 +149,13 @@ const flat = (tile: TileName, area: TileRect): MapObject => ({ tile, solid: fals
 /**
  * Furniture, sized to the pieces of assets/tiles/tiles.ts (a longer piece repeats: the counter is
  * three counter pieces). Chairs under the seats and the door are not solid, so members walk on them.
+ * Windows and the door have see-through parts, so they go over the wall and floor, not instead.
  */
 export const MAP_OBJECTS: readonly MapObject[] = [
+  flat('window', rect(4, 1, 1, 1)),
+  flat('window', rect(14, 1, 1, 1)),
+  flat('window', rect(18, 1, 1, 1)),
+  flat('window', rect(26, 1, 1, 1)),
   solid('throne', rect(15, 2, 2, 2)),
   solid('counter', rect(12, 8, 9, 1)),
   flat('door', rect(PLACES.door.col, PLACES.door.row - 1, 1, 2)),
@@ -184,7 +186,6 @@ const WALKABLE_GROUND: ReadonlySet<TileName> = new Set<TileName>([
   'floor',
   'floor-carpet',
   'rug-red',
-  'door',
 ]);
 
 export function contains(area: TileRect, pos: TilePos): boolean {
