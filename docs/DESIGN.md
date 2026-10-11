@@ -69,7 +69,16 @@ conect-guild/
 │       ├── adapters/
 │       │   ├── snapshot.ts   /snapshot.json を no-store で fetch して zod で検証
 │       │   └── storage.ts    localStorage の読み書き（失敗しても例外を外に出さない）
-│       ├── render/           Canvas。タイルマップ、スプライト、歩行、吹き出し、requestAnimationFrame（M2）
+│       ├── render/           Canvas（M2）。純粋な部分は vitest で守る
+│       │   ├── metrics.ts    大きさの一元管理（タイル 32px、キャラのコマ 64px、論理解像度 1024×576）
+│       │   ├── map.ts        32×18 マスの地図、家具、窓に隠れる範囲、歩けるマス
+│       │   ├── path.ts       タイル ↔ 論理座標、通路の経路探索（BFS）
+│       │   ├── scenes.ts     イベント → 演出の台本（受け渡し・宝箱・紙吹雪）
+│       │   ├── director.ts   台本の再生（時刻を渡すと全員の位置とコマを返す）
+│       │   ├── motion.ts / confetti.ts / bubbles.ts  歩行のコマ送り、紙吹雪の粒子（乱数を注入）、席の上の吹き出し
+│       │   ├── art.ts        絵の差し替え境界（TileArt / SpriteArt）と仮の矩形
+│       │   ├── tileArt.ts / spriteArt.ts / loadArt.ts  assets/ の絵で描く実装と読み込み
+│       │   └── draw.ts / loop.ts  描画と requestAnimationFrame（動くものがある間だけ回す）
 │       ├── ui/               Vue 部品: QuestBoard / PartyStatus / MessageWindow（Canvas の上に重ねる HTML）
 │       └── app/              Vue の reactive による小さなストア。Pinia は入れない
 ├── packages/collector/       収集スクリプト（TS。Node の型除去で直接実行）
@@ -196,7 +205,7 @@ packages/collector ──検証して一時ファイルに書き rename──▶
 |---|---|---|
 | M0 | 雛形 | `npm create vite`（vue-ts）、LICENSE、この設計書、ESLint（sonarjs）・Prettier・vitest・CI（`npm ci --ignore-scripts`）。7 章の手順で依存を入れて lockfile をコミット。`vite.config.ts` で `server.host: '127.0.0.1'`。collector の最小の雛形を置き、`node packages/collector/src/main.ts --once` が型除去で起動して設定を読み、GitHub に触れずに終わることを確かめる（実際の収集は M1）。collector の型検査も verify に入れる |
 | M1 | 静止画 + 生データ + クリア表示 | コンセプト画を背景にし、Vue の窓（掲示板・パーティ・メッセージ）に本物の値を出す。中身: collector の 60 秒ごとの収集（open / closed の Issue・PR、全ページ、原子的な書き込み）、snapshot 配信プラグイン、画面の 30 秒ごとの再取得、差分による 1 回限りのクリア表示（Vue のメッセージ窓）、`schemaVersion` と古さの表示。domain のテストもここで |
-| M2 | Canvas の社屋 | タイルとスプライトで社屋を描き直す。6 人が席に座る。イベントで歩く（出発・帰還）、吹き出し、紙吹雪 |
+| M2 | Canvas の社屋 | タイルとスプライトで社屋を描き直す。6 人が席に座る。イベントで歩く（出発・帰還）、吹き出し、紙吹雪。論理解像度 1024×576（32px タイル × 32×18 マス、キャラは 64×64 のコマ）を画面の幅に合わせて拡大する（2026-10-12、社長の判断で 16px から 2 倍に）。演出はメッセージ窓に出た瞬間に始まる |
 | M3 | リアルタイム | Claude Code の hooks で「今まさに作業中 / 許可待ち」を拾う。hooks は `~/.conect-guild/events.jsonl`（0600）に 1 行追記するだけ。collector が読み、snapshot に混ぜる。`tool_input` は保存しない。**5 セッションの `~/.claude/settings.json` を触るので、着手前に社長の承認を改めて取る** |
 | M4 | 遊び | 効果音、昼夜、累積の経験値とレベル（集計の持ち方を設計してから）、レベルアップの演出、ネコ |
 
@@ -222,7 +231,7 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 ## 8. 絵の素材
 
 - コンセプト画（codex 生成、`assets/concept/`）: 背景（M1）と目標の見た目として使う。生成の指示書も同じ場所に置く
-- タイル（床・壁・机・本棚）: CC0 のタイルセット（Kenney など）を使う。出所とライセンスを `assets/README.md` に書く
+- タイル（床・壁・机・本棚など 15 種）: codex にコンセプト画の雰囲気で生成させ、32px グリッドのシートに切り出す（`assets/tiles/`）。2026-10-12 の社長の判断で CC0 素材（Kenney など）から切り替えた。出所とライセンスを `assets/README.md` に書く
 - 6 体（かなめ・みのり・ひびき・ひらめ・ささえ・ゆきひろ）のスプライト: codex に「同じキャラの正面・横・歩き 2 コマ」を生成させ、手で整える。生成の指示書もリポジトリに残す
 - 実在のゲームの素材・ロゴは使わない
 
@@ -238,7 +247,7 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 
 1. zod を入れる（実行時の依存は Vue と zod の 2 つ）
 2. 置き場所は `~/my-apps/conect-guild`。`~/.claude/repos.md` に行を足す
-3. タイルは CC0 素材、キャラ 6 体は codex 生成
+3. タイルもキャラ 6 体も codex 生成（タイルは当初 CC0 素材の予定だったが、2026-10-12 に社長の判断でコンセプト画に雰囲気を合わせるため codex 生成に変えた）
 4. M3 の hooks は、着手前に改めて承認を取る
 5. メンバーの名前は確定（1 章の表。かなめ・みのり・ひびき・ひらめ・ささえ・ゆきひろ）
 6. 実データは `apps/web/.data/` に置き、開発時だけの自作プラグインで配信する。build と CI はダミーだけ（5 章）
@@ -251,6 +260,11 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 
 ## 変更履歴
 
+- **M2（2026-10-12）** Canvas の社屋を入れた
+  - タイルを CC0 素材から codex 生成に変えた（8 章、10 章 3。社長の判断）
+  - 論理解像度を 1024×576（32px タイル、キャラ 64px）にした（6 章。社長の判断で 2 倍に）
+  - render/ の中身を書いた（3 章）
+  - 閉じ直しの判定を「基準の closedAt と違う」に改めた。基準の fetchedAt より新しい closedAt の Issue が取得のたびにクリアを出していた（4.4 の実装の修正）
 - **M1（2026-10-12）** collector の実装に合わせ、ページ送りを `--paginate --slurp` から `--paginate --jq`（要るフィールドだけに絞る）に改めた（4.1）
 - **v0.2（2026-10-12）** codex レビュー 1 周目を反映
   - 実データを `public/` から `apps/web/.data/`（gitignore、0600、原子的な置き換え）に移し、開発時だけの自作 Vite プラグインで配信。`server.host` を `127.0.0.1` に固定し、build・CI はダミーだけにした（5 章を新設）
