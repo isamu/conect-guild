@@ -1,13 +1,17 @@
+import type { GuildEvent } from '../domain/events';
+import type { MessageEntry } from '../domain/message';
 import type { Cancel, Scheduler } from './scheduler';
 
 export interface GuildMessage {
   /** Unique within the queue's lifetime (used as the Vue key). */
   readonly id: number;
   readonly text: string;
+  /** The event this line reports; its scene starts when the line reaches the window. */
+  readonly event: GuildEvent | null;
 }
 
 export interface MessageQueue {
-  push(lines: readonly string[]): void;
+  push(entries: readonly MessageEntry[]): void;
   /** Drops the head message (the ▼ button, or the hold timer). */
   next(): void;
   /** Cancels the hold timer. */
@@ -53,9 +57,9 @@ export function createMessageQueue(
   }
 
   return {
-    push(lines) {
-      if (lines.length === 0) return;
-      set([...messages, ...lines.map((text) => ({ id: nextId++, text }))]);
+    push(entries) {
+      if (entries.length === 0) return;
+      set([...messages, ...entries.map((entry) => ({ id: nextId++, ...entry }))]);
       scheduleHold();
     },
     next,

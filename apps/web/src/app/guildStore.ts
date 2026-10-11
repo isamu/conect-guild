@@ -9,7 +9,7 @@ import {
 import { createKeyValueStore, type KeyValueStore } from '../adapters/storage';
 import { parseBaseline } from '../domain/baseline';
 import { diffSnapshot } from '../domain/events';
-import { diffMessages } from '../domain/message';
+import { diffEntries, type MessageEntry } from '../domain/message';
 import { createMessageQueue, type GuildMessage } from './messageQueue';
 import { globalScheduler, type Cancel, type Scheduler } from './scheduler';
 
@@ -32,7 +32,10 @@ export interface GuildState {
   effectsAvailable: boolean;
   /** Epoch ms of the latest finished fetch (success or failure). */
   checkedAt: number | null;
-  /** Message window queue; the head is on screen. */
+  /**
+   * Message window queue; the head is on screen. Each new event of a fetch arrives here once, on
+   * its message, and its scene plays when that message reaches the head.
+   */
   messages: readonly GuildMessage[];
   /** Result of the last "基準を消す". */
   baselineNotice: string | null;
@@ -63,7 +66,7 @@ export interface GuildStore {
 
 interface SyncOutcome {
   readonly effectsAvailable: boolean;
-  readonly lines: readonly string[];
+  readonly entries: readonly MessageEntry[];
 }
 
 /**
@@ -72,13 +75,14 @@ interface SyncOutcome {
  */
 function syncBaseline(storage: KeyValueStore, snapshot: Snapshot): SyncOutcome {
   const stored = storage.read(BASELINE_STORAGE_KEY, z.unknown());
-  if (!stored.ok && stored.reason === 'unavailable') return { effectsAvailable: false, lines: [] };
+  if (!stored.ok && stored.reason === 'unavailable')
+    return { effectsAvailable: false, entries: [] };
   const diff = diffSnapshot(stored.ok ? parseBaseline(stored.value) : null, snapshot);
   if (diff.baselineUpdate.action === 'replace') {
     const written = storage.write(BASELINE_STORAGE_KEY, diff.baselineUpdate.baseline);
-    if (!written.ok) return { effectsAvailable: false, lines: [] };
+    if (!written.ok) return { effectsAvailable: false, entries: [] };
   }
-  return { effectsAvailable: true, lines: diffMessages(diff, snapshot) };
+  return { effectsAvailable: true, entries: diffEntries(diff, snapshot) };
 }
 
 function initialState(): GuildState {
@@ -93,12 +97,12 @@ function initialState(): GuildState {
   };
 }
 
-/** Applies one fetch result. Returns the message lines to queue. */
+/** Applies one fetch result. Returns the messages (with their events) to queue. */
 function applyResult(
   state: GuildState,
   storage: KeyValueStore,
   result: SnapshotLoadResult,
-): readonly string[] {
+): readonly MessageEntry[] {
   if (!result.ok) {
     state.failure = result.reason;
     // Once halted, only a snapshot of the expected version resumes the screen.
@@ -110,7 +114,7 @@ function applyResult(
   state.halted = false;
   const outcome = syncBaseline(storage, result.snapshot);
   state.effectsAvailable = outcome.effectsAvailable;
-  return outcome.lines;
+  return outcome.entries;
 }
 
 export function createGuildStore(options: GuildStoreOptions = {}): GuildStore {

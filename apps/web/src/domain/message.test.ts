@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { GuildEvent } from './events';
 import { GAP_NOTICE_MESSAGE } from './events';
 import { closedIssue, issue, mergedPr, snapshot, T0 } from './fixtures.test-util';
-import { actorName, diffMessages, eventMessage } from './message';
+import { actorName, diffEntries, diffMessages, eventMessage } from './message';
 
 const snap = snapshot({
   issues: [closedIssue(98, T0, ['総務']), issue(104, { title: '受付の題名' })],
@@ -89,5 +89,32 @@ describe('diffMessages', () => {
   it('returns nothing for an empty diff', () => {
     const diff = { events: [], baselineUpdate: { action: 'keep' }, notice: null } as const;
     expect(diffMessages(diff, snap)).toEqual([]);
+  });
+});
+
+describe('diffEntries', () => {
+  it('pairs each line with its event, in order', () => {
+    const closed = event('issue-closed', 98, '総務');
+    const merged = event('pr-merged', 108, '総務');
+    const diff = {
+      events: [merged, closed],
+      baselineUpdate: { action: 'keep' },
+      notice: null,
+    } as const;
+    expect(diffEntries(diff, snap)).toEqual([
+      { text: 'ささえは PR#108「棚卸しの結果」を てにいれた！', event: merged },
+      { text: 'ささえは クエスト#98「架空の依頼 98」を クリアした！', event: closed },
+    ]);
+  });
+
+  it('gives the gap notice no event', () => {
+    const diff = {
+      events: [event('issue-closed', 98, '総務')],
+      baselineUpdate: { action: 'keep' },
+      notice: { kind: 'gap-unrecoverable', message: GAP_NOTICE_MESSAGE },
+    } as const;
+    const entries = diffEntries(diff, snap);
+    expect(entries[0]).toEqual({ text: GAP_NOTICE_MESSAGE, event: null });
+    expect(entries).toHaveLength(2);
   });
 });

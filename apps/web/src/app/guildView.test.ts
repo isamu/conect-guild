@@ -16,6 +16,7 @@ import {
   buildParty,
   countWaits,
   formatClock,
+  sceneCue,
   STATE_LABELS,
 } from './guildView';
 
@@ -202,5 +203,26 @@ describe('buildKingBubble', () => {
 
   it('does not wait before the first snapshot', () => {
     expect(buildKingBubble(null)).toEqual({ waiting: false, detail: null });
+  });
+});
+
+describe('sceneCue', () => {
+  const closed = {
+    id: 'issue-closed#98',
+    kind: 'issue-closed',
+    number: 98,
+    department: '総務',
+  } as const;
+
+  it('cues the event of the message in the window, keyed by the message id', () => {
+    expect(sceneCue({ id: 7, text: 'クリアした！', event: closed })).toEqual({
+      id: 7,
+      event: closed,
+    });
+  });
+
+  it('cues nothing for a notice or an empty window', () => {
+    expect(sceneCue({ id: 8, text: 'この期間の出来事は復元できません', event: null })).toBeNull();
+    expect(sceneCue(null)).toBeNull();
   });
 });
