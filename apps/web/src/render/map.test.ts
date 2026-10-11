@@ -15,6 +15,7 @@ import {
   MAP_OBJECTS,
   MAP_ROWS,
   PLACES,
+  TALLEST_WINDOW_EXTENTS,
   TILE_NAMES,
   WINDOW_EXTENTS,
 } from './map';
@@ -23,6 +24,8 @@ import { findPath } from './path';
 
 const WALKERS: readonly MemberId[] = ['kaname', 'minori', 'hibiki', 'hirame', 'sasae'];
 const DEPARTMENT_MEMBERS: readonly MemberId[] = ['minori', 'hibiki', 'hirame', 'sasae'];
+/** Everyone, the king included (his bubble is HTML, but his head must show too). */
+const SEATED: readonly MemberId[] = [...WALKERS, 'yukihiro'];
 
 describe('map: size and contents', () => {
   it('is 32 x 18 tiles of 32 px (1024 x 576)', () => {
@@ -46,14 +49,17 @@ describe('map: size and contents', () => {
     }
   });
 
-  it('walls in the room and puts the door in the bottom wall', () => {
+  it('walls in the room and puts the door at the bottom of the right wall', () => {
     expect(groundAt({ col: 0, row: 5 })).toBe('wall');
     expect(groundAt({ col: 31, row: 5 })).toBe('wall');
     expect(groundAt({ col: 5, row: 0 })).toBe('wall-top');
-    // A doorway (floor) in the bottom wall, with the door drawn over it.
+    // The back wall is two tiles high.
+    expect(groundAt({ col: 16, row: 2 })).toBe('wall');
+    // A doorway (floor) in the right wall, with the door drawn over it.
     expect(groundAt(PLACES.door)).toBe('floor');
-    expect(groundAt({ col: PLACES.door.col - 1, row: PLACES.door.row })).toBe('wall');
-    expect(PLACES.door.row).toBe(MAP_ROWS - 1);
+    expect(groundAt({ col: MAP_COLS - 1, row: PLACES.door.row })).toBe('floor');
+    expect(groundAt({ col: MAP_COLS - 1, row: 13 })).toBe('wall');
+    expect(PLACES.door.row).toBe(MAP_ROWS - 2);
     const door = MAP_OBJECTS.find((o) => o.tile === 'door');
     expect(door !== undefined && contains(door, PLACES.door) && !door.solid).toBe(true);
   });
@@ -86,15 +92,6 @@ describe('map: places and seats', () => {
     expect(MEMBERS.yukihiro.seat.col + 0.5).toBe(throne.col + throne.w / 2);
   });
 
-  it('puts かなめ right behind the counter, facing the counter front', () => {
-    const counter = MAP_OBJECTS.find((o) => o.tile === 'counter');
-    expect(counter).toBeDefined();
-    if (counter === undefined) return;
-    expect(contains(counter, { col: MEMBERS.kaname.seat.col, row: counter.row })).toBe(true);
-    expect(MEMBERS.kaname.seat.row).toBe(counter.row - 1);
-    expect(PLACES.counterFront).toEqual({ col: MEMBERS.kaname.seat.col, row: counter.row + 1 });
-  });
-
   it.each(WALKERS)('seats %s where they can walk and are not under a window', (id) => {
     const seat = MEMBERS[id].seat;
     expect(isWalkable(seat)).toBe(true);
@@ -119,13 +116,42 @@ describe('map: places and seats', () => {
     expect(findPath(PLACES.door, seat)).not.toBeNull();
   });
 
-  it('places one desk in each wing, one per department member', () => {
+  it('places one desk in each corner, right next to its department member', () => {
     const desks = MAP_OBJECTS.filter((o) => o.tile === 'desk');
     expect(desks).toHaveLength(4);
     for (const id of DEPARTMENT_MEMBERS) {
-      const seat = MEMBERS[id].seat;
-      expect(desks.some((d) => contains(d, { col: seat.col, row: seat.row + 1 }))).toBe(true);
+      const { col, row } = MEMBERS[id].seat;
+      const around = [-1, 0, 1].flatMap((dc) =>
+        [-1, 0, 1].map((dr) => ({ col: col + dc, row: row + dr })),
+      );
+      expect(desks.filter((d) => around.some((cell) => contains(d, cell)))).toHaveLength(1);
     }
+  });
+});
+
+describe('map: かなめ’s counter', () => {
+  it('builds one counter of left, middle and right pieces, 7 to 9 tiles wide', () => {
+    const pieces = MAP_OBJECTS.filter((o) => o.tile.startsWith('counter-'));
+    expect(pieces.map((o) => o.tile)).toEqual(['counter-left', 'counter-mid', 'counter-right']);
+    const [left, mid, right] = pieces;
+    if (left === undefined || mid === undefined || right === undefined) return;
+    expect([mid.col, right.col]).toEqual([left.col + left.w, mid.col + mid.w]);
+    expect(new Set(pieces.map((o) => `${String(o.row)},${String(o.h)}`)).size).toBe(1);
+    const width = right.col + right.w - left.col;
+    expect(width).toBeGreaterThanOrEqual(7);
+    expect(width).toBeLessThanOrEqual(9);
+  });
+
+  it('puts かなめ right behind the counter, facing the counter front', () => {
+    const counter = MAP_OBJECTS.find((o) => o.tile === 'counter-mid');
+    expect(counter).toBeDefined();
+    if (counter === undefined) return;
+    expect(contains(counter, { col: MEMBERS.kaname.seat.col, row: counter.row })).toBe(true);
+    expect(MEMBERS.kaname.seat.row).toBe(counter.row - 1);
+    expect(PLACES.counterFront).toEqual({
+      col: MEMBERS.kaname.seat.col,
+      row: counter.row + counter.h,
+    });
   });
 });
 
@@ -133,12 +159,14 @@ describe('map: walkable grid', () => {
   it('blocks walls, solid furniture and the outside', () => {
     expect(isWalkable({ col: 0, row: 10 })).toBe(false);
     expect(isWalkable({ col: 16, row: 8 })).toBe(false); // counter
+    expect(isWalkable({ col: 3, row: 11 })).toBe(false); // map table (floor decor)
     expect(isWalkable({ col: -1, row: 10 })).toBe(false);
   });
 
   it('lets members cross rugs, carpet, chairs and the door', () => {
     expect(isWalkable({ col: 16, row: 10 })).toBe(true); // rug-red
-    expect(isWalkable({ col: 12, row: 3 })).toBe(true); // floor-carpet
+    expect(isWalkable({ col: 13, row: 4 })).toBe(true); // floor-carpet
+    expect(isWalkable({ col: 14, row: 13 })).toBe(true); // light patch (flat decor)
     expect(isWalkable(MEMBERS.minori.seat)).toBe(true); // chair
     expect(isWalkable(PLACES.door)).toBe(true);
   });
@@ -149,18 +177,18 @@ describe('map: walkable grid', () => {
     expect(isWalkable({ col: 20, row: 15 })).toBe(false); // message
   });
 
-  it('keeps heads out from under the windows too (sprites are two tiles tall)', () => {
-    // Feet on row 11 below the party window (bottom 340 px): the head (from 320 px) is under it.
-    expect(isWalkable({ col: 24, row: 11 })).toBe(false);
-    expect(isWalkable({ col: 24, row: 12 })).toBe(true);
+  it('keeps heads out from under the windows too (sprites are 80 px tall)', () => {
+    // Below the party window (bottom 340 px): feet on row 12 put the head at 336 px, under it.
+    expect(isUnderWindow({ col: 24, row: 12 })).toBe(true);
+    expect(isUnderWindow({ col: 24, row: 13 })).toBe(false);
     // Feet just above the message window: the head is above the feet, so this is fine.
-    expect(isWalkable({ col: 6, row: 13 })).toBe(true);
+    expect(isWalkable({ col: 24, row: 13 })).toBe(true);
   });
 
-  it('keeps the sides of the sprite out too (64 px wide, half a tile beyond its own)', () => {
-    // Column 10 is right of the board (ends at 309 px), but the sprite reaches back to 304 px.
-    expect(isWalkable({ col: 10, row: 3 })).toBe(false);
-    expect(isWalkable({ col: 11, row: 3 })).toBe(true);
+  it('keeps the sides of the sprite out too (80 px wide, beyond its own tile)', () => {
+    // Column 10 is right of the board (ends at 309 px), but the sprite reaches back to 296 px.
+    expect(isUnderWindow({ col: 10, row: 3 })).toBe(true);
+    expect(isUnderWindow({ col: 11, row: 3 })).toBe(false);
     // Column 2 is left of the message window (from 100 px), but the sprite reaches to 112 px.
     expect(isUnderWindow({ col: 2, row: 15 })).toBe(true);
     expect(isUnderWindow({ col: 1, row: 15 })).toBe(false);
@@ -182,9 +210,9 @@ describe('map: windows over the canvas (App.vue)', () => {
 
   it('places the sprite frame with the feet at the bottom centre of the tile', () => {
     expect(spriteRect({ col: 4, row: 12 })).toEqual({
-      left: 112,
-      top: 352,
-      right: 176,
+      left: 104,
+      top: 336,
+      right: 184,
       bottom: 416,
     });
   });
@@ -197,21 +225,21 @@ describe('map: windows over the canvas (App.vue)', () => {
   });
 
   it('keeps feet on row 11 under the tall board off the walking grid (head under it)', () => {
-    expect(isWalkable({ col: 2, row: 11 })).toBe(false);
-    expect(isWalkable({ col: 2, row: 12 })).toBe(true);
+    expect(isUnderWindow({ col: 4, row: 11 })).toBe(true);
+    expect(isUnderWindow({ col: 4, row: 12 })).toBe(false);
   });
 
-  it.each(WALKERS)('keeps the whole sprite of %s clear of the windows, even mid-stretch', (id) => {
-    const frame = spriteRect(MEMBERS[id].seat);
-    const stretched = { ...frame, top: frame.top - AMBIENT.stretchPx };
-    for (const area of Object.values(WINDOW_EXTENTS)) expect(overlaps(stretched, area)).toBe(false);
+  it('takes the tallest right-hand column (rare notes) only for seats', () => {
+    expect(TALLEST_WINDOW_EXTENTS.party.bottom).toBe(373);
+    expect(TALLEST_WINDOW_EXTENTS.party.bottom).toBeGreaterThan(WINDOW_EXTENTS.party.bottom);
+    expect(TALLEST_WINDOW_EXTENTS.board).toEqual(WINDOW_EXTENTS.board);
   });
 
-  // The party window is left out: its rare tallest state may cover ささえ's bubble (reported).
-  it.each(WALKERS)('keeps the waiting bubble of %s clear of the board and message', (id) => {
+  it.each(SEATED)('keeps the head and bubble of %s clear of every window at its tallest', (id) => {
     const frame = spriteRect(MEMBERS[id].seat);
+    // Mid-stretch, with the waiting bubble on top (the highest thing drawn over a member).
     const withBubble = { ...frame, top: frame.bottom - OVERHEAD_TOP - AMBIENT.stretchPx };
-    for (const area of [WINDOW_EXTENTS.board, WINDOW_EXTENTS.message]) {
+    for (const area of Object.values(TALLEST_WINDOW_EXTENTS)) {
       expect(overlaps(withBubble, area)).toBe(false);
     }
   });

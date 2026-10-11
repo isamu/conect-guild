@@ -1,4 +1,5 @@
 import type { TilePos } from '../guild.config';
+import { DECOR_PLACEMENTS } from './decor';
 import { SPRITE_SIZE, TILE_SIZE } from './metrics';
 
 /**
@@ -20,17 +21,19 @@ export const TILE_NAMES = [
   'floor-carpet',
   'wall',
   'wall-top',
-  'window',
-  'door',
-  'counter',
-  'desk',
-  'chair',
-  'shelf',
-  'plant',
-  'throne',
   'rug-red',
-  'board',
+  'plant',
   'crate',
+  'desk',
+  'board',
+  'chair',
+  'window',
+  'throne',
+  'shelf',
+  'door',
+  'counter-left',
+  'counter-mid',
+  'counter-right',
 ] as const;
 export type TileName = (typeof TILE_NAMES)[number];
 
@@ -75,9 +78,8 @@ export const WINDOW_EXTENTS: Readonly<Record<'board' | 'party' | 'message', PxRe
     bottom: 1.6 * PCT_Y + 31 * CQW,
   },
   // .stage__side: right 1.1%, top 1.6%, width 24.6%. Its height is its content (party window and
-  // fetch status): measured 324 px, 340 px with a failure line (Chrome, 2026-10-12). Rare extra
-  // notes (localStorage unavailable) reach 355-373 px and may cover ささえ's head and bubble;
-  // left for the president to decide (seat layout or the fetch window), see the M2 report.
+  // fetch status): measured 324 px, 340 px with a failure line (Chrome, 2026-10-12). Walking uses
+  // 340; seats keep clear of the tallest, PARTY_TALLEST_BOTTOM.
   party: {
     left: (100 - 1.1 - 24.6) * PCT_X,
     top: 1.6 * PCT_Y,
@@ -93,7 +95,20 @@ export const WINDOW_EXTENTS: Readonly<Record<'board' | 'party' | 'message', PxRe
   },
 };
 
-/** The 64 x 64 frame of a member whose feet are on `pos` (bottom centre, as path.tileToPoint). */
+/**
+ * The tallest the right-hand column gets: rare extra notes (localStorage unavailable, a failed
+ * baseline clear) on top of a failure line, measured 372.5 px. Seats and their bubbles keep clear
+ * of it; a member walking past may be covered for a moment in that rare state.
+ */
+export const PARTY_TALLEST_BOTTOM = 373;
+
+/** The windows at their tallest: what seats and bubbles must stay clear of. */
+export const TALLEST_WINDOW_EXTENTS: Readonly<Record<'board' | 'party' | 'message', PxRect>> = {
+  ...WINDOW_EXTENTS,
+  party: { ...WINDOW_EXTENTS.party, bottom: PARTY_TALLEST_BOTTOM },
+};
+
+/** The 80 x 80 frame of a member whose feet are on `pos` (bottom centre, as path.tileToPoint). */
 export function spriteRect(pos: TilePos): PxRect {
   const x = pos.col * TILE_SIZE + TILE_SIZE / 2;
   const y = (pos.row + 1) * TILE_SIZE;
@@ -114,72 +129,80 @@ export function isUnderWindow(pos: TilePos): boolean {
 /** Fixed places the scenes walk between. */
 export const PLACES = {
   /** Where a visitor stands in front of かなめ's counter. */
-  counterFront: { col: 16, row: 9 },
-  /** The exit; a member who reaches it leaves the screen. */
-  door: { col: 30, row: 17 },
+  counterFront: { col: 16, row: 10 },
+  /** The exit (in the doorway of the right wall); a member who reaches it leaves the screen. */
+  door: { col: 30, row: 16 },
 } as const satisfies Record<string, TilePos>;
 
 interface GroundFill extends TileRect {
   readonly tile: TileName;
 }
 
-const rect = (col: number, row: number, w: number, h: number): TileRect => ({ col, row, w, h });
+export const rect = (col: number, row: number, w: number, h: number): TileRect => ({
+  col,
+  row,
+  w,
+  h,
+});
 
-/** Ground layer, painted in order (later fills win). */
+/**
+ * Ground layer, painted in order (later fills win). The back wall is two tiles high; a carpet in
+ * each department's corner, a red rug from the throne down to かなめ and in front of her counter.
+ */
 const GROUND_FILLS: readonly GroundFill[] = [
   { tile: 'floor', ...rect(0, 0, MAP_COLS, MAP_ROWS) },
-  { tile: 'floor-carpet', ...rect(9, 2, 5, 5) },
-  { tile: 'floor-carpet', ...rect(19, 2, 5, 5) },
-  { tile: 'floor-carpet', ...rect(1, 10, 8, 4) },
-  { tile: 'floor-carpet', ...rect(23, 10, 6, 4) },
-  { tile: 'rug-red', ...rect(15, 4, 3, 4) },
-  { tile: 'rug-red', ...rect(14, 9, 5, 3) },
-  { tile: 'wall', ...rect(0, 1, MAP_COLS, 1) },
+  { tile: 'floor-carpet', ...rect(10, 3, 4, 4) },
+  { tile: 'floor-carpet', ...rect(19, 3, 4, 4) },
+  { tile: 'floor-carpet', ...rect(1, 11, 11, 3) },
+  { tile: 'floor-carpet', ...rect(21, 11, 9, 3) },
+  { tile: 'rug-red', ...rect(15, 5, 3, 3) },
+  { tile: 'rug-red', ...rect(13, 10, 7, 3) },
+  { tile: 'wall', ...rect(0, 1, MAP_COLS, 2) },
   { tile: 'wall', ...rect(0, 1, 1, MAP_ROWS - 1) },
   { tile: 'wall', ...rect(MAP_COLS - 1, 1, 1, MAP_ROWS - 1) },
   { tile: 'wall', ...rect(0, MAP_ROWS - 1, MAP_COLS, 1) },
   { tile: 'wall-top', ...rect(0, 0, MAP_COLS, 1) },
-  // The doorway in the bottom wall; the door itself is drawn over it (MAP_OBJECTS).
-  { tile: 'floor', ...PLACES.door, w: 1, h: 1 },
+  // The doorway in the right wall; the door itself is drawn over it (MAP_OBJECTS).
+  { tile: 'floor', ...rect(30, 14, 2, 3) },
 ];
 
 const solid = (tile: TileName, area: TileRect): MapObject => ({ tile, solid: true, ...area });
 const flat = (tile: TileName, area: TileRect): MapObject => ({ tile, solid: false, ...area });
 
 /**
- * Furniture, sized to the pieces of assets/tiles/tiles.ts (a longer piece repeats: the counter is
- * three counter pieces). Chairs under the seats and the door are not solid, so members walk on them.
- * Windows and the door have see-through parts, so they go over the wall and floor, not instead.
+ * Furniture, sized to the pieces of assets/tiles/tiles.ts, laid out like
+ * assets/concept/rpg-company-ui.png within what the HTML windows leave free: the throne at the back
+ * centre, かなめ's counter (left + middles + right) in front of it, a department in each corner and
+ * the door at the bottom right. The upper departments sit between the quest board and the party
+ * window; the lower ones just above the message window. Chairs (the seats) and the door are not
+ * solid, so members walk on them. Windows and the door have see-through parts, so they go over the
+ * wall and floor, not instead.
  */
 export const MAP_OBJECTS: readonly MapObject[] = [
-  flat('window', rect(4, 1, 1, 1)),
-  flat('window', rect(14, 1, 1, 1)),
-  flat('window', rect(18, 1, 1, 1)),
-  flat('window', rect(26, 1, 1, 1)),
-  solid('throne', rect(15, 2, 2, 2)),
-  solid('counter', rect(12, 8, 9, 1)),
-  flat('door', rect(PLACES.door.col, PLACES.door.row - 1, 1, 2)),
-  // 経理 (upper left wing)
-  solid('desk', rect(10, 5, 2, 1)),
-  flat('chair', rect(11, 4, 1, 1)),
-  solid('shelf', rect(13, 2, 1, 2)),
-  solid('plant', rect(12, 2, 1, 1)),
-  // 広報 (upper right wing)
-  solid('desk', rect(20, 5, 2, 1)),
-  flat('chair', rect(21, 4, 1, 1)),
-  solid('board', rect(21, 1, 2, 1)),
-  solid('plant', rect(19, 2, 1, 1)),
-  // 企画 (lower left)
-  solid('desk', rect(3, 13, 2, 1)),
-  flat('chair', rect(4, 12, 1, 1)),
-  solid('shelf', rect(1, 10, 1, 2)),
-  solid('plant', rect(8, 11, 1, 1)),
-  // 総務 (lower right, by the door)
-  solid('desk', rect(25, 13, 2, 1)),
-  flat('chair', rect(26, 12, 1, 1)),
-  solid('shelf', rect(28, 10, 1, 2)),
-  solid('crate', rect(29, 15, 1, 1)),
-  solid('plant', rect(22, 12, 1, 1)),
+  flat('window', rect(10, 1, 2, 2)),
+  flat('window', rect(21, 1, 2, 2)),
+  solid('board', rect(12, 1, 3, 2)),
+  solid('throne', rect(15, 2, 3, 3)),
+  solid('counter-left', rect(13, 8, 1, 2)),
+  solid('counter-mid', rect(14, 8, 5, 2)),
+  solid('counter-right', rect(19, 8, 1, 2)),
+  flat('door', rect(30, 14, 2, 3)),
+  // 経理 (upper left): the member behind the desk
+  flat('chair', rect(12, 3, 1, 2)),
+  solid('desk', rect(10, 5, 4, 2)),
+  // 広報 (upper right)
+  flat('chair', rect(20, 3, 1, 2)),
+  solid('desk', rect(19, 5, 4, 2)),
+  solid('plant', rect(22, 7, 1, 1)),
+  // 企画 (lower left): the member beside the desk, in front of the message window
+  solid('shelf', rect(1, 10, 2, 3)),
+  solid('desk', rect(7, 11, 4, 2)),
+  flat('chair', rect(11, 12, 1, 2)),
+  // 総務 (lower right)
+  flat('chair', rect(21, 12, 1, 2)),
+  solid('desk', rect(22, 11, 4, 2)),
+  // the bottom-left corner, left of the message window
+  solid('crate', rect(2, 14, 1, 1)),
 ];
 
 const WALKABLE_GROUND: ReadonlySet<TileName> = new Set<TileName>([
@@ -221,13 +244,14 @@ export function groundAt(pos: TilePos): TileName | null {
 }
 
 /**
- * True where a member may walk: walkable ground, no solid furniture, and no part of the sprite
- * (64 px wide and tall, so it reaches into the tiles beside and above) under a window, so nobody
+ * True where a member may walk: walkable ground, no solid furniture or floor decor, and no part of the sprite
+ * (80 px wide and tall, so it reaches into the tiles beside and above) under a window, so nobody
  * vanishes behind one on the way.
  */
 export function isWalkable(pos: TilePos): boolean {
   const ground = groundAt(pos);
   if (ground === null || !WALKABLE_GROUND.has(ground)) return false;
   if (MAP_OBJECTS.some((object) => object.solid && contains(object, pos))) return false;
+  if (DECOR_PLACEMENTS.some((item) => item.solid && contains(item, pos))) return false;
   return !isUnderWindow(pos);
 }

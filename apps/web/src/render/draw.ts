@@ -1,20 +1,47 @@
+import { decorPose } from './ambient';
 import type { GuildArt } from './art';
 import type { BubbleKind, Bubbles } from './bubbles';
 import type { ConfettiView, StageFrame } from './director';
+import { ANIMATED_DECOR, FLOOR_PATCH_DECOR, STILL_DECOR, type DecorPlacement } from './decor';
 import { GROUND, MAP_OBJECTS } from './map';
-import { BUBBLE_RISE, DETAIL_SCALE, OVERHEAD_OFFSET } from './metrics';
+import { BUBBLE_RISE, DETAIL_SCALE, OVERHEAD_OFFSET, TILE_SIZE } from './metrics';
 import type { Point } from './path';
 
 /** Canvas side effects only: every decision was made in the pure modules. Logical pixels. */
 
-/** Ground and furniture: they never move, so the loop draws them once into a cached layer. */
+function drawPlacement(ctx: CanvasRenderingContext2D, art: GuildArt, item: DecorPlacement): void {
+  art.decor.drawDecor(ctx, item.name, item.col * TILE_SIZE, item.row * TILE_SIZE);
+}
+
+/**
+ * Ground, furniture and the small things that never move: the loop draws them once into a cached
+ * layer. The lamps and the cat are left out (drawAnimatedDecor).
+ */
 export function drawStatic(ctx: CanvasRenderingContext2D, art: GuildArt): void {
   GROUND.forEach((cells, row) => {
     cells.forEach((tile, col) => {
       art.tiles.drawTile(ctx, tile, { col, row, w: 1, h: 1 });
     });
   });
+  for (const item of FLOOR_PATCH_DECOR) drawPlacement(ctx, art, item);
   for (const object of MAP_OBJECTS) art.tiles.drawTile(ctx, object.tile, object);
+  for (const item of STILL_DECOR) drawPlacement(ctx, art, item);
+}
+
+/** Lamps with a flickering flame (a little light added over them) and the breathing cat. */
+export function drawAnimatedDecor(ctx: CanvasRenderingContext2D, art: GuildArt, now: number): void {
+  for (const { placement, motion, phaseMs } of ANIMATED_DECOR) {
+    const { dy, glow } = decorPose(motion, phaseMs, now);
+    const x = placement.col * TILE_SIZE;
+    const y = placement.row * TILE_SIZE + dy;
+    art.decor.drawDecor(ctx, placement.name, x, y);
+    if (glow <= 0) continue;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = glow;
+    art.decor.drawDecor(ctx, placement.name, x, y);
+    ctx.restore();
+  }
 }
 
 const BUBBLE_GLYPHS: Readonly<Record<BubbleKind, { glyph: string; color: string }>> = {

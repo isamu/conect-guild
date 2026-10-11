@@ -1,3 +1,4 @@
+import type { DecorName } from '../../../../assets/decor/decor';
 import { MEMBERS, type MemberId } from '../guild.config';
 import type { TileName, TileRect } from './map';
 import { DETAIL_SCALE, TILE_SIZE } from './metrics';
@@ -31,9 +32,15 @@ export interface SpriteArt {
   drawProp(ctx: CanvasRenderingContext2D, prop: Prop, at: Point): void;
 }
 
+export interface DecorArt {
+  /** Draws a small thing with its top-left at `x`, `y` (logical px), at its own size. */
+  drawDecor(ctx: CanvasRenderingContext2D, name: DecorName, x: number, y: number): void;
+}
+
 export interface GuildArt {
   readonly tiles: TileArt;
   readonly sprites: SpriteArt;
+  readonly decor: DecorArt;
 }
 
 const TILE_COLORS: Readonly<Record<TileName, string>> = {
@@ -43,7 +50,9 @@ const TILE_COLORS: Readonly<Record<TileName, string>> = {
   'wall-top': '#2e1d12',
   window: '#9fd3f0',
   door: '#3c2414',
-  counter: '#b07a3e',
+  'counter-left': '#b07a3e',
+  'counter-mid': '#b07a3e',
+  'counter-right': '#b07a3e',
   desk: '#a0682f',
   chair: '#6e4424',
   shelf: '#4e3220',
@@ -122,5 +131,17 @@ const placeholderSprites: SpriteArt = {
   drawProp: drawPlaceholderProp,
 };
 
+/** A small brown box per thing when the decor sheet cannot be loaded. */
+const placeholderDecor: DecorArt = {
+  drawDecor(ctx, _name, x, y) {
+    ctx.fillStyle = '#6b4a2b';
+    ctx.fillRect(Math.round(x) + 8, Math.round(y) + 8, TILE_SIZE - 16, TILE_SIZE - 16);
+  },
+};
+
 /** Coloured boxes until the real tiles and sprites arrive. */
-export const placeholderArt: GuildArt = { tiles: placeholderTiles, sprites: placeholderSprites };
+export const placeholderArt: GuildArt = {
+  tiles: placeholderTiles,
+  sprites: placeholderSprites,
+  decor: placeholderDecor,
+};

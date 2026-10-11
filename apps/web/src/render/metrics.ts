@@ -48,4 +48,12 @@ export const AMBIENT = {
   fidgetBurstMs: 3_360,
   fidgetStepMs: 420,
   fidgetPx: 2,
+  /** Lamps and candles: the flame brightens by up to this much (added light), changing every step. */
+  flameGlow: 0.22,
+  flameStepMs: 280,
+  /** The sleeping cat rises 1 px for half of each breath. */
+  breathMs: 2_520,
+  breathPx: 1,
+  /** Shifts each lamp's flicker and each cat's breath against the others. */
+  decorPhaseStepMs: 377,
 } as const;

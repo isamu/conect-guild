@@ -6,6 +6,8 @@ import {
   ambientMoodsOf,
   ambientPose,
   createAmbientSeeds,
+  DECOR_MOTION,
+  decorPose,
   type AmbientMood,
   type AmbientSeed,
 } from './ambient';
@@ -177,5 +179,50 @@ describe('AMBIENT defaults', () => {
       AMBIENT.fidgetBurstMs,
     );
     expect(longest).toBeLessThan(AMBIENT.minIntervalMs);
+  });
+});
+
+describe('decorPose', () => {
+  it('flickers a flame with up to AMBIENT.flameGlow of added light, never moving it', () => {
+    const glows = new Set<number>();
+    for (let t = 0; t < 20 * AMBIENT.flameStepMs; t += AMBIENT.flameStepMs) {
+      const pose = decorPose('flame', 0, t);
+      expect(pose.dy).toBe(0);
+      expect(pose.glow).toBeGreaterThanOrEqual(0);
+      expect(pose.glow).toBeLessThan(AMBIENT.flameGlow);
+      glows.add(pose.glow);
+    }
+    expect(glows.size).toBeGreaterThan(5);
+  });
+
+  it('keeps a flame steady within one step, and the same for the same time', () => {
+    const step = 7 * AMBIENT.flameStepMs;
+    expect(decorPose('flame', 0, step)).toEqual(
+      decorPose('flame', 0, step + AMBIENT.flameStepMs - 1),
+    );
+    expect(decorPose('flame', 0, step)).toEqual(decorPose('flame', 0, step));
+  });
+
+  it('shifts a flame by its phase', () => {
+    expect(decorPose('flame', AMBIENT.flameStepMs, 0)).toEqual(
+      decorPose('flame', 0, AMBIENT.flameStepMs),
+    );
+  });
+
+  it('lets the cat breathe: 1 px up for half of each breath, no light', () => {
+    const half = AMBIENT.breathMs / 2;
+    expect(decorPose('breath', 0, 0)).toEqual({ dy: 0, glow: 0 });
+    expect(decorPose('breath', 0, half)).toEqual({ dy: -AMBIENT.breathPx, glow: 0 });
+    expect(decorPose('breath', 0, AMBIENT.breathMs)).toEqual({ dy: 0, glow: 0 });
+  });
+
+  it('moves only lamps, candles and the sleeping cat', () => {
+    expect(DECOR_MOTION).toEqual({
+      lantern: 'flame',
+      sconce: 'flame',
+      'pillar-lamp': 'flame',
+      candlestick: 'flame',
+      'sleeping-cat': 'breath',
+    });
   });
 });

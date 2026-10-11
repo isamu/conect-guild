@@ -11,15 +11,17 @@ import {
   scheduleEvent,
   type Director,
 } from './director';
-import { drawActors, drawStatic } from './draw';
+import { ANIMATED_DECOR } from './decor';
+import { drawActors, drawAnimatedDecor, drawStatic } from './draw';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './map';
 import { AMBIENT } from './metrics';
 import { DEFAULT_SEATS } from './scenes';
 
 /**
  * The requestAnimationFrame loop. It runs every frame while a scene plays; between scenes it
- * redraws only every AMBIENT.frameMs for the members' small moves (or sleeps when there are none)
- * until the bubbles change, a scene starts or the canvas is resized. While the page is hidden or
+ * redraws only every AMBIENT.frameMs for the small moves (members, lamps, the cat), and sleeps
+ * when there are none until the bubbles change, a scene starts or the canvas is resized. While the
+ * page is hidden or
  * the canvas has no width (narrow screens hide it) it does not run at all.
  */
 
@@ -180,12 +182,13 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(background, 0, 0);
+    drawAnimatedDecor(ctx, art, t);
     drawActors(ctx, frameAt(director, t, DEFAULT_SEATS, { moods, seeds }), bubbles, art);
     director = prune(director, t);
     const next = nextDraw({
       hidden: paused(),
       animating: isAnimating(director, t),
-      ambient: Object.keys(moods).length > 0,
+      ambient: Object.keys(moods).length > 0 || ANIMATED_DECOR.length > 0,
     });
     if (next === 'frame') schedule.now();
     if (next === 'ambient') schedule.later();

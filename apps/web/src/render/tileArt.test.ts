@@ -32,22 +32,22 @@ describe('tileDraws', () => {
   });
 
   it('repeats a piece along a longer area', () => {
-    const draws = tileDraws('counter', { col: 12, row: 8, w: 9, h: 1 });
-    expect(draws.map((d) => d.dx)).toEqual([12, 15, 18].map((c) => c * TILE_SIZE));
+    const draws = tileDraws('counter-mid', { col: 14, row: 8, w: 5, h: 2 });
+    expect(draws.map((d) => d.dx)).toEqual([14, 15, 16, 17, 18].map((c) => c * TILE_SIZE));
     for (const d of draws) {
-      expect([d.sx, d.sy, d.sw, d.sh]).toEqual([5 * 32, 32, 96, 32]);
+      expect([d.sx, d.sy, d.sw, d.sh]).toEqual([8 * 32, 3 * 32, 32, 64]);
     }
   });
 
   it('cuts the last copy where the area ends', () => {
-    const draws = tileDraws('desk', { col: 0, row: 0, w: 3, h: 1 });
-    expect(draws.map((d) => d.dw)).toEqual([64, 32]);
-    expect(draws.map((d) => d.sw)).toEqual([64, 32]);
+    const draws = tileDraws('desk', { col: 0, row: 0, w: 5, h: 2 });
+    expect(draws.map((d) => d.dw)).toEqual([128, 32]);
+    expect(draws.map((d) => d.sw)).toEqual([128, 32]);
   });
 
   it('draws a multi-cell piece whole', () => {
-    expect(tileDraws('throne', { col: 15, row: 2, w: 2, h: 2 })).toEqual([
-      { sx: 64, sy: 64, sw: 64, sh: 64, dx: 480, dy: 64, dw: 64, dh: 64 },
+    expect(tileDraws('throne', { col: 15, row: 2, w: 3, h: 3 })).toEqual([
+      { sx: 0, sy: 96, sw: 96, sh: 96, dx: 480, dy: 64, dw: 96, dh: 96 },
     ]);
   });
 

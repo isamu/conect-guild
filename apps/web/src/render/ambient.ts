@@ -1,3 +1,4 @@
+import type { DecorName } from '../../../../assets/decor/decor';
 import type { MemberState } from '../domain/party';
 import type { MemberId } from '../guild.config';
 import type { Random } from './confetti';
@@ -159,4 +160,38 @@ const MOVES: Readonly<Record<AmbientMood, (time: CycleTime) => AmbientPose>> = {
 /** The frame, facing, offset and handled item of a member in `mood` at `now` (ms). */
 export function ambientPose(mood: AmbientMood, seed: AmbientSeed, now: number): AmbientPose {
   return MOVES[mood](cycleTime(seed, now));
+}
+
+/**
+ * Small things that move between scenes: the flames of lamps and candles flicker (a little added
+ * light) and the sleeping cat breathes (1 px). Pure: the time and each thing's phase are passed in.
+ */
+export type DecorMotion = 'flame' | 'breath';
+
+export const DECOR_MOTION: Readonly<Partial<Record<DecorName, DecorMotion>>> = {
+  lantern: 'flame',
+  sconce: 'flame',
+  'pillar-lamp': 'flame',
+  candlestick: 'flame',
+  'sleeping-cat': 'breath',
+};
+
+export interface DecorPose {
+  /** Added to the top of the picture, logical px. */
+  readonly dy: number;
+  /** How much light to add over the picture, 0 (none) to AMBIENT.flameGlow. */
+  readonly glow: number;
+}
+
+/** A number in [0, 1) that looks random but is fixed for each step (integer hash). */
+function flicker(step: number): number {
+  return (Math.imul(step, 2_654_435_761) >>> 0) / 2 ** 32;
+}
+
+export function decorPose(motion: DecorMotion, phaseMs: number, now: number): DecorPose {
+  const t = now + phaseMs;
+  if (motion === 'flame') {
+    return { dy: 0, glow: AMBIENT.flameGlow * flicker(Math.floor(t / AMBIENT.flameStepMs)) };
+  }
+  return { dy: alternate(t, AMBIENT.breathMs / 2) === 1 ? -AMBIENT.breathPx : 0, glow: 0 };
 }
