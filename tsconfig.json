@@ -7,5 +7,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "files": ["vitest.config.ts", "assets/tiles/tiles.ts"]
+  "files": ["vitest.config.ts", "assets/tiles/tiles.ts", "assets/decor/decor.ts"]
 }
