@@ -142,17 +142,12 @@ export function frameAt(
   }))
     .sort((a, b) => a.pose.point.y - b.pose.point.y)
     .map((member) => withAmbient(director, member, now, ambient));
+  // Over the seat, even while the member walks to the counter and back.
   const confetti = director.bursts
-    .map((burst): ConfettiView => {
-      const seat = seats[burst.actor];
-      const pose = poseAt(director, burst.actor, now, seat);
-      // Over the seat while the member is out of the door.
-      const feet = pose.visible ? pose.point : standingPose(seat).point;
-      return {
-        origin: burstOrigin(feet),
-        particles: confettiAt(burst.particles, now - burst.start),
-      };
-    })
+    .map((burst): ConfettiView => ({
+      origin: burstOrigin(standingPose(seats[burst.actor]).point),
+      particles: confettiAt(burst.particles, now - burst.start),
+    }))
     .filter((view) => view.particles.length > 0);
   return { members, confetti };
 }

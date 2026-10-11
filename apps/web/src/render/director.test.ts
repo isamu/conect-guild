@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GuildEvent, GuildEventKind } from '../domain/events';
-import type { DepartmentLabel } from '../guild.config';
+import type { DepartmentLabel, MemberId } from '../guild.config';
 import { ambientPose, createAmbientSeeds } from './ambient';
 import { CONFETTI_MS } from './confetti';
 import {
@@ -16,12 +16,21 @@ import {
   type Director,
 } from './director';
 import { PLACES } from './map';
-import { OVERHEAD_OFFSET } from './metrics';
-import { standingPose } from './motion';
+import { OVERHEAD_OFFSET, TILE_SIZE } from './metrics';
+import { MS_PER_TILE, standingPose } from './motion';
 import { tileToPoint } from './path';
-import { DEFAULT_SEATS } from './scenes';
+import { DEFAULT_SEATS, PICK_UP_MS } from './scenes';
 
 const context = { seats: DEFAULT_SEATS, random: () => 0.5 };
+
+const MEMBER_IDS: readonly MemberId[] = [
+  'kaname',
+  'minori',
+  'hibiki',
+  'hirame',
+  'sasae',
+  'yukihiro',
+];
 
 function event(kind: GuildEventKind, department: DepartmentLabel | null, number = 1): GuildEvent {
   return { id: `${kind}#${String(number)}`, kind, number, department };
@@ -60,19 +69,31 @@ describe('director: scheduling', () => {
 
   it('waits until a busy member is back before the next scene', () => {
     const once = play(EMPTY_DIRECTOR, event('pr-merged', '経理', 1), 0);
-    const busy = once.busyUntil.minori ?? 0;
+    const busy = Math.max(once.busyUntil.minori ?? 0, once.busyUntil.kaname ?? 0);
     const twice = play(once, event('issue-opened', '経理', 2), 100);
-    expect(twice.tracks).toHaveLength(3);
-    expect(twice.tracks[1]?.segments[0]?.start).toBe(busy);
-    // かなめ's part waits with the member, so the handover still meets.
-    expect(twice.tracks[2]?.actor).toBe('kaname');
-    expect(twice.tracks[2]?.segments[0]?.start).toBe(busy);
+    expect(twice.tracks).toHaveLength(4);
+    // Both parts of the second scene wait together, so the handover still meets.
+    expect(twice.tracks.slice(2).map((t) => [t.actor, t.segments[0]?.start])).toEqual([
+      ['kaname', busy],
+      ['minori', busy],
+    ]);
   });
 
-  it('lets different members act at the same time', () => {
-    const one = play(EMPTY_DIRECTOR, event('pr-merged', '経理'), 0);
+  it('makes a handover for another member wait until かなめ is back at the counter', () => {
+    const one = play(EMPTY_DIRECTOR, event('issue-opened', '企画'), 0);
+    const kanameBack = one.busyUntil.kaname ?? 0;
+    expect(kanameBack).toBeLessThan(one.busyUntil.hirame ?? 0);
     const two = play(one, event('pr-merged', '広報'), 100);
-    expect(two.tracks[1]?.segments[0]?.start).toBe(100);
+    expect(two.tracks.slice(2).map((t) => t.segments[0]?.start)).toEqual([kanameBack, kanameBack]);
+    // A reception without a department waits for her too.
+    const three = play(two, event('issue-opened', null), 200);
+    expect(three.tracks.at(-1)?.segments[0]?.start).toBe(two.busyUntil.kaname);
+  });
+
+  it('lets members act at the same time when their scenes share nobody', () => {
+    const one = play(EMPTY_DIRECTOR, event('pr-merged', '経理'), 0);
+    const two = play(one, event('issue-closed', '広報'), 100);
+    expect(two.bursts[0]?.start).toBe(100);
   });
 
   it('starts confetti at once even while the member walks', () => {
@@ -88,23 +109,65 @@ describe('director: scheduling', () => {
   });
 });
 
+describe('director: nobody teleports through a run of events', () => {
+  // Close together, mixing departments and receptions, so かなめ is wanted again and again.
+  const events: readonly (readonly [GuildEvent, number])[] = [
+    [event('issue-opened', '企画', 1), 0],
+    [event('pr-merged', '総務', 2), 100],
+    [event('issue-opened', '経理', 3), 200],
+    [event('pr-merged', null, 4), 300],
+    [event('issue-opened', null, 5), 400],
+    [event('issue-closed', '広報', 6), 500],
+    [event('pr-merged', '広報', 7), 600],
+    [event('issue-opened', '総務', 8), 700],
+  ];
+  const director = events.reduce((d, [e, at]) => play(d, e, at), EMPTY_DIRECTOR);
+  const end = Math.max(...director.tracks.map(trackEnd));
+  const STEP_MS = 10;
+  // The farthest anyone may move in one step: walking pace, plus rounding.
+  const maxStepPx = (TILE_SIZE * STEP_MS) / MS_PER_TILE + 1e-9;
+
+  it('moves every member at most at walking pace between samples', () => {
+    for (const id of MEMBER_IDS) {
+      let previous = poseAt(director, id, 0, DEFAULT_SEATS[id]).point;
+      for (let t = STEP_MS; t <= end + STEP_MS; t += STEP_MS) {
+        const point = poseAt(director, id, t, DEFAULT_SEATS[id]).point;
+        expect(Math.hypot(point.x - previous.x, point.y - previous.y)).toBeLessThanOrEqual(
+          maxStepPx,
+        );
+        previous = point;
+      }
+    }
+  });
+
+  it('never gives かなめ two scenes at once', () => {
+    const parts = director.tracks.filter((t) => t.actor === 'kaname');
+    expect(parts).toHaveLength(7);
+    for (let i = 1; i < parts.length; i += 1) {
+      const previous = parts[i - 1];
+      const next = parts[i];
+      if (previous === undefined || next === undefined) continue;
+      expect(next.segments[0]?.start).toBeGreaterThanOrEqual(trackEnd(previous));
+    }
+  });
+
+  it('leaves everyone at their seat at the end, かなめ behind the counter', () => {
+    for (const id of MEMBER_IDS) {
+      expect(poseAt(director, id, end, DEFAULT_SEATS[id])).toEqual(standingPose(DEFAULT_SEATS[id]));
+    }
+  });
+});
+
 describe('director: poses', () => {
   const director = play(EMPTY_DIRECTOR, event('pr-merged', '総務'), 0);
   const track = director.tracks[0];
-  const away = track?.segments[1];
 
   it('moves the member while the track runs', () => {
     expect(poseAt(director, 'sasae', 0, DEFAULT_SEATS.sasae).point).toEqual(
       tileToPoint(DEFAULT_SEATS.sasae),
     );
-    expect(poseAt(director, 'sasae', 300, DEFAULT_SEATS.sasae).frame).toBeGreaterThanOrEqual(2);
-  });
-
-  it('hides the member beyond the door', () => {
-    const t = away?.start ?? 0;
-    const pose = poseAt(director, 'sasae', t + 1, DEFAULT_SEATS.sasae);
-    expect(pose.visible).toBe(false);
-    expect(pose.point).toEqual(tileToPoint(PLACES.door));
+    const walking = PICK_UP_MS + 300;
+    expect(poseAt(director, 'sasae', walking, DEFAULT_SEATS.sasae).frame).toBeGreaterThanOrEqual(2);
   });
 
   it('puts the member back at the seat once the track is over', () => {
@@ -130,11 +193,14 @@ describe('director: confetti', () => {
     expect(frame.confetti[0]?.origin).toEqual({ x: seat.x, y: seat.y - OVERHEAD_OFFSET });
   });
 
-  it('bursts over the seat while the member is out of the door', () => {
+  it('bursts over the seat even while the member is at the counter', () => {
     const out = play(EMPTY_DIRECTOR, event('pr-merged', '企画'), 0);
-    const awayStart = out.tracks[0]?.segments[1]?.start ?? 0;
-    const director = play(out, event('issue-closed', '企画'), awayStart + 1);
-    const frame = frameAt(director, awayStart + 2, DEFAULT_SEATS);
+    const atCounter = out.tracks[0]?.segments[2]?.start ?? 0;
+    expect(poseAt(out, 'hirame', atCounter, DEFAULT_SEATS.hirame).point).toEqual(
+      tileToPoint(PLACES.counterFront),
+    );
+    const director = play(out, event('issue-closed', '企画'), atCounter);
+    const frame = frameAt(director, atCounter + 1, DEFAULT_SEATS);
     const seat = tileToPoint(DEFAULT_SEATS.hirame);
     expect(frame.confetti[0]?.origin).toEqual({ x: seat.x, y: seat.y - OVERHEAD_OFFSET });
   });
@@ -167,8 +233,8 @@ describe('director: animating and pruning', () => {
   it('drops only what is over', () => {
     const middle = prune(director, CONFETTI_MS);
     expect(middle.bursts).toEqual([]);
-    expect(middle.tracks).toHaveLength(1);
-    expect(middle.busyUntil).toEqual({ minori: end });
+    expect(middle.tracks.map((t) => t.actor)).toEqual(['minori', 'kaname']);
+    expect(middle.busyUntil).toEqual({ minori: end, kaname: director.busyUntil.kaname });
     expect(prune(director, end)).toEqual(EMPTY_DIRECTOR);
   });
 });
