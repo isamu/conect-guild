@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { CollectorError } from './errors.ts';
-import { ghApiProjected, parseJsonLines, parseOrThrow, type GhRunner } from './gh.ts';
+import {
+  ghApiProjected,
+  parseJsonLines,
+  parseOrThrow,
+  projectionFilter,
+  type GhRunner,
+} from './gh.ts';
 
 function kindOf(fn: () => unknown): string | undefined {
   try {
@@ -33,6 +39,14 @@ describe('parseJsonLines', () => {
   });
 });
 
+describe('projectionFilter', () => {
+  it('fails on a page that is not an array instead of printing nothing', () => {
+    expect(projectionFilter('.filename')).toBe(
+      'if type != "array" then error("unexpected page") else .[] end | .filename | @json',
+    );
+  });
+});
+
 describe('ghApiProjected', () => {
   it('projects each item inside gh with --paginate --jq and no --slurp', async () => {
     const calls: (readonly string[])[] = [];
@@ -45,7 +59,7 @@ describe('ghApiProjected', () => {
       'b.md',
     ]);
     expect(calls).toEqual([
-      ['api', '--paginate', '--jq', '.[] | .filename | @json', 'repos/o/n/pulls/1/files'],
+      ['api', '--paginate', '--jq', projectionFilter('.filename'), 'repos/o/n/pulls/1/files'],
     ]);
   });
 

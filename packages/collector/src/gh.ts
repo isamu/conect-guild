@@ -50,6 +50,14 @@ export function parseJsonLines(stdout: string): unknown[] {
 }
 
 /**
+ * jq filter for one page. A page that is not an array (e.g. `{}`) would make
+ * `.[]` print nothing and look like an empty list, so it fails gh instead.
+ */
+export function projectionFilter(projection: string): string {
+  return `if type != "array" then error("unexpected page") else .[] end | ${projection} | @json`;
+}
+
+/**
  * GET every page of a list endpoint and keep only `projection` of each item.
  * The projection runs inside gh (`--jq`), so fields it leaves out (bodies,
  * diffs) never reach this process. `--slurp` cannot be combined with `--jq`;
@@ -60,7 +68,7 @@ export async function ghApiProjected(
   path: string,
   projection: string,
 ): Promise<unknown[]> {
-  const stdout = await gh(['api', '--paginate', '--jq', `.[] | ${projection} | @json`, path]);
+  const stdout = await gh(['api', '--paginate', '--jq', projectionFilter(projection), path]);
   return parseJsonLines(stdout);
 }
 

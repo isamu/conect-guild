@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GhRunner } from './gh.ts';
+import { projectionFilter } from './gh.ts';
 import { fetchChangedFiles, fetchIssues, fetchPrs } from './github.ts';
 
 const SINCE = new Date('2026-10-05T00:00:00.000Z');
@@ -20,7 +21,7 @@ describe('fetchChangedFiles', () => {
   it('asks gh for file paths only, so diffs (patch) never reach the collector', async () => {
     const gh = recordingGh('"a/CLAUDE.md"\n"b.md"\n');
     await expect(fetchChangedFiles(gh, 'o/r', 7)).resolves.toEqual(['a/CLAUDE.md', 'b.md']);
-    expect(gh.filters).toEqual(['.[] | .filename | @json']);
+    expect(gh.filters).toEqual([projectionFilter('.filename')]);
     expect(gh.args.flat()).not.toContain('--slurp');
   });
 
@@ -65,9 +66,9 @@ describe('fetchPrs', () => {
   it('keeps the body (needed for linked issues) but projects away everything else', async () => {
     const gh = recordingGh('');
     await fetchPrs(gh, 'o/r');
-    expect(gh.filters).toEqual([
-      '.[] | {number, title, body, state, merged_at, closed_at, head_ref: .head.ref} | @json',
-      '.[] | {number, title, body, state, merged_at, closed_at, head_ref: .head.ref} | @json',
-    ]);
+    const filter = projectionFilter(
+      '{number, title, body, state, merged_at, closed_at, head_ref: .head.ref}',
+    );
+    expect(gh.filters).toEqual([filter, filter]);
   });
 });
