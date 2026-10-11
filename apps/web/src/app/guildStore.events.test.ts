@@ -6,6 +6,8 @@ import { GAP_NOTICE_MESSAGE } from '../domain/events';
 import { issue, mergedPr, minutesAfter, pr, snapshot, T0 } from '../domain/fixtures.test-util';
 import { createGuildStore, MESSAGE_HOLD_MS, REFRESH_INTERVAL_MS } from './guildStore';
 import { sceneCue, type SceneCue } from './guildView';
+import { EMPTY_DIRECTOR, scheduleEvent } from '../render/director';
+import { DEFAULT_SEATS } from '../render/scenes';
 
 /** Events reach the canvas on their messages (render/ starts a scene per cue). */
 
@@ -50,6 +52,8 @@ const busy = snapshot({
   ],
   prs: [mergedPr(110, minutesAfter(T0, 0.5), { linkedIssues: [102] })],
 });
+
+const context = { seats: DEFAULT_SEATS, random: () => 0.5 };
 
 const ok = (snap: Snapshot): SnapshotLoadResult => ({ ok: true, snapshot: snap });
 
@@ -98,7 +102,7 @@ describe('createGuildStore: events for the canvas', () => {
     store.stop();
   });
 
-  it('cues each scene once, when its message reaches the window, 8 seconds apart', async () => {
+  it('cues each scene once, when its message reaches the window and its cast is free', async () => {
     const store = setup([ok(first), ok(busy)]);
     const cues: SceneCue[] = [];
     const record = () => {
@@ -109,13 +113,23 @@ describe('createGuildStore: events for the canvas', () => {
     await settle();
     await vi.advanceTimersByTimeAsync(REFRESH_INTERVAL_MS);
     record();
-    expect(cues.map((c) => c.event.kind)).toEqual(['issue-opened']);
-    await vi.advanceTimersByTimeAsync(MESSAGE_HOLD_MS - 1);
+    const [opened] = cues;
+    if (opened === undefined) throw new Error('the first message has a scene');
+    expect(opened.event.kind).toBe('issue-opened');
+    // The PR scene needs かなめ too: its message waits until かなめ is back from the scroll.
+    const sceneMs = scheduleEvent(EMPTY_DIRECTOR, opened.event, 0, context).busyUntil.kaname ?? 0;
+    expect(sceneMs).toBeGreaterThan(MESSAGE_HOLD_MS);
+    await vi.advanceTimersByTimeAsync(sceneMs - 1);
     record();
     expect(cues).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(1);
     record();
-    await vi.advanceTimersByTimeAsync(MESSAGE_HOLD_MS);
+    expect(cues).toHaveLength(2);
+    // Confetti needs nobody: the clear comes after the usual 8 seconds.
+    await vi.advanceTimersByTimeAsync(MESSAGE_HOLD_MS - 1);
+    record();
+    expect(cues).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(1);
     record();
     // The last message stays, and so does its cue: no second start.
     await vi.advanceTimersByTimeAsync(MESSAGE_HOLD_MS * 3);
@@ -125,6 +139,29 @@ describe('createGuildStore: events for the canvas', () => {
       'pr-merged#110',
       'issue-closed#101',
     ]);
+    store.stop();
+  });
+});
+
+describe('createGuildStore: hidden page', () => {
+  it('holds the messages while the page is hidden and goes on once it is shown', async () => {
+    const store = setup([ok(first), ok(busy)]);
+    const head = () => store.state.messages[0]?.event?.id;
+    store.start();
+    await settle();
+    await vi.advanceTimersByTimeAsync(REFRESH_INTERVAL_MS);
+    store.setHidden(true);
+    await vi.advanceTimersByTimeAsync(REFRESH_INTERVAL_MS * 4);
+    expect(head()).toBe('issue-opened#103');
+    store.setHidden(false);
+    // Hidden right as the scroll scene began: all of it is still to come.
+    const opened = store.state.messages[0]?.event;
+    if (opened === undefined || opened === null) throw new Error('the head has a scene');
+    const sceneMs = scheduleEvent(EMPTY_DIRECTOR, opened, 0, context).busyUntil.kaname ?? 0;
+    await vi.advanceTimersByTimeAsync(sceneMs - 1);
+    expect(head()).toBe('issue-opened#103');
+    await vi.advanceTimersByTimeAsync(1);
+    expect(head()).toBe('pr-merged#110');
     store.stop();
   });
 });
