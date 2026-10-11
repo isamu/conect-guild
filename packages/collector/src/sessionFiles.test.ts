@@ -63,16 +63,40 @@ describe('readCompanySessions', () => {
     expect(JSON.stringify(result)).not.toMatch(new RegExp(`${OTHER}|${OTHER_PATH}|${dir}`));
   });
 
-  it('reads a large log line by line', async () => {
+  it('reads a large log with many company relaunches in one pass', async () => {
     const root = paths.seats[0]?.cwd ?? '';
-    const others = Array.from({ length: 20_000 }, (_, i) => `${OTHER} ${OTHER_PATH}/${String(i)}`);
-    await writeCwdLog(...others, `${KANAME} ${root}`);
-    await writeFile(paths.activityStatePath, '{}');
-    await expect(readCompanySessions(paths)).resolves.toMatchObject({ ok: true, found: 1 });
+    const id = (i: number) => `aaaaaaaa-0000-4000-8000-${String(i).padStart(12, '0')}`;
+    // ~15 MB: 200k lines, half of them new company sessions at かなめ's path.
+    const lines = Array.from({ length: 200_000 }, (_, i) =>
+      i % 2 === 0 ? `${id(i)} ${root}` : `${OTHER} ${OTHER_PATH}/${'x'.repeat(i % 7)}`,
+    );
+    await writeFile(paths.cwdLogPath, lines.map((line) => `\n${line}`).join(''));
+    await writeFile(
+      paths.activityStatePath,
+      JSON.stringify({ [id(199_998)]: { working: true, waiting: false, event: null } }),
+    );
+    const started = performance.now();
+    await expect(readCompanySessions(paths)).resolves.toMatchObject({
+      ok: true,
+      found: 1,
+      members: [{ department: null, state: 'working' }, expect.anything()],
+    });
+    expect(performance.now() - started).toBeLessThan(3_000);
   });
 });
 
 describe('readCompanySessions: failures', () => {
+  it('ends with read-failed when the signal aborts', async () => {
+    await writeCwdLog();
+    await writeFile(paths.activityStatePath, '{}');
+    const controller = new AbortController();
+    controller.abort();
+    await expect(readCompanySessions(paths, controller.signal)).resolves.toEqual({
+      ok: false,
+      kind: 'read-failed',
+    });
+  });
+
   it('is missing when the cwd log does not exist', async () => {
     await writeFile(paths.activityStatePath, '{}');
     await expect(readCompanySessions(paths)).resolves.toEqual({ ok: false, kind: 'missing' });
@@ -90,7 +114,9 @@ describe('readCompanySessions: failures', () => {
       kind: 'read-failed',
     });
   });
+});
 
+describe('readCompanySessions: size and contents', () => {
   it('is too-large when the cwd log passes its limit', async () => {
     await writeFile(paths.cwdLogPath, Buffer.alloc(MAX_CWD_LOG_BYTES + 1, 0x61));
     await writeFile(paths.activityStatePath, '{}');

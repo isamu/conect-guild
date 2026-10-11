@@ -20,11 +20,12 @@ function clockedHarness(gh: GhRunner, untilMs: number, patch: Partial<RunDeps> =
       sessionReads.push(elapsed);
       return Promise.resolve(SESSIONS_OK);
     },
-    sleep: (ms) => {
+    // Like a real sleep, it lets background work (a GitHub fetch) settle before the next tick.
+    sleep: async (ms) => {
       sleeps.push(ms);
+      await new Promise((resolve) => setImmediate(resolve));
       elapsed += ms;
       if (elapsed >= untilMs) controller.abort();
-      return Promise.resolve();
     },
     ...patch,
   });
@@ -79,8 +80,8 @@ describe('runCollector loop', () => {
     const last = snapshotSchema.parse(JSON.parse(deps.writes.at(-1) ?? ''));
     expect(last.fetchedAt).toBe('2026-10-12T00:00:00.000Z');
     expect(last.sessions.checkedAt).toBe('2026-10-12T00:01:05.000Z');
-    // Logged when the background fetch ends, which is after the next tick here.
-    expect(deps.errors).toEqual(['[collector] 2026-10-12T00:01:05.000Z failed: gh-failed']);
+    // Logged when the background fetch ends, before the next tick.
+    expect(deps.errors).toEqual(['[collector] 2026-10-12T00:01:00.000Z failed: gh-failed']);
   });
 });
 
@@ -101,8 +102,9 @@ describe('runCollector loop: failures', () => {
         cycle = deps.now().getTime() >= Date.parse('2026-10-12T00:01:00.000Z') ? 1 : 0;
       },
     });
-    // 12 ticks before the retry at 60 s write nothing; 60 s and 65 s write.
-    expect(deps.writes).toHaveLength(2);
+    // 12 ticks before the retry at 60 s write nothing. The retry runs in the background, so the
+    // tick at 60 s has nothing yet; 65 s writes.
+    expect(deps.writes).toHaveLength(1);
     expect(deps.errors).toEqual(['[collector] 2026-10-12T00:00:00.000Z failed: gh-failed']);
     expect(deps.logs).toContain('[collector] 2026-10-12T00:01:00.000Z ok: issues=1 prs=2');
   });
@@ -175,6 +177,55 @@ describe('runCollector loop: slow GitHub and interrupts', () => {
     // Every 5 seconds from 0 to 85 s, also while the fetch started at 60 s hangs.
     expect(sessionReads).toEqual(Array.from({ length: 18 }, (_, i) => i * 5_000));
     expect(deps.writes).toHaveLength(18);
+  });
+
+  it('keeps reading the sessions while a retry before the first success is slow', async () => {
+    const waiting: (() => void)[] = [];
+    let attempt = 0;
+    const base = fakeGh();
+    const gh: GhRunner = async (args) => {
+      if (attempt === 0) throw new CollectorError('gh-failed');
+      if (!deps.signal.aborted) {
+        await new Promise<void>((resolve) => {
+          waiting.push(resolve);
+        });
+      }
+      return base(args);
+    };
+    const { deps, sessionReads } = clockedHarness(gh, 90_000);
+    const sleep = deps.sleep;
+    await runCollector([], {
+      ...deps,
+      sleep: async (ms) => {
+        attempt = 1; // the retry at 60 s hangs until the loop stops
+        await sleep(ms);
+        if (deps.signal.aborted) for (const resolve of waiting.splice(0)) resolve();
+      },
+    });
+    expect(sessionReads).toEqual(Array.from({ length: 18 }, (_, i) => i * 5_000));
+    expect(deps.writes).toEqual([]);
+  });
+});
+
+describe('runCollector loop: interrupts', () => {
+  it('ends when interrupted while a sessions reading is pending', async () => {
+    const controller = new AbortController();
+    const deps = harness(fakeGh(), {
+      signal: controller.signal,
+      // Like readCompanySessions: a pending read ends when the signal aborts.
+      readSessions: () =>
+        new Promise((resolve) => {
+          controller.signal.addEventListener('abort', () => {
+            resolve({ ok: false, kind: 'read-failed' });
+          });
+          setImmediate(() => {
+            controller.abort();
+          });
+        }),
+    });
+    await expect(runCollector([], deps)).resolves.toBe(0);
+    expect(deps.writes).toEqual([]);
+    expect([...deps.logs, ...deps.errors].filter((l) => l.includes('sessions'))).toEqual([]);
   });
 
   it('writes nothing when interrupted while reading the sessions', async () => {
