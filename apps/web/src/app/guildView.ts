@@ -1,0 +1,199 @@
+import type { Snapshot } from '@conect-guild/snapshot';
+import type { SnapshotLoadFailure } from '../adapters/snapshot';
+import {
+  DEPARTMENT_LABELS,
+  DEPARTMENT_MEMBER,
+  MEMBERS,
+  type DepartmentLabel,
+  type MemberConfig,
+  type MemberId,
+} from '../guild.config';
+import { isSnapshotStale } from '../domain/freshness';
+import {
+  assignPr,
+  deriveMemberStatuses,
+  indexIssues,
+  prWaitKind,
+  type MemberState,
+} from '../domain/party';
+import { toQuests, type Quest } from '../domain/quest';
+import { countRecentRewards } from '../domain/reward';
+
+/**
+ * Pure builders that turn a snapshot into what the windows show. The windows only render these;
+ * every decision (who, which state, which label) is made here or in domain/.
+ */
+
+type SnapshotLists = Pick<Snapshot, 'issues' | 'prs'>;
+
+export interface BoardGroup {
+  /** 'reception' or the department label. */
+  readonly key: 'reception' | DepartmentLabel;
+  readonly label: string;
+  readonly color: string;
+  readonly quests: readonly Quest[];
+}
+
+export const STATE_LABELS: Readonly<Record<MemberState, string>> = {
+  'awaiting-president': '社長の承認まち',
+  'awaiting-kaname': 'かなめの確認まち',
+  working: '作業中',
+  done: '完了',
+  idle: '待機中',
+};
+
+/** Open quests grouped as the board shows them: かなめの受付 first, then each department. */
+export function buildBoard(snapshot: SnapshotLists): BoardGroup[] {
+  const open = toQuests(snapshot.issues).filter((quest) => quest.state === 'open');
+  const reception: BoardGroup = {
+    key: 'reception',
+    label: `${MEMBERS.kaname.name}の受付`,
+    color: MEMBERS.kaname.color,
+    quests: open.filter((quest) => quest.department === null),
+  };
+  const departments = DEPARTMENT_LABELS.map((department): BoardGroup => {
+    const member = MEMBERS[DEPARTMENT_MEMBER[department]];
+    return {
+      key: department,
+      label: `${member.name}（${department}）`,
+      color: member.color,
+      quests: open.filter((quest) => quest.department === department),
+    };
+  });
+  return [reception, ...departments].filter((group) => group.quests.length > 0);
+}
+
+/** CSS-facing state of a row. Department members use MemberState; かなめ and the king reuse it. */
+export interface PartyRow {
+  readonly id: MemberId;
+  readonly name: string;
+  readonly role: string;
+  readonly color: string;
+  readonly state: MemberState;
+  readonly stateLabel: string;
+  /** Tooltip text (title attribute); null when there is nothing to explain. */
+  readonly tooltip: string | null;
+  /** 最近の成果 (PRs merged in the last 7 days); null for かなめ and the king. */
+  readonly rewards: number | null;
+}
+
+export interface WaitCounts {
+  /** Open PRs that change rules and wait for the president's merge. */
+  readonly president: number;
+  /** Open PRs that wait for かなめ's review. */
+  readonly kaname: number;
+  /** Open Issues and open PRs with no department, waiting at the reception. */
+  readonly reception: number;
+}
+
+export function countWaits(snapshot: SnapshotLists): WaitCounts {
+  const index = indexIssues(snapshot.issues);
+  const waits = snapshot.prs.map(prWaitKind);
+  const openQuests = toQuests(snapshot.issues).filter((quest) => quest.state === 'open');
+  const unassignedPrs = snapshot.prs.filter(
+    (pr) => pr.state === 'open' && assignPr(pr, index).department === null,
+  );
+  return {
+    president: waits.filter((wait) => wait === 'president').length,
+    kaname: waits.filter((wait) => wait === 'kaname').length,
+    reception:
+      openQuests.filter((quest) => quest.department === null).length + unassignedPrs.length,
+  };
+}
+
+function row(
+  member: MemberConfig,
+  view: Pick<PartyRow, 'state' | 'stateLabel' | 'tooltip' | 'rewards'>,
+): PartyRow {
+  return { id: member.id, name: member.name, role: member.role, color: member.color, ...view };
+}
+
+function kanameRow(waits: WaitCounts): PartyRow {
+  const tooltip = `確認まちの PR ${String(waits.kaname)} 件・受付の巻物 ${String(waits.reception)} 件`;
+  if (waits.kaname > 0) {
+    return row(MEMBERS.kaname, {
+      state: 'awaiting-kaname',
+      stateLabel: `PR の確認 ${String(waits.kaname)} 件`,
+      tooltip,
+      rewards: null,
+    });
+  }
+  if (waits.reception > 0) {
+    return row(MEMBERS.kaname, {
+      state: 'working',
+      stateLabel: `受付 ${String(waits.reception)} 件`,
+      tooltip,
+      rewards: null,
+    });
+  }
+  return row(MEMBERS.kaname, { state: 'idle', stateLabel: '受付で待機', tooltip, rewards: null });
+}
+
+function kingRow(waits: WaitCounts): PartyRow {
+  if (waits.president > 0) {
+    return row(MEMBERS.yukihiro, {
+      state: 'awaiting-president',
+      stateLabel: `承認まち ${String(waits.president)} 件`,
+      tooltip: 'ルール（CLAUDE.md・.claude/agents/）を変える PR は社長がマージします',
+      rewards: null,
+    });
+  }
+  return row(MEMBERS.yukihiro, {
+    state: 'idle',
+    stateLabel: '玉座で待機',
+    tooltip: '承認まちの PR はありません',
+    rewards: null,
+  });
+}
+
+/** Six rows: かなめ, the four departments (fixed order), then the king. `now` is epoch ms. */
+export function buildParty(snapshot: SnapshotLists, now: number): PartyRow[] {
+  const waits = countWaits(snapshot);
+  const rewards = countRecentRewards(snapshot, now);
+  const members = deriveMemberStatuses(snapshot, now).map((status) =>
+    row(MEMBERS[status.memberId], {
+      state: status.state,
+      stateLabel: STATE_LABELS[status.state],
+      tooltip: status.reason,
+      rewards: rewards[status.department],
+    }),
+  );
+  return [kanameRow(waits), ...members, kingRow(waits)];
+}
+
+const FAILURE_LABELS: Readonly<Record<SnapshotLoadFailure, string>> = {
+  network: 'つながりません',
+  timeout: '時間切れ',
+  http: 'サーバーがエラーを返しました',
+  parse: 'データが壊れています',
+  invalid: 'データの形が違います',
+  'schema-version': '収集スクリプトを更新してください',
+};
+
+export interface FetchStatusView {
+  /** e.g. `取得失敗（つながりません）`; null after a successful fetch. */
+  readonly failure: string | null;
+  /** True when the shown snapshot is older than the stale limit (the collector may be down). */
+  readonly stale: boolean;
+  /** `HH:MM` (local time) of the shown snapshot's fetchedAt; null before the first success. */
+  readonly fetchedAt: string | null;
+}
+
+/** `HH:MM` in the runtime's local time zone. */
+export function formatClock(epochMs: number): string {
+  const date = new Date(epochMs);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+export function buildFetchStatus(
+  snapshot: Pick<Snapshot, 'fetchedAt'> | null,
+  failure: SnapshotLoadFailure | null,
+  now: number,
+): FetchStatusView {
+  return {
+    failure: failure === null ? null : `取得失敗（${FAILURE_LABELS[failure]}）`,
+    stale: snapshot !== null && isSnapshotStale(snapshot.fetchedAt, now),
+    fetchedAt: snapshot === null ? null : formatClock(Date.parse(snapshot.fetchedAt)),
+  };
+}
