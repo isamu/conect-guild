@@ -120,6 +120,8 @@ export function sessionsSummary(reading: SessionsReading): string {
 interface LoopState {
   github: GithubPart | null;
   githubAttemptAt: number | null;
+  /** The GitHub fetch still running, if any; ticks go on without waiting for it. */
+  githubInFlight: Promise<void> | null;
   /** The last logged sessions summary; the loop logs only changes (it reads every 5 seconds). */
   sessionsLogged: string | null;
   writeFailing: boolean;
@@ -136,7 +138,7 @@ function reportSessions(deps: RunDeps, state: LoopState, reading: SessionsReadin
   deps.log(`${prefix(deps)} ${summary}`);
 }
 
-/** A write failure outside a GitHub cycle is logged once, when it starts. */
+/** A write failure is logged once, when it starts (the loop writes every 5 seconds). */
 function reportWrite(deps: RunDeps, state: LoopState, write: WriteResult | null): void {
   const failing = write !== null && !write.ok;
   if (failing && !state.writeFailing) deps.error(`${prefix(deps)} failed: ${write.kind}`);
@@ -144,26 +146,39 @@ function reportWrite(deps: RunDeps, state: LoopState, write: WriteResult | null)
 }
 
 /**
- * One tick of the loop: GitHub when its interval has passed (keeping the last good part when it
- * fails), then the sessions, then one atomic write of both.
+ * Starts a GitHub fetch in the background, so a slow GitHub does not hold up the 5-second
+ * sessions. A failed fetch keeps the last good part. An interrupted one ends quietly.
+ */
+function startGithub(deps: RunDeps, state: LoopState, now: Date): Promise<void> {
+  state.githubAttemptAt = now.getTime();
+  const running = fetchGithub(deps, now).then((result) => {
+    state.githubInFlight = null;
+    if (deps.signal.aborted) return;
+    if (result.ok) state.github = result.part;
+    reportCycle(deps, cycleResult(result, null));
+  });
+  state.githubInFlight = running;
+  return running;
+}
+
+/**
+ * One tick of the loop: start GitHub when its interval has passed, read the sessions, and write
+ * both atomically. Until GitHub has succeeded once there is nothing to write, so the tick waits
+ * for that fetch instead.
  */
 async function tick(deps: RunDeps, state: LoopState): Promise<void> {
+  // A function call keeps TypeScript from narrowing `aborted` across awaits.
+  const stopped = (): boolean => deps.signal.aborted;
   const now = deps.now();
-  let github: GithubResult | null = null;
-  if (isGithubDue(state.githubAttemptAt, now.getTime())) {
-    github = await fetchGithub(deps, now);
-    state.githubAttemptAt = now.getTime();
-    if (github.ok) state.github = github.part;
+  if (state.githubInFlight === null && isGithubDue(state.githubAttemptAt, now.getTime())) {
+    const running = startGithub(deps, state, now);
+    if (state.github === null) await running;
   }
-  if (deps.signal.aborted) return;
+  if (stopped()) return;
   const reading = await readSessionsSafely(deps);
+  if (stopped()) return;
   const write = state.github === null ? null : await writeSnapshot(deps, state.github, reading);
-  if (github === null) {
-    reportWrite(deps, state, write);
-  } else {
-    reportCycle(deps, cycleResult(github, write));
-    state.writeFailing = write !== null && !write.ok;
-  }
+  reportWrite(deps, state, write);
   reportSessions(deps, state, reading);
 }
 
@@ -172,6 +187,7 @@ async function runLoop(deps: RunDeps): Promise<void> {
   const state: LoopState = {
     github: null,
     githubAttemptAt: null,
+    githubInFlight: null,
     sessionsLogged: null,
     writeFailing: false,
   };
@@ -180,9 +196,11 @@ async function runLoop(deps: RunDeps): Promise<void> {
   while (!stopped()) {
     await tick(deps, state);
     // An interrupt during a tick ends quietly instead of reporting the killed gh.
-    if (stopped()) return;
+    if (stopped()) break;
     await deps.sleep(COLLECTOR_CONFIG.sessions.intervalMs);
   }
+  // No gh process outlives the loop.
+  await state.githubInFlight;
 }
 
 /** Entry logic of the collector. Resolves with the process exit code. */
