@@ -57,3 +57,17 @@ export const AMBIENT = {
   /** Shifts each lamp's flicker and each cat's breath against the others. */
   decorPhaseStepMs: 377,
 } as const;
+
+/**
+ * How far a member at a seat is drawn below the feet of their tile (logical px), so the furniture
+ * in front hides the lower body (seating.ts). Measured on the tiles: a desk's back edge is 12 px
+ * below its top, the counter's 3 px, the throne's seat cushion 62 px.
+ */
+export const SEATING = {
+  /** On a chair behind a desk: the desk hides everything below the chest. */
+  chairPx: 36,
+  /** かなめ right behind the counter top: it hides her from the waist down. */
+  counterPx: 30,
+  /** The king deep in the throne: its seat and arms hide his legs. */
+  thronePx: 26,
+} as const;
