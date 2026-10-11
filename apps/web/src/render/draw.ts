@@ -58,9 +58,13 @@ export function drawActors(
   bubbles: Bubbles,
   art: GuildArt,
 ): void {
-  for (const { id, pose } of frame.members) {
+  for (const { id, pose, hand } of frame.members) {
     if (!pose.visible) continue;
     art.sprites.drawMember(ctx, id, pose, pose.point);
+    if (hand !== null) {
+      const at = { x: pose.point.x + hand.offset.x, y: pose.point.y + hand.offset.y };
+      art.sprites.drawProp(ctx, hand.prop, at);
+    }
     const bubble = bubbles[id];
     if (pose.prop !== null) {
       art.sprites.drawProp(ctx, pose.prop, { x: pose.point.x, y: pose.point.y - OVERHEAD_OFFSET });

@@ -1,5 +1,6 @@
 import type { GuildEvent } from '../domain/events';
 import type { MemberId, TilePos } from '../guild.config';
+import { ambientPose, type AmbientMoods, type AmbientSeeds, type HandProp } from './ambient';
 import { burstOrigin, confettiAt, CONFETTI_MS, type PlacedParticle } from './confetti';
 import { poseOnSegment, standingPose, type Pose } from './motion';
 import type { Point } from './path';
@@ -32,6 +33,14 @@ export const EMPTY_DIRECTOR: Director = { tracks: [], bursts: [], busyUntil: {} 
 export interface MemberPose {
   readonly id: MemberId;
   readonly pose: Pose;
+  /** An item the member handles at their seat (ambient), placed from the feet; null otherwise. */
+  readonly hand: HandProp | null;
+}
+
+/** The small moves while members are out of scenes (ambient.ts). */
+export interface AmbientContext {
+  readonly moods: AmbientMoods;
+  readonly seeds: AmbientSeeds;
 }
 
 export interface ConfettiView {
@@ -82,14 +91,57 @@ export function poseAt(director: Director, id: MemberId, now: number, seat: Tile
   return standingPose(seat);
 }
 
+/** True while a member walks, stays or holds something in a scene, or has confetti over them. */
+export function inScene(director: Director, id: MemberId, now: number): boolean {
+  return (
+    director.tracks.some(
+      (track) => track.actor === id && track.segments.some((s) => s.start <= now && now < s.end),
+    ) ||
+    director.bursts.some(
+      (burst) => burst.actor === id && burst.start <= now && now < burst.start + CONFETTI_MS,
+    )
+  );
+}
+
+/** Applies the member's ambient move to the pose at their seat; scenes are left as they are. */
+function withAmbient(
+  director: Director,
+  member: MemberPose,
+  now: number,
+  ambient: AmbientContext | undefined,
+): MemberPose {
+  const mood = ambient?.moods[member.id];
+  if (ambient === undefined || mood === undefined || inScene(director, member.id, now)) {
+    return member;
+  }
+  const move = ambientPose(mood, ambient.seeds[member.id], now);
+  const { point } = member.pose;
+  return {
+    id: member.id,
+    pose: {
+      ...member.pose,
+      point: { x: point.x + move.offset.x, y: point.y + move.offset.y },
+      frame: move.frame,
+      flip: move.flip,
+    },
+    hand: move.hand,
+  };
+}
+
 export function frameAt(
   director: Director,
   now: number,
   seats: Readonly<Record<MemberId, TilePos>>,
+  ambient?: AmbientContext,
 ): StageFrame {
-  const members = MEMBER_IDS.map((id) => ({ id, pose: poseAt(director, id, now, seats[id]) })).sort(
-    (a, b) => a.pose.point.y - b.pose.point.y,
-  );
+  // Ordered by the seat before the ambient offsets, so a bob never swaps who is in front.
+  const members = MEMBER_IDS.map((id): MemberPose => ({
+    id,
+    pose: poseAt(director, id, now, seats[id]),
+    hand: null,
+  }))
+    .sort((a, b) => a.pose.point.y - b.pose.point.y)
+    .map((member) => withAmbient(director, member, now, ambient));
   const confetti = director.bursts
     .map((burst): ConfettiView => {
       const seat = seats[burst.actor];
