@@ -110,6 +110,8 @@ def shrink(rgba, size):
 
 
 def build(sheet_path, out_dir, preview_path=None):
+    if preview_path and preview_path.resolve() in {(out_dir / f"{m}.png").resolve() for m in MEMBERS}:
+        sys.exit(f"{preview_path}: the preview would overwrite a sprite")
     sheet = Image.open(sheet_path).convert("RGB")
     if sheet.size != SHEET_SIZE:
         sys.exit(f"{sheet_path}: expected {SHEET_SIZE[0]}x{SHEET_SIZE[1]}, got {sheet.width}x{sheet.height}")
