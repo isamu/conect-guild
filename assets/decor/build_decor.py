@@ -12,12 +12,14 @@ neighbour reaching into its bbox is not copied). Every piece is shrunk by the sa
 factor (128px cell -> 32px tile) so relative sizes stay as drawn, then placed
 bottom-center in its slot of the output sheet. A piece slightly larger than
 its slot is shrunk to fit, up to MAX_FIT_SHRINK; beyond that the build fails.
-Keep LAYOUT in sync with decor.ts.
+Keep LAYOUT in sync with decor.ts (checked before building).
 """
 
 import hashlib
 import os
+import re
 import sys
+from pathlib import Path
 
 from PIL import Image, ImageChops, ImageFilter
 
@@ -165,7 +167,10 @@ def find_pieces(sheet_id, img):
     its bbox. A region takes the components whose center lies in it. Every
     component of MIN_PX or more must land in exactly one region, so a drifted
     or regenerated sheet fails instead of yielding clipped or merged pieces;
-    smaller specks outside every region are dropped."""
+    smaller specks outside every region are dropped. A piece must also lie
+    wholly inside its region, so a region that catches only part of a piece,
+    or a neighbour that reaches far out, fails too. Two regions swapped with
+    each other still pass: check the preview after editing LAYOUT."""
     regions, labels = components(img)
     names = [n for n, spec in LAYOUT.items() if spec[0] == sheet_id]
     owner = {}
@@ -192,6 +197,9 @@ def find_pieces(sheet_id, img):
             max(regions[i][0][2] for i in mine),
             max(regions[i][0][3] for i in mine),
         )
+        region = LAYOUT[name][1]
+        if not (region[0] <= bbox[0] and region[1] <= bbox[1] and bbox[2] <= region[2] and bbox[3] <= region[3]):
+            raise SystemExit(f"{name}: drawn pixels {bbox} reach outside its region {region}")
         mask = Image.new("L", img.size)
         wanted = set(mine)
         mask.putdata([255 if label in wanted else 0 for label in labels])
@@ -233,6 +241,22 @@ def check_slots():
                 taken[(c, r)] = name
 
 
+DECOR_TS = Path(__file__).resolve().parent / "decor.ts"
+TS_ENTRY = re.compile(r"^  '?([a-z-]+)'?: \{ col: (\d+), row: (\d+), w: (\d+), h: (\d+) \},$", re.M)
+
+
+def check_decor_ts():
+    """decor.ts must list exactly LAYOUT's slots and the same tile size."""
+    source = DECOR_TS.read_text(encoding="utf-8")
+    if f"export const DECOR_TILE_SIZE = {TILE};" not in source:
+        raise SystemExit(f"{DECOR_TS}: DECOR_TILE_SIZE is not {TILE}")
+    entries = TS_ENTRY.findall(source)
+    in_ts = {name: tuple(int(v) for v in rest) for name, *rest in entries}
+    in_py = {name: spec[2:] for name, spec in LAYOUT.items()}
+    if len(entries) != len(in_ts) or in_ts != in_py:
+        raise SystemExit(f"{DECOR_TS} does not match LAYOUT; update one to match the other")
+
+
 def load_raw(sheet_id, path):
     size, sha = RAW[sheet_id]
     with open(path, "rb") as f:
@@ -253,6 +277,7 @@ def main(src_a, src_b, dst):
     if same_file(src_a, dst) or same_file(src_b, dst):
         raise SystemExit("output path must differ from the source images")
     check_slots()
+    check_decor_ts()
     raws = {"a": load_raw("a", src_a), "b": load_raw("b", src_b)}
     sheet = Image.new("RGBA", (SHEET_COLS * TILE, SHEET_ROWS * TILE), (0, 0, 0, 0))
     for sheet_id, raw in raws.items():
