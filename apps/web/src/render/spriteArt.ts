@@ -1,12 +1,14 @@
 import type { MemberId } from '../guild.config';
 import type { SpriteArt } from './art';
 import { SPRITE_SIZE } from './metrics';
+import { hasHoldFrames } from './hands';
 import type { SpriteFrame } from './motion';
 import type { Point } from './path';
 
 /**
- * The real members: one sheet per member (assets/sprites/<memberId>.png), four 80 x 80 frames in a
- * row (front, right standing, right walking 1 and 2), feet at the bottom centre. Facing left is the
+ * The real members: one sheet per member (assets/sprites/<memberId>.png), 80 x 80 frames in a row
+ * (front, right standing, right walking 1 and 2, then optionally hands up, arms in front and arms in
+ * front facing right: hands.ts), feet at the bottom centre. Facing left is the
  * right-facing frame mirrored. Held items keep the drawing passed in.
  */
 
@@ -27,11 +29,19 @@ export function spriteDraw(frame: SpriteFrame, feet: Point): SpriteDraw {
   };
 }
 
+/** A member's sheet: an image whose width tells how many frames it has. */
+export type SpriteSheet = HTMLImageElement | HTMLCanvasElement | ImageBitmap;
+
+function sheetWidth(sheet: SpriteSheet): number {
+  return 'naturalWidth' in sheet ? sheet.naturalWidth : sheet.width;
+}
+
 export function createSpriteArt(
-  sheets: Readonly<Record<MemberId, CanvasImageSource>>,
+  sheets: Readonly<Record<MemberId, SpriteSheet>>,
   drawProp: SpriteArt['drawProp'],
 ): SpriteArt {
   return {
+    hasHoldFrames: (id) => hasHoldFrames(sheetWidth(sheets[id])),
     drawMember(ctx, id, pose, feet) {
       const { sx, dx, dy } = spriteDraw(pose.frame, feet);
       ctx.save();

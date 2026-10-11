@@ -9,6 +9,12 @@ describe('spriteDraw', () => {
     ]);
   });
 
+  it('takes the holding frames 4–6 from the columns after them', () => {
+    expect(([4, 5, 6] as const).map((f) => spriteDraw(f, { x: 0, y: 0 }).sx)).toEqual([
+      320, 400, 480,
+    ]);
+  });
+
   it('puts the bottom centre of the frame on the feet', () => {
     const draw = spriteDraw(0, { x: 528, y: 256 });
     expect(draw.dx + SPRITE_SIZE / 2).toBe(528);

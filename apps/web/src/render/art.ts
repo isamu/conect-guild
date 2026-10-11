@@ -20,7 +20,8 @@ export interface TileArt {
 export interface SpriteArt {
   /**
    * Draws a member with their feet at `feet`. Frames: 0 front, 1 side standing, 2 and 3 side
-   * walking; the side frames face right and `flip` mirrors them to face left.
+   * walking, and with hasHoldFrames 4 hands up, 5 arms in front, 6 arms in front sideways; the
+   * side frames face right and `flip` mirrors them to face left.
    */
   drawMember(
     ctx: CanvasRenderingContext2D,
@@ -28,6 +29,8 @@ export interface SpriteArt {
     pose: { readonly frame: SpriteFrame; readonly flip: boolean },
     feet: Point,
   ): void;
+  /** True when the member's sheet has the holding frames 4–6 (hands.ts). */
+  hasHoldFrames(id: MemberId): boolean;
   /**
    * Draws a held item centred on `at` (in the arms or over the head: motion.heldItemPoint). `hold`
    * may pick the picture (a raised scroll is a bundle of three: decorArt.propPicture).
@@ -131,6 +134,7 @@ const placeholderSprites: SpriteArt = {
     ctx.fillText(member.name.charAt(0), left + 6, top + 18);
     ctx.restore();
   },
+  hasHoldFrames: () => false,
   drawProp: drawPlaceholderProp,
 };
 

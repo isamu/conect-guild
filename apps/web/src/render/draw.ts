@@ -12,7 +12,7 @@ import {
 } from './layers';
 import { GROUND } from './map';
 import { BUBBLE_RISE, DETAIL_SCALE, OVERHEAD_OFFSET, TILE_SIZE } from './metrics';
-import { heldItemPoint } from './motion';
+import { heldLook } from './hands';
 import type { Point } from './path';
 
 /** Canvas side effects only: every decision was made in the pure modules. Logical pixels. */
@@ -119,14 +119,17 @@ export interface CachedFrontLayer {
 
 function drawMemberPose(ctx: CanvasRenderingContext2D, member: MemberPose, art: GuildArt): void {
   const { id, pose, hand } = member;
+  if (pose.held !== null) {
+    const { prop, hold } = pose.held;
+    const look = heldLook(id, pose, pose.held, art.sprites.hasHoldFrames(id));
+    art.sprites.drawMember(ctx, id, look, look.feet);
+    art.sprites.drawProp(ctx, prop, look.item, hold);
+    return;
+  }
   art.sprites.drawMember(ctx, id, pose, pose.point);
   if (hand !== null) {
     const at = { x: pose.point.x + hand.offset.x, y: pose.point.y + hand.offset.y };
     art.sprites.drawProp(ctx, hand.prop, at, 'carry');
-  }
-  if (pose.held !== null) {
-    const { prop, hold } = pose.held;
-    art.sprites.drawProp(ctx, prop, heldItemPoint(pose, hold), hold);
   }
 }
 

@@ -21,8 +21,12 @@ export interface Held {
 export const carry = (prop: Prop): Held => ({ prop, hold: 'carry' });
 export const raise = (prop: Prop): Held => ({ prop, hold: 'raise' });
 
-/** Sprite frame: 0 front, 1 side standing, 2 and 3 side walking (contract with the sprite art). */
-export type SpriteFrame = 0 | 1 | 2 | 3;
+/** Standing and walking frames: 0 front, 1 side standing, 2 and 3 side walking. */
+export type MoveFrame = 0 | 1 | 2 | 3;
+/** Holding frames (hands.ts): 4 hands up, 5 arms in front (front), 6 arms in front (side). */
+export type HoldFrame = 4 | 5 | 6;
+/** Sprite frame: the n-th 80 px column of a member's sheet (contract with the sprite art). */
+export type SpriteFrame = MoveFrame | HoldFrame;
 
 export const MS_PER_TILE = 250;
 export const STEP_FRAME_MS = 160;
@@ -39,7 +43,7 @@ export interface Segment {
 export interface Pose {
   /** Feet, in logical pixels. */
   readonly point: Point;
-  readonly frame: SpriteFrame;
+  readonly frame: MoveFrame;
   /** True when facing left (the art draws the right-facing frame mirrored). */
   readonly flip: boolean;
   readonly held: Held | null;
@@ -89,7 +93,7 @@ export function poseOnSegment(segment: Segment, t: number): Pose {
   const step = Math.min(Math.floor(progress), segment.path.length - 2);
   const from = segment.path[step] ?? first;
   const to = segment.path[step + 1] ?? from;
-  const frame: SpriteFrame = Math.floor(elapsed / STEP_FRAME_MS) % 2 === 0 ? 2 : 3;
+  const frame: MoveFrame = Math.floor(elapsed / STEP_FRAME_MS) % 2 === 0 ? 2 : 3;
   return {
     ...base,
     point: lerp(tileToPoint(from), tileToPoint(to), progress - step),

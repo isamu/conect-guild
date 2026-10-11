@@ -78,4 +78,6 @@ export const HOLD = {
   carryHeightPx: 30,
   /** Forward of the middle when facing sideways: at the hands, a little out from the body. */
   carryForwardPx: 14,
+  /** Up on every other step while walking in the carrying frame (it has no stepping legs). */
+  walkBobPx: 2,
 } as const;
