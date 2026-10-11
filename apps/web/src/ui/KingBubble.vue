@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// Shown only while something waits for the king; the canvas draws no bubble for him.
+// A single root element, so the class from App.vue (its position) lands on the bubble.
 defineProps<{
   /** True while a rule-changing PR waits for the president. */
   waiting: boolean;
@@ -8,10 +10,7 @@ defineProps<{
 </script>
 
 <template>
-  <!-- Always drawn over the throne; the canvas draws no bubble for the king. -->
-  <div class="bubble" :class="{ 'bubble--waiting': waiting }" :title="detail ?? undefined">
-    {{ waiting ? '承認まち' : '……' }}
-  </div>
+  <div v-if="waiting" class="bubble bubble--waiting" :title="detail ?? undefined">承認まち</div>
 </template>
 
 <style scoped>
