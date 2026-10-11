@@ -230,7 +230,7 @@ M3 からは、セッションの状態（4.7）を混ぜる。優先順位は �
 **読めないとき**
 
 - 行ログか activity-state.json が無い、読めない、JSON として壊れている（MulmoTerminal は `fs.writeFile` で書き直すので、空や途中の JSON が見えることがある）、会社のエントリの形が違う → その周期の `sessions` は `unavailable`。GitHub の部分はそのまま書く。次の周期（5 秒後）に読み直す
-- 行ログが 16 MB、activity-state.json が 1 MB を超えていたら、読まずに `unavailable` にする（どちらもふだんは数十 KB 以下。5 秒ごとに全部読むので上限を置く）
+- 行ログは 16 MB、activity-state.json は 1 MB を上限に読み、超えた分は読まずに `unavailable` にする（どちらもふだんは数十 KB 以下。5 秒ごとに全部読むので上限を置く。読んでいる間に増えても上限で止まる）
 - ログは種類だけ（`missing`・`read-failed`・`too-large`・`parse-failed`・`invalid`）
 - 画面は `sessions.checkedAt` が 30 秒より古ければ（collector が止まった）リアルタイムの状態を使わず、GitHub だけで決める。`unavailable` か古いときは取得の窓に小さく出す
 

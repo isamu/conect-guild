@@ -1,5 +1,4 @@
-import { createReadStream } from 'node:fs';
-import { readFile, stat } from 'node:fs/promises';
+import { createReadStream, type ReadStream } from 'node:fs';
 import { createInterface } from 'node:readline';
 import type { CompanySeat } from '../collector.config.ts';
 import {
@@ -19,8 +18,16 @@ export const MAX_ACTIVITY_STATE_BYTES = 1024 * 1024;
 
 class TooLargeError extends Error {}
 
-async function assertSize(path: string, maxBytes: number): Promise<void> {
-  if ((await stat(path)).size > maxBytes) throw new TooLargeError();
+/**
+ * A read-only stream of at most `maxBytes + 1` bytes, so a file that grows while it is read is
+ * still capped. {@link assertWithin} then tells whether the limit was passed.
+ */
+function cappedStream(path: string, maxBytes: number): ReadStream {
+  return createReadStream(path, { encoding: 'utf8', flags: 'r', start: 0, end: maxBytes });
+}
+
+function assertWithin(stream: ReadStream, maxBytes: number): void {
+  if (stream.bytesRead > maxBytes) throw new TooLargeError();
 }
 
 export interface SessionFilePaths {
@@ -37,23 +44,33 @@ function failureKindOf(error: unknown): SessionsFailureKind {
 }
 
 /**
- * Lines of the cwd log, streamed: each line is handed over and dropped, so the lines of other
- * directories are never held together. Opened read-only; MulmoTerminal's files are never written.
+ * The company session ids from the cwd log, streamed: each line is handed over and dropped, so the
+ * lines of other directories are never held together.
  */
-function cwdLogLines(path: string): AsyncIterable<string> {
-  return createInterface({
-    input: createReadStream(path, { encoding: 'utf8', flags: 'r' }),
-    crlfDelay: Infinity,
-  });
+async function readCwdLog(paths: SessionFilePaths): Promise<ReadonlyMap<string, string>> {
+  const stream = cappedStream(paths.cwdLogPath, MAX_CWD_LOG_BYTES);
+  const lines = createInterface({ input: stream, crlfDelay: Infinity });
+  const ids = await latestCompanySessionIds(lines, paths.seats);
+  assertWithin(stream, MAX_CWD_LOG_BYTES);
+  return ids;
 }
 
-/** Reads MulmoTerminal's two files and returns the company seats' states. Never throws. */
+async function readActivityState(path: string): Promise<string> {
+  const stream = cappedStream(path, MAX_ACTIVITY_STATE_BYTES);
+  let text = '';
+  for await (const chunk of stream) text += String(chunk);
+  assertWithin(stream, MAX_ACTIVITY_STATE_BYTES);
+  return text;
+}
+
+/**
+ * Reads MulmoTerminal's two files and returns the company seats' states. Never throws. Both are
+ * opened read-only; MulmoTerminal's files are never written or locked.
+ */
 export async function readCompanySessions(paths: SessionFilePaths): Promise<SessionsReading> {
   try {
-    await assertSize(paths.cwdLogPath, MAX_CWD_LOG_BYTES);
-    const ids = await latestCompanySessionIds(cwdLogLines(paths.cwdLogPath), paths.seats);
-    await assertSize(paths.activityStatePath, MAX_ACTIVITY_STATE_BYTES);
-    const activity = await readFile(paths.activityStatePath, { encoding: 'utf8', flag: 'r' });
+    const ids = await readCwdLog(paths);
+    const activity = await readActivityState(paths.activityStatePath);
     return readSeatStates(activity, paths.seats, ids);
   } catch (error) {
     return { ok: false, kind: failureKindOf(error) };
