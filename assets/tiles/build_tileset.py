@@ -1,4 +1,4 @@
-"""Normalize the codex-generated sheet (tiles_raw.png) into a 16px tileset.
+"""Normalize the codex-generated sheet (tiles_raw.png) into a 32px tileset.
 
 Usage: python build_tileset.py <tiles_raw.png> <tileset.png>
 Ran with Python 3.14.7 and Pillow 12.3.0 (installed in a throwaway venv,
@@ -6,7 +6,9 @@ not a project dependency).
 
 The raw image follows prompt.txt: an 8x4 grid of equal cells on a #FF00FF
 background. For every tile we find the drawn pixels inside its slot, crop
-them, shrink them into w*16 x h*16 and turn the magenta into transparency.
+them, shrink them into w*32 x h*32 and turn the magenta into transparency.
+Shrinking is a 1/4 area average (BOX) from the 128px cells; nearest-neighbour
+was tried and left magenta fringes and jagged lines.
 Keep LAYOUT in sync with tiles.ts.
 """
 
@@ -20,7 +22,7 @@ RAW_SIZE = (1024, 512)
 # SOURCE_BOX below is measured on this exact file; refuse any other input.
 # After regenerating tiles_raw.png, re-measure SOURCE_BOX and update the hash.
 RAW_SHA256 = "855e94b468a0c289ad83065c439c9c85fd21e3b1f1f2d1ab68aaec4084d278df"
-TILE = 16
+TILE = 32
 SHEET_COLS = 8
 SHEET_ROWS = 4
 

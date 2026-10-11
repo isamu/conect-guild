@@ -1,6 +1,6 @@
-// Tile positions in tileset.png, in 16px tile units.
+// Tile positions in tileset.png, in 32px tile units.
 // w/h are how many tiles the piece covers; keep in sync with build_tileset.py.
-export const TILE_SIZE = 16;
+export const TILE_SIZE = 32;
 
 export const TILES = {
   floor: { col: 0, row: 0, w: 1, h: 1 },
