@@ -14,7 +14,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageChops
+from PIL import Image, ImageChops, ImageFilter
 
 MEMBERS = ["kaname", "minori", "hibiki", "hirame", "sasae", "yukihiro"]
 COLS = 4
@@ -27,6 +27,9 @@ MAX_H = FRAME - 1
 MAX_W = FRAME - 2
 ALPHA_CUTOFF = 0.5
 PREVIEW_SCALE = 2
+# Outline pixels next to the background are blended with magenta by the generator.
+# Within this many source pixels of the background, dark magenta-tinted pixels are pulled to grey.
+SPILL_REACH = 2
 
 
 def threshold(channel, test):
@@ -43,14 +46,41 @@ def cut_cells(sheet):
         ]
 
 
+def all_of(*masks):
+    result = masks[0]
+    for mask in masks[1:]:
+        result = ImageChops.multiply(result, mask)
+    return result
+
+
+def despilled(cell, background):
+    """Turn dark outline pixels tinted by the magenta background back into neutral dark grey.
+
+    Only pixels near the background with almost no green, red close to blue and both clearly
+    above green are touched, so purple hair, pink hair and red cloth keep their colours.
+    """
+    r, g, b = cell.split()
+    near_background = ImageChops.subtract(
+        background.filter(ImageFilter.MaxFilter(2 * SPILL_REACH + 1)), background
+    )
+    spill = all_of(
+        near_background,
+        threshold(g, lambda v: v < 40),
+        threshold(ImageChops.subtract(r, g), lambda v: v > 30),
+        threshold(ImageChops.difference(r, b), lambda v: v < 60),
+    )
+    fixed = cell.copy()
+    fixed.paste(Image.merge("RGB", (g, g, g)), (0, 0), spill)
+    return fixed
+
+
 def keyed(cell):
     """Return the cell as RGBA with the magenta background made transparent."""
     r, g, b = cell.split()
-    background = ImageChops.multiply(
-        ImageChops.multiply(threshold(r, lambda v: v > 170), threshold(b, lambda v: v > 170)),
-        threshold(g, lambda v: v < 90),
+    background = all_of(
+        threshold(r, lambda v: v > 170), threshold(b, lambda v: v > 170), threshold(g, lambda v: v < 90)
     )
-    rgba = cell.convert("RGBA")
+    rgba = despilled(cell, background).convert("RGBA")
     rgba.putalpha(ImageChops.invert(background))
     return rgba
 
