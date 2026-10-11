@@ -50,8 +50,10 @@ export const snapshotSessionsSchema = z.discriminatedUnion('status', [
   z.strictObject({
     status: z.literal('ok'),
     checkedAt: isoDateTime,
+    // Exactly one entry for かなめ and each department: the collector always writes all five.
     members: z
       .array(snapshotSessionSchema)
+      .length(SESSION_DEPARTMENTS.length + 1)
       .refine(
         (members) => new Set(members.map((m) => m.department)).size === members.length,
         'one entry per department',
