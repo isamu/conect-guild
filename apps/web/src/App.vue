@@ -103,7 +103,7 @@ const { state, board, party, king, fetchStatus, message, cue, nextMessage, clear
   min-height: 21.1cqw;
 }
 
-/* Above the king on the throne (render/map.ts: seat col 16, row 3), tail towards him. */
+/* Above the king on the throne (render/map.ts: seat col 16, row 4), tail towards him. */
 .stage__king {
   left: 52.5%;
   top: 0.8%;
