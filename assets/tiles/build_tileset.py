@@ -10,12 +10,16 @@ them, shrink them into w*16 x h*16 and turn the magenta into transparency.
 Keep LAYOUT in sync with tiles.ts.
 """
 
+import hashlib
 import os
 import sys
 
 from PIL import Image
 
 RAW_SIZE = (1024, 512)
+# SOURCE_BOX below is measured on this exact file; refuse any other input.
+# After regenerating tiles_raw.png, re-measure SOURCE_BOX and update the hash.
+RAW_SHA256 = "855e94b468a0c289ad83065c439c9c85fd21e3b1f1f2d1ab68aaec4084d278df"
 TILE = 16
 SHEET_COLS = 8
 SHEET_ROWS = 4
@@ -170,6 +174,10 @@ def build_object(img, bbox, size):
 def main(src, dst):
     if os.path.realpath(src) == os.path.realpath(dst):
         raise SystemExit("output path must differ from the source image")
+    with open(src, "rb") as f:
+        digest = hashlib.sha256(f.read()).hexdigest()
+    if digest != RAW_SHA256:
+        raise SystemExit(f"{src} is not the tiles_raw.png that SOURCE_BOX was measured on (sha256 {digest})")
     raw = keyed(Image.open(src))
     if raw.size != RAW_SIZE:
         raise SystemExit(f"expected a {RAW_SIZE} source image, got {raw.size}")
