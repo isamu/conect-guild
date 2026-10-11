@@ -80,6 +80,19 @@ const placeholderTiles: TileArt = {
 
 const PROP_COLORS: Readonly<Record<Prop, string>> = { scroll: '#f3e2b3', chest: '#c58b2a' };
 
+/** A plain box for a held item (no picture for scrolls and chests yet). */
+export function drawPlaceholderProp(ctx: CanvasRenderingContext2D, prop: Prop, at: Point): void {
+  ctx.save();
+  ctx.translate(Math.round(at.x), Math.round(at.y));
+  ctx.scale(DETAIL_SCALE, DETAIL_SCALE);
+  ctx.fillStyle = PROP_COLORS[prop];
+  ctx.fillRect(-5, -3, 10, 6);
+  ctx.strokeStyle = '#1b120b';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(-4.5, -2.5, 9, 5);
+  ctx.restore();
+}
+
 const placeholderSprites: SpriteArt = {
   drawMember(ctx, id, pose, feet) {
     const member = MEMBERS[id];
@@ -106,17 +119,7 @@ const placeholderSprites: SpriteArt = {
     ctx.fillText(member.name.charAt(0), left + 6, top + 18);
     ctx.restore();
   },
-  drawProp(ctx, prop, at) {
-    ctx.save();
-    ctx.translate(Math.round(at.x), Math.round(at.y));
-    ctx.scale(DETAIL_SCALE, DETAIL_SCALE);
-    ctx.fillStyle = PROP_COLORS[prop];
-    ctx.fillRect(-5, -3, 10, 6);
-    ctx.strokeStyle = '#1b120b';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(-4.5, -2.5, 9, 5);
-    ctx.restore();
-  },
+  drawProp: drawPlaceholderProp,
 };
 
 /** Coloured boxes until the real tiles and sprites arrive. */

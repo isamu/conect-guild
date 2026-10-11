@@ -1,0 +1,48 @@
+import type { MemberId } from '../guild.config';
+import type { SpriteArt } from './art';
+import { SPRITE_SIZE } from './metrics';
+import type { SpriteFrame } from './motion';
+import type { Point } from './path';
+
+/**
+ * The real members: one sheet per member (assets/sprites/<memberId>.png), four 64 x 64 frames in a
+ * row (front, right standing, right walking 1 and 2), feet at the bottom centre. Facing left is the
+ * right-facing frame mirrored. Held items keep the drawing passed in (no picture for them yet).
+ */
+
+export interface SpriteDraw {
+  /** Left edge of the frame in the sheet. */
+  readonly sx: number;
+  /** Top-left of the frame on the canvas, logical px (before mirroring). */
+  readonly dx: number;
+  readonly dy: number;
+}
+
+/** Where a frame comes from and where it lands, with the feet at `feet`. Pure. */
+export function spriteDraw(frame: SpriteFrame, feet: Point): SpriteDraw {
+  return {
+    sx: frame * SPRITE_SIZE,
+    dx: Math.round(feet.x) - SPRITE_SIZE / 2,
+    dy: Math.round(feet.y) - SPRITE_SIZE,
+  };
+}
+
+export function createSpriteArt(
+  sheets: Readonly<Record<MemberId, CanvasImageSource>>,
+  drawProp: SpriteArt['drawProp'],
+): SpriteArt {
+  return {
+    drawMember(ctx, id, pose, feet) {
+      const { sx, dx, dy } = spriteDraw(pose.frame, feet);
+      ctx.save();
+      if (pose.flip) {
+        // Mirror around the feet so the member stays on the same spot.
+        ctx.translate(2 * dx + SPRITE_SIZE, 0);
+        ctx.scale(-1, 1);
+      }
+      ctx.drawImage(sheets[id], sx, 0, SPRITE_SIZE, SPRITE_SIZE, dx, dy, SPRITE_SIZE, SPRITE_SIZE);
+      ctx.restore();
+    },
+    drawProp,
+  };
+}
