@@ -101,7 +101,8 @@ function applyResult(
 ): readonly string[] {
   if (!result.ok) {
     state.failure = result.reason;
-    state.halted = result.reason === 'schema-version';
+    // Once halted, only a snapshot of the expected version resumes the screen.
+    state.halted = state.halted || result.reason === 'schema-version';
     return [];
   }
   state.snapshot = result.snapshot;
