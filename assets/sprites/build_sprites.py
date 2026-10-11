@@ -26,6 +26,8 @@ FRAME = 64
 MAX_H = FRAME - 1
 MAX_W = FRAME - 2
 ALPHA_CUTOFF = 0.5
+# A crown tip or hair may touch the cell edge, but most of the outline must be background.
+MIN_OUTLINE_BACKGROUND = 0.9
 PREVIEW_SCALE = 2
 # Outline pixels next to the background are blended with magenta by the generator.
 # Within this many source pixels of the background, dark magenta-tinted pixels are pulled to grey.
@@ -88,6 +90,15 @@ def keyed(cell):
     return rgba
 
 
+def outline_background_ratio(rgba):
+    """Share of the cell's one-pixel outline that is transparent (keyed background)."""
+    alpha = rgba.getchannel("A")
+    w, h = alpha.size
+    edges = [alpha.crop(box) for box in ((0, 0, w, 1), (0, h - 1, w, h), (0, 0, 1, h), (w - 1, 0, w, h))]
+    clear = sum(edge.histogram()[0] for edge in edges)
+    return clear / (2 * w + 2 * h)
+
+
 def shrink(rgba, size):
     """Area-average downscale on premultiplied colour, then make alpha binary (crisp pixel edges)."""
     small = rgba.convert("RGBa").resize(size, Image.Resampling.BOX).convert("RGBA")
@@ -108,6 +119,15 @@ def build(sheet_path, out_dir, preview_path=None):
     empty = [f"{MEMBERS[r]} frame {c}" for r, row in enumerate(boxes) for c, box in enumerate(row) if box is None]
     if empty:
         sys.exit(f"{sheet_path}: no character found in " + ", ".join(empty))
+    # The cell outline should be almost all background; otherwise the key colour is not magenta.
+    off_key = [
+        f"{MEMBERS[r]} frame {c}"
+        for r, row in enumerate(rows)
+        for c, cell in enumerate(row)
+        if outline_background_ratio(cell) < MIN_OUTLINE_BACKGROUND
+    ]
+    if off_key:
+        sys.exit(f"{sheet_path}: background is not magenta in " + ", ".join(off_key))
     tallest = max(box[3] - box[1] for row in boxes for box in row)
     widest = max(box[2] - box[0] for row in boxes for box in row)
     scale = min(MAX_H / tallest, MAX_W / widest)
