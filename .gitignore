@@ -3,5 +3,5 @@ dist/
 .env
 .env.*
 .dev.vars
-apps/web/public/snapshot.json
+apps/web/.data/
 .DS_Store
