@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, useTemplateRef, watch } from 'vue';
 import type { PartyRow, SceneCue } from '../app/guildView';
+import { ambientMoodsOf } from '../render/ambient';
 import type { GuildArt } from '../render/art';
 import { bubblesOf } from '../render/bubbles';
 import { loadArt } from '../render/loadArt';
@@ -22,6 +23,7 @@ function start(element: HTMLCanvasElement, art: GuildArt): void {
   const running = startRenderLoop({ canvas: element, art });
   loop = running;
   running.setBubbles(bubblesOf(props.party));
+  running.setMoods(ambientMoodsOf(props.party));
   observer = new ResizeObserver((entries) => {
     const width = entries[0]?.contentRect.width ?? element.clientWidth;
     running.resize(width, globalThis.devicePixelRatio);
@@ -49,6 +51,7 @@ watch(
   () => props.party,
   (rows) => {
     loop?.setBubbles(bubblesOf(rows));
+    loop?.setMoods(ambientMoodsOf(rows));
   },
 );
 
