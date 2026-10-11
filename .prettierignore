@@ -1,0 +1,8 @@
+node_modules/
+dist/
+coverage/
+apps/web/.data/
+package-lock.json
+assets/
+*.md
+.mulmoterminal.json

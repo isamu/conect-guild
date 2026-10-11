@@ -1,0 +1,13 @@
+{
+  "name": "@conect-guild/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -p tsconfig.app.json && vite build"
+  },
+  "dependencies": {
+    "vue": "^3.5.43",
+    "zod": "^4.6.5"
+  }
+}
