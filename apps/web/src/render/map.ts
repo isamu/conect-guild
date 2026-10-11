@@ -48,14 +48,67 @@ export interface MapObject extends TileRect {
   readonly solid: boolean;
 }
 
-/** Where the HTML windows sit over the canvas (App.vue), in tiles, rounded outwards. */
+/** A rectangle in logical px (edges, not size). */
+export interface PxRect {
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+}
+
+/**
+ * App.vue places the windows in % of the stage (left / right / width of its width, top / bottom /
+ * height of its height) and cqw (1 % of the stage width). The stage is the canvas, 1024 x 576
+ * logical px, so 1 % across = 10.24 px, 1 % down = 5.76 px and 1cqw = 10.24 px.
+ */
+const PCT_X = LOGICAL_WIDTH / 100;
+const PCT_Y = LOGICAL_HEIGHT / 100;
+const CQW = LOGICAL_WIDTH / 100;
+
+/** The most each window covers (logical px), from the numbers in App.vue's styles. */
+export const WINDOW_EXTENTS: Readonly<Record<'board' | 'party' | 'message', PxRect>> = {
+  // .stage__board: left 1.2%, top 1.6%, width 29%, max-height 33cqw (it scrolls beyond that)
+  board: {
+    left: 1.2 * PCT_X,
+    top: 1.6 * PCT_Y,
+    right: (1.2 + 29) * PCT_X,
+    bottom: 1.6 * PCT_Y + 33 * CQW,
+  },
+  // .stage__side: right 1.1%, top 1.6%, width 24.6%. Its height is its content (party window and
+  // fetch status): measured 324 px, 340 px with a failure line (Chrome, 2026-10-12). Rare extra
+  // notes (localStorage unavailable) reach 355-373 px; see the M2 report.
+  party: {
+    left: (100 - 1.1 - 24.6) * PCT_X,
+    top: 1.6 * PCT_Y,
+    right: (100 - 1.1) * PCT_X,
+    bottom: 340,
+  },
+  // .stage__message: left 9.8%, width 80.4%, bottom 1.9%, height 17.4%
+  message: {
+    left: 9.8 * PCT_X,
+    top: (100 - 1.9 - 17.4) * PCT_Y,
+    right: (9.8 + 80.4) * PCT_X,
+    bottom: (100 - 1.9) * PCT_Y,
+  },
+};
+
+/** Every tile the rectangle touches (rounded outwards). */
+export function coveredTiles(rect: PxRect): TileRect {
+  const col = Math.floor(rect.left / TILE_SIZE);
+  const row = Math.floor(rect.top / TILE_SIZE);
+  return {
+    col,
+    row,
+    w: Math.ceil(rect.right / TILE_SIZE) - col,
+    h: Math.ceil(rect.bottom / TILE_SIZE) - row,
+  };
+}
+
+/** Where the HTML windows sit over the canvas, in tiles. */
 export const HIDDEN_AREAS: Readonly<Record<'board' | 'party' | 'message', TileRect>> = {
-  // left 1.2%, width 29%, up to about a third of the height (more with many quests)
-  board: { col: 0, row: 0, w: 10, h: 10 },
-  // right 1.1%, width 24.6%: the party window and the fetch status under it reach about 62%
-  party: { col: 23, row: 0, w: 9, h: 11 },
-  // 9.8% to 90.2% across, bottom 19%
-  message: { col: 3, row: 14, w: 26, h: 4 },
+  board: coveredTiles(WINDOW_EXTENTS.board),
+  party: coveredTiles(WINDOW_EXTENTS.party),
+  message: coveredTiles(WINDOW_EXTENTS.message),
 };
 
 /** Fixed places the scenes walk between. */

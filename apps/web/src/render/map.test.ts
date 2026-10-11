@@ -4,6 +4,7 @@ import {
   contains,
   GROUND,
   groundAt,
+  coveredTiles,
   HIDDEN_AREAS,
   isHidden,
   isInsideMap,
@@ -15,8 +16,10 @@ import {
   MAP_ROWS,
   PLACES,
   TILE_NAMES,
+  WINDOW_EXTENTS,
 } from './map';
-import { findPath } from './path';
+import { AMBIENT, SPRITE_SIZE } from './metrics';
+import { findPath, tileToPoint } from './path';
 
 const WALKERS: readonly MemberId[] = ['kaname', 'minori', 'hibiki', 'hirame', 'sasae'];
 const DEPARTMENT_MEMBERS: readonly MemberId[] = ['minori', 'hibiki', 'hirame', 'sasae'];
@@ -149,5 +152,60 @@ describe('map: walkable grid', () => {
     expect(isHidden({ col: message.col - 1, row: message.row })).toBe(false);
     expect(isHidden({ col: message.col + message.w, row: message.row })).toBe(false);
     expect(isHidden({ col: message.col, row: message.row - 1 })).toBe(false);
+  });
+});
+
+describe('map: windows over the canvas (App.vue)', () => {
+  it('converts App.vue’s % and cqw to logical px', () => {
+    const { board, party, message } = WINDOW_EXTENTS;
+    // 1.6% of 576 down, then max-height 33cqw = 33 x 10.24.
+    expect(board.top).toBeCloseTo(9.216);
+    expect(board.bottom).toBeCloseTo(9.216 + 337.92);
+    expect(board.right).toBeCloseTo(30.2 * 10.24);
+    expect(party.left).toBeCloseTo(74.3 * 10.24);
+    expect(party.right).toBeCloseTo(98.9 * 10.24);
+    expect(message.top).toBeCloseTo(80.7 * 5.76);
+    expect(message.bottom).toBeCloseTo(98.1 * 5.76);
+  });
+
+  it('hides every tile a window touches', () => {
+    expect(HIDDEN_AREAS).toEqual({
+      // The board reaches 347 px: row 10 (320-352) is under it.
+      board: { col: 0, row: 0, w: 10, h: 11 },
+      party: { col: 23, row: 0, w: 9, h: 11 },
+      message: { col: 3, row: 14, w: 26, h: 4 },
+    });
+  });
+
+  it('rounds outwards, and an edge on a tile line takes no extra tile', () => {
+    expect(coveredTiles({ left: 31.9, top: 0.1, right: 32.1, bottom: 64 })).toEqual({
+      col: 0,
+      row: 0,
+      w: 2,
+      h: 2,
+    });
+  });
+
+  it('keeps feet on row 11 under the tall board off the walking grid (head under it)', () => {
+    expect(isWalkable({ col: 2, row: 11 })).toBe(false);
+    expect(isWalkable({ col: 2, row: 12 })).toBe(true);
+  });
+
+  it.each(WALKERS)('keeps the whole sprite of %s clear of the windows, even mid-stretch', (id) => {
+    const feet = tileToPoint(MEMBERS[id].seat);
+    const sprite = {
+      left: feet.x - SPRITE_SIZE / 2,
+      right: feet.x + SPRITE_SIZE / 2,
+      top: feet.y - SPRITE_SIZE - AMBIENT.stretchPx,
+      bottom: feet.y,
+    };
+    for (const area of Object.values(WINDOW_EXTENTS)) {
+      const overlaps =
+        sprite.left < area.right &&
+        area.left < sprite.right &&
+        sprite.top < area.bottom &&
+        area.top < sprite.bottom;
+      expect(overlaps).toBe(false);
+    }
   });
 });

@@ -85,7 +85,8 @@ const { state, board, party, king, fetchStatus, message, cue, nextMessage, clear
   width: 29%;
   /* Heights in cqw (stage width) because the stage height is 9/16 of it. */
   min-height: 17.7cqw;
-  max-height: 34cqw;
+  /* render/map.ts WINDOW_EXTENTS: ends above the head of ひらめ (seat row 12) even mid-stretch. */
+  max-height: 33cqw;
 }
 
 /* Party and fetch status share the right column so they never overlap. */
