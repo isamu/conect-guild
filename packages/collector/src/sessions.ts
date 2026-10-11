@@ -35,25 +35,24 @@ export async function latestCompanySessionIds(
   lines: AsyncIterable<string> | Iterable<string>,
   seats: readonly CompanySeat[],
 ): Promise<ReadonlyMap<string, string>> {
-  // Candidate ids per seat, oldest first. Only ids last seen at a company path stay here.
-  const candidates = new Map<string, string[]>(seats.map((seat) => [seat.cwd, []]));
-  for await (const line of lines) {
-    const record = parseCwdLine(line);
+  const seatPaths = new Set(seats.map((seat) => seat.cwd));
+  // Company ids only: where each one was last seen and on which line. One pass, no rescans.
+  const lastSeen = new Map<string, { cwd: string; line: number }>();
+  let line = 0;
+  for await (const text of lines) {
+    line += 1;
+    const record = parseCwdLine(text);
     if (record === null) continue;
-    for (const [cwd, ids] of candidates) {
-      candidates.set(
-        cwd,
-        ids.filter((id) => id !== record.id),
-      );
-    }
-    candidates.get(record.cwd)?.push(record.id);
+    if (seatPaths.has(record.cwd)) lastSeen.set(record.id, { cwd: record.cwd, line });
+    else lastSeen.delete(record.id);
   }
-  const latest = new Map<string, string>();
-  for (const [cwd, ids] of candidates) {
-    const last = ids.at(-1);
-    if (last !== undefined) latest.set(cwd, last);
+  const latest = new Map<string, { id: string; line: number }>();
+  for (const [id, seen] of lastSeen) {
+    const current = latest.get(seen.cwd);
+    if (current === undefined || seen.line > current.line)
+      latest.set(seen.cwd, { id, line: seen.line });
   }
-  return latest;
+  return new Map([...latest].map(([cwd, { id }]) => [cwd, id]));
 }
 
 /** One entry of activity-state.json. Extra keys are ignored; a missing or mistyped one fails. */
