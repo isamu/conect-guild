@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+.env.*
+.dev.vars
+apps/web/public/snapshot.json
+.DS_Store
