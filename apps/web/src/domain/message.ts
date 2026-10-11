@@ -32,7 +32,9 @@ export function eventMessage(
     case 'issue-closed':
       return `${actor}は クエスト#${n}${title}を クリアした！`;
     case 'pr-merged':
-      return `${actor}は PR#${n}${title}を てにいれた！`;
+      return event.department === null
+        ? `かなめの受付に PR#${n}${title}が とどいた！`
+        : `${actor}は PR#${n}${title}を かなめに とどけた！`;
     case 'issue-opened':
       return event.department === null
         ? `かなめの受付に クエスト#${n}${title}が とどいた！`

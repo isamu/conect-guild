@@ -30,7 +30,7 @@ describe('eventMessage', () => {
 
   it('announces a merged PR with the PR title', () => {
     expect(eventMessage(event('pr-merged', 108, '総務'), snap)).toBe(
-      'ささえは PR#108「棚卸しの結果」を てにいれた！',
+      'ささえは PR#108「棚卸しの結果」を かなめに とどけた！',
     );
   });
 
@@ -56,10 +56,16 @@ describe('eventMessage', () => {
     );
   });
 
+  it('says a PR with no department arrived at the reception', () => {
+    expect(eventMessage(event('pr-merged', 108, null), snap)).toBe(
+      'かなめの受付に PR#108「棚卸しの結果」が とどいた！',
+    );
+  });
+
   it('does not take an Issue title for a PR with the same number', () => {
     const clash = snapshot({ issues: [issue(5, { title: 'Issue の題名' })], prs: [] });
     expect(eventMessage(event('pr-merged', 5, '経理'), clash)).toBe(
-      'みのりは PR#5 を てにいれた！',
+      'みのりは PR#5 を かなめに とどけた！',
     );
   });
 });
@@ -72,7 +78,7 @@ describe('diffMessages', () => {
       notice: null,
     } as const;
     expect(diffMessages(diff, snap)).toEqual([
-      'ささえは PR#108「棚卸しの結果」を てにいれた！',
+      'ささえは PR#108「棚卸しの結果」を かなめに とどけた！',
       'ささえは クエスト#98「架空の依頼 98」を クリアした！',
     ]);
   });
@@ -102,7 +108,7 @@ describe('diffEntries', () => {
       notice: null,
     } as const;
     expect(diffEntries(diff, snap)).toEqual([
-      { text: 'ささえは PR#108「棚卸しの結果」を てにいれた！', event: merged },
+      { text: 'ささえは PR#108「棚卸しの結果」を かなめに とどけた！', event: merged },
       { text: 'ささえは クエスト#98「架空の依頼 98」を クリアした！', event: closed },
     ]);
   });
