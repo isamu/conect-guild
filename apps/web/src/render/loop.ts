@@ -15,7 +15,14 @@ import {
   type StageFrame,
 } from './director';
 import { ANIMATED_DECOR } from './decor';
-import { drawActors, drawAnimatedDecor, drawStatic } from './draw';
+import {
+  drawActors,
+  drawAnimatedDecor,
+  drawFrontLayer,
+  drawStatic,
+  type CachedFrontLayer,
+} from './draw';
+import { FRONT_LAYERS } from './layers';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './map';
 import { AMBIENT } from './metrics';
 import { DEFAULT_SEATS } from './scenes';
@@ -68,12 +75,30 @@ function context2d(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   return ctx;
 }
 
-function staticLayer(art: GuildArt): HTMLCanvasElement {
+function cachedLayer(draw: (ctx: CanvasRenderingContext2D) => void): HTMLCanvasElement {
   const layer = document.createElement('canvas');
   layer.width = LOGICAL_WIDTH;
   layer.height = LOGICAL_HEIGHT;
-  drawStatic(context2d(layer), art);
+  draw(context2d(layer));
   return layer;
+}
+
+/** Everything that never moves, drawn once: the background and each front layer. */
+function cachedScenery(art: GuildArt): {
+  background: HTMLCanvasElement;
+  front: CachedFrontLayer[];
+} {
+  const background = cachedLayer((ctx) => {
+    drawStatic(ctx, art);
+  });
+  const front = FRONT_LAYERS.map((layer) => ({
+    depth: layer.depth,
+    layer,
+    image: cachedLayer((ctx) => {
+      drawFrontLayer(ctx, art, layer);
+    }),
+  }));
+  return { background, front };
 }
 
 /** True while drawing would not be seen: the page is hidden or the canvas has no width. */
@@ -149,10 +174,18 @@ function fitCanvas(canvas: HTMLCanvasElement, cssWidth: number, pixelRatio: numb
   return width / LOGICAL_WIDTH;
 }
 
-/** One frame: the cached background, then the lamps and the cat, then the members. */
+/**
+ * One frame: the cached background, the lamps and the cat, then the members between the cached
+ * front layers (desks, the counter, the throne's arms).
+ */
 function paint(
   ctx: CanvasRenderingContext2D,
-  layer: { background: HTMLCanvasElement; art: GuildArt; scale: number },
+  layer: {
+    background: HTMLCanvasElement;
+    front: readonly CachedFrontLayer[];
+    art: GuildArt;
+    scale: number;
+  },
   t: number,
   actors: { frame: StageFrame; bubbles: Bubbles },
 ): void {
@@ -160,7 +193,7 @@ function paint(
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(layer.background, 0, 0);
   drawAnimatedDecor(ctx, layer.art, t);
-  drawActors(ctx, actors.frame, actors.bubbles, layer.art);
+  drawActors(ctx, { ...actors, now: t }, layer.art, layer.front);
 }
 
 export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
@@ -168,7 +201,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   const now = options.now ?? (() => performance.now());
   const random = options.random ?? Math.random;
   const ctx = context2d(canvas);
-  const background = staticLayer(art);
+  const { background, front } = cachedScenery(art);
   const seeds = createAmbientSeeds(random);
   const visibility = options.visibility ?? documentVisibility;
   // Narrow screens hide the canvas (display: none): its width is 0 and nothing is drawn.
@@ -183,7 +216,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   function draw(): void {
     const t = stageNow();
     const frame = frameAt(director, t, DEFAULT_SEATS, { moods, seeds });
-    paint(ctx, { background, art, scale }, t, { frame, bubbles });
+    paint(ctx, { background, front, art, scale }, t, { frame, bubbles });
     director = prune(director, t);
     const next = nextDraw({
       hidden: paused(),
