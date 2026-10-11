@@ -8,13 +8,14 @@
   },
   "workspaces": [
     "apps/web",
-    "packages/collector"
+    "packages/collector",
+    "packages/snapshot"
   ],
   "scripts": {
     "dev": "npm run dev -w apps/web",
     "build": "npm run build -w apps/web",
     "lint": "eslint .",
-    "typecheck": "vue-tsc -p apps/web/tsconfig.app.json && tsc -p apps/web/tsconfig.node.json && tsc -p packages/collector/tsconfig.json && tsc -p tsconfig.json",
+    "typecheck": "vue-tsc -p apps/web/tsconfig.app.json && tsc -p apps/web/tsconfig.node.json && tsc -p packages/snapshot/tsconfig.json && tsc -p packages/collector/tsconfig.json && tsc -p tsconfig.json",
     "test": "vitest run",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

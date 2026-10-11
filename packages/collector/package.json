@@ -4,5 +4,9 @@
   "type": "module",
   "scripts": {
     "once": "node src/main.ts --once"
+  },
+  "dependencies": {
+    "@conect-guild/snapshot": "*",
+    "zod": "^4.6.5"
   }
 }
