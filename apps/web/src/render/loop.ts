@@ -1,3 +1,4 @@
+import { documentVisibility, type PageVisibility } from '../adapters/visibility';
 import type { GuildEvent } from '../domain/events';
 import { createAmbientSeeds, type AmbientMoods } from './ambient';
 import type { GuildArt } from './art';
@@ -27,23 +28,6 @@ import { DEFAULT_SEATS } from './scenes';
  * the canvas has no width (narrow screens hide it) it does not run at all, and the stage clock
  * (clock.ts) stands still, so a scene goes on from where it was once the canvas is shown again.
  */
-
-/** Whether the page is shown, and a way to hear when that changes. */
-export interface PageVisibility {
-  isHidden(): boolean;
-  /** Calls `listener` on every change; returns the unsubscribe function. */
-  subscribe(listener: () => void): () => void;
-}
-
-const documentVisibility: PageVisibility = {
-  isHidden: () => document.visibilityState === 'hidden',
-  subscribe(listener) {
-    document.addEventListener('visibilitychange', listener);
-    return () => {
-      document.removeEventListener('visibilitychange', listener);
-    };
-  },
-};
 
 /** What to do after a frame: draw the next one, wait for the next ambient move, or sleep. */
 export type NextDraw = 'frame' | 'ambient' | 'sleep';
