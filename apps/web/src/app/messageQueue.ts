@@ -21,7 +21,10 @@ export interface GuildMessage {
 
 export interface MessageQueue {
   push(entries: readonly MessageEntry[]): void;
-  /** Drops the head message (the ▼ button, or the hold timer). */
+  /**
+   * The ▼ button: skips the rest of the head's hold. The next message still waits until its scene
+   * can start (the press is kept until then); without one, the head goes away at once.
+   */
   next(): void;
   /** Cancels the hold timer. */
   dispose(): void;
@@ -33,6 +36,11 @@ export interface MessageQueue {
    * so the hold and the scenes go on together from where they were once it is shown again.
    */
   setHidden(hidden: boolean): void;
+  /**
+   * Whether the canvas is on screen (narrow screens hide it). While it is not, no scenes are kept
+   * and nobody waits for them: messages go on every `holdMs`, as the canvas drops those scenes too.
+   */
+  setStageShown(shown: boolean): void;
 }
 
 export interface MessageQueueOptions {
@@ -68,29 +76,77 @@ function withHeadScene(director: Director, head: GuildMessage, t: number): Direc
 }
 
 /**
+ * Decides when the next message shows: it keeps the head's hold and the scenes the canvas plays (as
+ * the queue sees them), on a clock that stops with the canvas's while the page is hidden.
+ */
+interface Pacer {
+  /** `head` reached the window: its hold starts over, and the canvas starts its scene now. */
+  headShown(head: GuildMessage): void;
+  /** Ms until `next` may show (nextShowAt); null while stopped (hidden page or halted screen). */
+  delayFor(next: GuildMessage): number | null;
+  /** The ▼ button: ends the head's hold. True when `next` (if any) may show at once. */
+  skipHold(next: GuildMessage | undefined): boolean;
+  setHidden(hidden: boolean): void;
+  /** While halted the window is hidden: the head gets its full hold again once it is back. */
+  setHalted(halted: boolean): void;
+  setStageShown(shown: boolean): void;
+}
+
+function createPacer(wallNow: () => number, holdMs: number): Pacer {
+  let clock: StageClock = RUNNING_CLOCK;
+  let director: Director = EMPTY_DIRECTOR;
+  let stageShown = true;
+  let halted = false;
+  /** Queue time when the head's hold began; null until the head has a successor to wait for. */
+  let holdStart: number | null = null;
+  const now = () => stageTime(clock, wallNow());
+  return {
+    headShown(head) {
+      holdStart = null;
+      if (stageShown) director = withHeadScene(director, head, now());
+    },
+    delayFor(next) {
+      if (halted || clock.pausedAt !== null) return null;
+      const t = now();
+      holdStart ??= t;
+      return Math.max(nextShowAt(director, holdStart + holdMs, next) - t, 0);
+    },
+    skipHold(next) {
+      if (next === undefined) return true;
+      const t = now();
+      holdStart = t - holdMs;
+      return nextShowAt(director, t, next) <= t;
+    },
+    setHidden(hidden) {
+      clock = withPaused(clock, hidden, wallNow());
+    },
+    setHalted(next) {
+      halted = next;
+      if (halted) holdStart = null;
+    },
+    setStageShown(shown) {
+      stageShown = shown;
+      // The canvas drops its scenes when it goes out of sight; old ones never play later.
+      if (!shown) director = EMPTY_DIRECTOR;
+    },
+  };
+}
+
+/**
  * The message window's queue. Each message shows once: the head stays at least `holdMs`, and the
  * next one waits until its scene can start (nextShowAt); the last one stays until the next push or
- * `next()`. It plans the scenes the canvas will play (render/director.ts) on a clock that stops
- * while the page is hidden, like the canvas's. Every change is handed to `publish` as a new array.
+ * `next()`. Every change is handed to `publish` as a new array.
  */
 export function createMessageQueue(options: MessageQueueOptions): MessageQueue {
-  const { scheduler, holdMs, publish } = options;
+  const { scheduler, publish } = options;
+  const pacer = createPacer(options.now, options.holdMs);
   let messages: readonly GuildMessage[] = [];
   let cancelHold: Cancel | null = null;
   let nextId = 1;
-  let halted = false;
-  let clock: StageClock = RUNNING_CLOCK;
-  let director: Director = EMPTY_DIRECTOR;
-  /** Queue time when the head's hold began; null until the head has a successor to wait for. */
-  let holdStart: number | null = null;
-  const queueNow = () => stageTime(clock, options.now());
 
   function set(next: readonly GuildMessage[]): void {
     const head = next[0];
-    if (head !== undefined && head.id !== messages[0]?.id) {
-      holdStart = null;
-      director = withHeadScene(director, head, queueNow());
-    }
+    if (head !== undefined && head.id !== messages[0]?.id) pacer.headShown(head);
     messages = next;
     publish(messages);
   }
@@ -102,17 +158,21 @@ export function createMessageQueue(options: MessageQueueOptions): MessageQueue {
 
   function scheduleHold(): void {
     const following = messages[1];
-    if (halted || clock.pausedAt !== null || cancelHold !== null || following === undefined) return;
-    const t = queueNow();
-    holdStart ??= t;
-    const due = nextShowAt(director, holdStart + holdMs, following);
-    // next() clears the handle (cancelling a timer that has fired does nothing).
-    cancelHold = scheduler.after(Math.max(due - t, 0), next);
+    if (cancelHold !== null || following === undefined) return;
+    const delay = pacer.delayFor(following);
+    // advance() clears the handle (cancelling a timer that has fired does nothing).
+    if (delay !== null) cancelHold = scheduler.after(delay, advance);
   }
 
-  function next(): void {
+  function advance(): void {
     dispose();
     set(messages.slice(1));
+    scheduleHold();
+  }
+
+  /** Re-plans the pending hold after what it waits for has changed. */
+  function reschedule(): void {
+    dispose();
     scheduleHold();
   }
 
@@ -122,22 +182,26 @@ export function createMessageQueue(options: MessageQueueOptions): MessageQueue {
       set([...messages, ...entries.map((entry) => ({ id: nextId++, ...entry }))]);
       scheduleHold();
     },
-    next,
+    next() {
+      if (pacer.skipHold(messages[1])) advance();
+      else reschedule();
+    },
     dispose,
     pause() {
-      halted = true;
-      // The window is hidden while halted: the head gets its full hold again once it is back.
-      holdStart = null;
+      pacer.setHalted(true);
       dispose();
     },
     resume() {
-      halted = false;
+      pacer.setHalted(false);
       scheduleHold();
     },
     setHidden(hidden) {
-      clock = withPaused(clock, hidden, options.now());
-      dispose();
-      scheduleHold();
+      pacer.setHidden(hidden);
+      reschedule();
+    },
+    setStageShown(shown) {
+      pacer.setStageShown(shown);
+      reschedule();
     },
   };
 }

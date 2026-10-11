@@ -61,10 +61,12 @@ export interface GuildStore {
   stop(): void;
   /** Fetches once. Skipped while another fetch is in flight. */
   refresh(): Promise<void>;
-  /** Removes the head message (the ▼ button). */
+  /** The ▼ button: skips the rest of the hold (the next message still waits for its scene). */
   nextMessage(): void;
   /** Stops the messages (and the scenes they start) while the page is hidden. */
   setHidden(hidden: boolean): void;
+  /** Whether the canvas is on screen; while it is not, messages do not wait for scenes. */
+  setStageShown(shown: boolean): void;
   /** Removes the stored baseline; the next fetch counts as the first one (no events). */
   clearBaseline(): void;
 }
@@ -188,6 +190,9 @@ export function createGuildStore(options: GuildStoreOptions = {}): GuildStore {
     },
     setHidden(hidden) {
       queue.setHidden(hidden);
+    },
+    setStageShown(shown) {
+      queue.setStageShown(shown);
     },
     clearBaseline() {
       const removed = storage.remove(BASELINE_STORAGE_KEY);
