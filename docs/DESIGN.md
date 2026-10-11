@@ -42,7 +42,7 @@ GitHub 上の部門ラベル（`経理` など）とは対応表で結び、Issu
 2. **依存は最小限。** 本体の実行時依存は Vue と zod（外部入力の検証。型は schema から推論する）の 2 つだけ。Canvas はブラウザ標準の機能なので追加なし。PixiJS などの描画ライブラリは入れない
 3. **ブラウザから外部へ通信しない。** GitHub API はブラウザから呼ばず、ローカルの収集スクリプトが `gh` CLI で取って JSON に落とす。ブラウザはその JSON を読むだけ。トークンをフロントに置かない（`gh` の認証をそのまま使う）
 4. **待ち受けを増やさない。** 立てるサーバーは Vite の開発サーバーだけで、`127.0.0.1` に固定する（`vite.config.ts` の `server.host`。`--host` は使わない）。独自の HTTP/WS サーバーは作らない。安全性調査（2026-10-12）で pixtuoid がいちばん安全だった理由と同じ
-5. **会話の中身に触れない。** 読むのは Issue・PR の番号・題名・ラベル・状態・日時・ブランチ名と、open PR の変更ファイルのパスだけ。PR の題名と本文は対応 Issue の番号を拾うためだけに読み、本文は保存しない。将来 hooks を使うときも、ツールの入力（`tool_input`）は捨て、イベント名とセッションの対応だけを残す
+5. **会話の中身に触れない。** 読むのは Issue・PR の番号・題名・ラベル・状態・日時・ブランチ名と、open PR の変更ファイルのパスだけ。PR の題名と本文は対応 Issue の番号を拾うためだけに読み、本文は保存しない。セッションの状態（M3）は hooks を足さず、MulmoTerminal が書くファイルから会社の 5 セッションの行だけを読み、部門と状態（作業中・許可待ちなど）だけを残す。会話・ツールの入力・会社以外のセッションのパスや ID は読まず、保存もログもしない（4.7）
 6. **ロジックは純粋関数に。** Issue → クエスト、状態の導出、最近の成果の計算は副作用のない関数にして vitest で守る。UI（Vue / Canvas）には判定を書かない
 7. **実データは配信物に入れない。** Issue の題名には取引先の名前が入るので、画面は手元で見るもの。実データは `apps/web/public/` に置かず、ビルドにも入れない（5 章の「公開範囲」）。GitHub Pages などに載せない
 8. **外部の文字列は文字として描く。** Issue・PR の題名やラベルは外部入力なので、Vue のテキスト補間（`{{ }}`）か Canvas の `fillText` だけで描く。`v-html`、`innerHTML` などの HTML への直接挿入、外部 URL の画像・フォント・スクリプトの読み込みは使わない（画面にスクリプトを差し込まれると、手元の snapshot を外へ送られる）
@@ -85,8 +85,8 @@ conect-guild/
 │       ├── ui/               Vue 部品: QuestBoard / PartyStatus / MessageWindow（Canvas の上に重ねる HTML）
 │       └── app/              Vue の reactive による小さなストア。Pinia は入れない
 ├── packages/collector/       収集スクリプト（TS。Node の型除去で直接実行）
-│   ├── collector.config.ts   対象リポジトリ（既定 yukihiroyamaguchi569/conect-management）、間隔
-│   └── src/main.ts           `gh api` で Issue・PR を取り、検証して .data/snapshot.json を原子的に書く
+│   ├── collector.config.ts   対象リポジトリ（既定 yukihiroyamaguchi569/conect-management）、間隔、会社の 5 セッションの起動ディレクトリ、MulmoTerminal のファイルのパス
+│   └── src/main.ts           `gh api` で Issue・PR を取り、MulmoTerminal のファイルからセッションの状態を読み、検証して .data/snapshot.json を原子的に書く
 ├── assets/                   コンセプト画、スプライト、タイル（出所とライセンスを README に書く）
 ├── docs/DESIGN.md            この文書
 ├── LICENSE                   MIT
@@ -98,14 +98,14 @@ conect-guild/
 ## 4. データの流れ
 
 ```
-GitHub（collector.config.ts に固定したリポジトリの Issue / PR）
-   │  gh api（execFile で引数配列。gh の認証を使う。ブラウザは触らない）
-   ▼
+GitHub（collector.config.ts に固定したリポジトリの Issue / PR）    MulmoTerminal のファイル（~/.mulmoterminal/、読むだけ）
+   │  gh api（execFile で引数配列。gh の認証を使う。60 秒ごと）          │  会社の 5 セッションの行だけ（5 秒ごと、4.7）
+   ▼                                                                      ▼
 packages/collector ──検証して一時ファイルに書き rename──▶ apps/web/.data/snapshot.json（0600、gitignore）
                                                               │  開発時だけ: Vite の自作プラグインが
                                                               │  GET /snapshot.json に Cache-Control: no-store で返す
                                                               ▼
-                              画面: 30 秒ごとに fetch('/snapshot.json', { cache: 'no-store' })
+                              画面: 5 秒ごとに fetch('/snapshot.json', { cache: 'no-store' })
                                                               ▼
                               domain: zod で検証 → Quest / Party / Reward / Events
                                                               ▼
@@ -121,31 +121,37 @@ packages/collector ──検証して一時ファイルに書き rename──▶
 - **PR**: open は全部、closed / merged は直近 7 日のもの。全ページ取る
 - **PR と Issue の結び付け**: PR の題名と本文から、同じリポジトリを指す参照（`#番号` と `<対象リポジトリ>#番号`）を正規表現で拾い、`linkedIssues: number[]` として持つ。別リポジトリの参照（`owner/other#番号`）は拾わない。`Closes`・`Fixes`・`Resolves` の後の参照が 1 つでもあれば、それだけを使う。本文そのものは保存しない
 - **変更ファイル**: open PR だけ、`gh api --paginate --jq` で `repos/<r>/pulls/<n>/files` の `filename` だけを取り、`changedFiles: string[]` として持つ（差分の中身は取らない）
-- **間隔**: 既定 60 秒（`gh` のレート制限に十分収まる）。`--once` で 1 回だけ実行もできる
+- **間隔**: GitHub は 60 秒ごと（`gh` のレート制限に十分収まる）。collector 自体は 5 秒ごとに回り、セッションの状態（4.7）を読むたびに、GitHub の最後の正常な結果と合わせて snapshot を書き直す。`--once` で 1 回だけ（GitHub とセッションを 1 回ずつ）実行もできる
 - **書き込み**: 取得した結果を zod で検証してから、同じディレクトリの一時ファイルに 0600 で書き、`rename` で `apps/web/.data/snapshot.json` を原子的に置き換える。画面が書きかけの JSON を読むことはない
-- **失敗したとき**: 取得や検証に 1 つでも失敗したら snapshot を書き換えず、直前の正常なものを残す（空の配列で上書きしない）
-- **ログ**: 出すのは件数・時刻・エラーの種類だけ。題名・本文・ブランチ名はログに出さない
+- **失敗したとき**: GitHub の取得や検証に 1 つでも失敗したら、GitHub の部分は直前の正常なもの（`fetchedAt` も直前のまま）を使い、空の配列で上書きしない。起動してから GitHub が一度も成功していなければ snapshot を書かない。セッションの状態が読めないときは `sessions` を `unavailable` にし、GitHub の部分の書き込みは妨げない
+- **ログ**: 出すのは件数・時刻・エラーの種類だけ。題名・本文・ブランチ名・パス・セッション ID はログに出さない。セッションの行（`sessions=5 ok` / `sessions unavailable: parse-failed`）は 5 秒ごとには出さず、変わったときだけ出す
 
 ### 4.2 snapshot.json の中身
 
 ```
 {
-  schemaVersion: 1,
-  fetchedAt: ISO 8601,
+  schemaVersion: 2,
+  fetchedAt: ISO 8601,                 // GitHub を取った時刻（60 秒ごと）
   repo: "owner/name",
   issues: [{ number, title, labels: string[], state, createdAt, updatedAt, closedAt | null }],
   prs:    [{ number, title, state, mergedAt | null, closedAt | null, headRef,
-             linkedIssues: number[], changedFiles: string[] }]   // changedFiles は open PR だけ。closed は []
+             linkedIssues: number[], changedFiles: string[] }],  // changedFiles は open PR だけ。closed は []
+  sessions: { status: "ok", checkedAt: ISO 8601,       // セッションを読んだ時刻（5 秒ごと）
+              members: [{ department: "経理" | "広報" | "企画" | "総務" | null,   // null はかなめ
+                          state: "awaiting-permission" | "working" | "resting" | "idle" }] }
+          | { status: "unavailable", checkedAt: ISO 8601 }
 }
 ```
 
-本文とコメントは保存しない。
+本文とコメントは保存しない。MulmoTerminal のセッション ID とパスも保存しない（部門と状態だけ）。
+
+`schemaVersion` は M3 で 2 に上げた（`sessions` を足したため）。v1 の snapshot（古い collector が書いたもの）は、画面が「収集スクリプトを更新してください」で止める。
 
 ### 4.3 画面の取得と表示
 
-- 画面は 30 秒ごとに `/snapshot.json` を `cache: 'no-store'` で fetch する。ネットワークエラーと HTTP エラーの両方を扱い、失敗したら前回の表示を残して小さく「取得失敗」と出す
+- 画面は 5 秒ごとに `/snapshot.json` を `cache: 'no-store'` で fetch する（M3 で 30 秒から短くした。手元の no-store の読み込みなので軽い）。ネットワークエラーと HTTP エラーの両方を扱い、失敗したら前回の表示を残して小さく「取得失敗」と出す
 - `schemaVersion` が画面の想定と違えば、表示を止めて「収集スクリプトを更新してください」と出す
-- `fetchedAt` が 5 分より古ければ「情報が古い」の印を出す（collector が止まっている合図）
+- `fetchedAt`（GitHub の取得時刻）が 5 分より古ければ「情報が古い」の印を出す（collector が止まっている合図）。セッションの状態の古さは別に `sessions.checkedAt` で見る（4.7）
 - 開発時だけ、Vite の自作プラグイン（`configureServer` のミドルウェア。依存なし）が `/snapshot.json` を `apps/web/.data/snapshot.json` から返す。ファイルが無ければ 404。`.data/` は `public/` の外なので、Vite の public 監視による再読み込みは起きない
 
 ### 4.4 差分 → イベント（domain/events.ts, domain/baseline.ts）
@@ -191,7 +197,48 @@ packages/collector ──検証して一時ファイルに書き rename──▶
 
 判定に必要な値が欠けているとき（例: 対応表に無いラベルだけの Issue）は idle にし、理由をツールチップに出す。
 
+M3 からは、セッションの状態（4.7）を混ぜる。優先順位は 許可待ち（リアルタイム） > 社長の承認まち > かなめの確認まち > いま作業中（リアルタイム） > working > done > idle。リアルタイムの 2 つは、パーティの窓に「許可待ち」「いま作業中」と点滅する印付きで出し、ツールチップに MulmoTerminal から読んだことを書く。一区切り（resting）と待機（idle）のセッションは GitHub だけで決める。かなめも同じ考えで、許可待ち > PR の確認 > いま作業中 > 受付 > 待機。社長にはセッションが無いので変わらない。セッションの状態が取れないか古いときは、M2 までと同じく GitHub だけで決める。
+
 「最近の成果」= 自分が担当の、直近 7 日にマージされた PR の数（domain/reward.ts。テストで固定）。取得範囲に合わせた値なので、時間がたつと減る。累積の経験値とレベルは全履歴の集計が要るので、M4 で別に設計する。
+
+### 4.7 セッションの状態（M3。domain/session.ts、packages/collector/src/sessions.ts）
+
+社長の判断（2026-10-12）で、Claude Code の hooks は足さず、MulmoTerminal（v8.8.0 で確認）がもともと書いているファイルを collector が読む。5 セッションの `~/.claude/settings.json` には触らない。
+
+**読むファイル**（`collector.config.ts` に固定。読むだけで、書かない・ロックしない）
+
+- `~/.mulmoterminal/dev-terminal-cwds.json`: 名前は .json だが中身は行ログ。1 行が `<セッション ID> <絶対パス>`。グリッドのセルが接続したとき、新しい ID か cwd が変わったときに追記される。同じ ID が何度も出たら最後の行が正
+- `~/.mulmoterminal/activity-state.json`: `{ "<ID>": { working, waiting, event } }`。作業中か待ちのセッションだけが残り、暇なセッションは消える。時刻は持たない
+
+**会社以外を捨てる**
+
+- 会社の 5 セッションの起動ディレクトリを `collector.config.ts` に固定する: `~/conect-management`（かなめ）、その下の `accounting`（経理）・`pr`（広報）・`planning`（企画）・`general-affairs`（総務）。ホームは `os.homedir()` で決め、引数・環境変数では変えない
+- 行ログは 1 行ずつストリームで読み、パスが 5 つに**完全一致する行だけ**を残す（末尾の `/`、子ディレクトリ、worktree は当たらない）。それ以外の行はその場で比べて捨て、変数にためず、保存も、件数を含めてログもしない。会社の ID が後で別のパスの行に出たら、その ID は会社の候補から外す（ID の最後の行が正）
+- パスごとに、残った候補のうち最後の行の ID を今のセッションとする。行は MulmoTerminal と同じく前後の空白を落とし、最初の空白で ID とパスに分ける（パスの中の空白はそのまま）。ID が UUID の形でない行、空行、壊れた行は飛ばす
+- activity-state.json からは、その ID のキーだけを引く。ほかのキーは見ない（壊れていても関係ない）。全体が JSON のオブジェクトであることと、会社のエントリの形（`working`・`waiting` が真偽値、`event` が文字列か null）を zod で確かめる
+- snapshot に入れるのは部門（かなめは null）と状態だけ。ID とパスは入れない
+
+**状態の規則**（上から最初に当たったもの）
+
+| 条件 | 状態 | 画面 |
+|---|---|---|
+| `waiting` かつ `event === 'Notification'` | awaiting-permission | 許可待ち |
+| `working` | working | いま作業中 |
+| `waiting`（Stop・MarkedUnread など） | resting（一区切り） | GitHub で決める |
+| エントリなし（セッションが行ログに無い場合も） | idle（待機） | GitHub で決める |
+
+**読めないとき**
+
+- 行ログか activity-state.json が無い、読めない、JSON として壊れている（MulmoTerminal は `fs.writeFile` で書き直すので、空や途中の JSON が見えることがある）、会社のエントリの形が違う → その周期の `sessions` は `unavailable`。GitHub の部分はそのまま書く。次の周期（5 秒後）に読み直す
+- ログは種類だけ（`missing`・`read-failed`・`parse-failed`・`invalid`）
+- 画面は `sessions.checkedAt` が 30 秒より古ければ（collector が止まった）リアルタイムの状態を使わず、GitHub だけで決める。`unavailable` か古いときは取得の窓に小さく出す
+
+**制約**（画面に出る状態の限界）
+
+- MulmoTerminal で表示中のペインで終わった作業は、一区切り（resting）と待機（idle）を区別できない（どちらも GitHub で決めるので、画面の表示は同じになる）
+- 携帯から許可に答えると、`Notification` が残ったままになることがある（次のイベントで直る）。その間は「許可待ち」と出る
+- グリッドのセル以外で開いたセッション（ふつうのターミナルの `claude` など）は行ログに載らないので映らない
+- MulmoTerminal の内部ファイルなので、版が上がると形が変わりうる。zod で確かめ、合わなければリアルタイムだけを止める（GitHub の表示は続ける）
 
 ## 5. 公開範囲
 
@@ -209,7 +256,7 @@ packages/collector ──検証して一時ファイルに書き rename──▶
 | M0 | 雛形 | `npm create vite`（vue-ts）、LICENSE、この設計書、ESLint（sonarjs）・Prettier・vitest・CI（`npm ci --ignore-scripts`）。7 章の手順で依存を入れて lockfile をコミット。`vite.config.ts` で `server.host: '127.0.0.1'`。collector の最小の雛形を置き、`node packages/collector/src/main.ts --once` が型除去で起動して設定を読み、GitHub に触れずに終わることを確かめる（実際の収集は M1）。collector の型検査も verify に入れる |
 | M1 | 静止画 + 生データ + クリア表示 | コンセプト画を背景にし、Vue の窓（掲示板・パーティ・メッセージ）に本物の値を出す。中身: collector の 60 秒ごとの収集（open / closed の Issue・PR、全ページ、原子的な書き込み）、snapshot 配信プラグイン、画面の 30 秒ごとの再取得、差分による 1 回限りのクリア表示（Vue のメッセージ窓）、`schemaVersion` と古さの表示。domain のテストもここで |
 | M2 | Canvas の社屋 | タイルとスプライトで社屋を描き直す。6 人が席に座る。イベントで歩く（かなめが巻物を机まで運ぶ、担当が宝箱を受付に届ける。部屋から出ない）、吹き出し、紙吹雪。論理解像度 1024×576（32px タイル × 32×18 マス、キャラは 80×80 のコマ）を画面の幅に合わせて拡大する（2026-10-12、社長の判断で 16px から 2 倍に）。部屋は原画の比率で、家具を大きくし、壁・机・床を小物で埋める（2026-10-12、社長の判断）。演出はメッセージ窓に出た瞬間に始まる。メッセージは 8 秒ずつ進むが、次の演出に出る人（かなめなど）が前の演出から戻るまでは次のメッセージを出さない（紙吹雪とお知らせは 8 秒のまま）。ページが非表示の間はメッセージも演出も止まり、表示に戻ると続きから進む。出来事が無い間も小さく動く（アンビエント） |
-| M3 | リアルタイム | Claude Code の hooks で「今まさに作業中 / 許可待ち」を拾う。hooks は `~/.conect-guild/events.jsonl`（0600）に 1 行追記するだけ。collector が読み、snapshot に混ぜる。`tool_input` は保存しない。**5 セッションの `~/.claude/settings.json` を触るので、着手前に社長の承認を改めて取る** |
+| M3 | リアルタイム | 「いま作業中 / 許可待ち」を数秒の遅れでパーティの窓に出す。hooks は足さず、collector が MulmoTerminal のファイル（`dev-terminal-cwds.json` と `activity-state.json`）を 5 秒ごとに読み、会社の 5 セッションの部門と状態だけを snapshot（`schemaVersion` 2）に混ぜる（4.7）。会社以外の行は捨てる。画面は 5 秒ごとに再取得する。Canvas への表示（吹き出し・動き）は M2 のマージ後に別に足す |
 | M4 | 遊び | 効果音、昼夜、累積の経験値とレベル（集計の持ち方を設計してから）、レベルアップの演出、ネコ |
 
 M1 まで行けば「本物の Issue が掲示板に出て、クローズでクリアのメッセージが出る」ところまで見られる。かなめの受け渡しなどの演出は M2 から。
@@ -253,9 +300,10 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 1. zod を入れる（実行時の依存は Vue と zod の 2 つ）
 2. 置き場所は `~/my-apps/conect-guild`。`~/.claude/repos.md` に行を足す
 3. タイルもキャラ 6 体も codex 生成（タイルは当初 CC0 素材の予定だったが、2026-10-12 に社長の判断でコンセプト画に雰囲気を合わせるため codex 生成に変えた）
-4. M3 の hooks は、着手前に改めて承認を取る
+4. M3 の hooks は、着手前に改めて承認を取る → 2026-10-12 に社長が判断: hooks は足さず、MulmoTerminal のファイルを読む（10 章 7）
 5. メンバーの名前は確定（1 章の表。かなめ・みのり・ひびき・ひらめ・ささえ・ゆきひろ）
 6. 実データは `apps/web/.data/` に置き、開発時だけの自作プラグインで配信する。build と CI はダミーだけ（5 章）
+7. M3 のセッションの状態は、Claude Code の hooks を足さず、MulmoTerminal が書くファイルを collector が読んで取る（社長の判断）。5 セッションの設定を触らずに済む。会社の 5 つの起動ディレクトリに完全一致する行だけを使い、ほかは捨てる。MulmoTerminal の内部ファイルなので、形が合わなければリアルタイムだけを止める（4.7）
 
 ## 11. 作り方の体制
 
@@ -265,6 +313,12 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 
 ## 変更履歴
 
+- **M3（2026-10-12）** セッションの状態を足した
+  - hooks の案（`~/.conect-guild/events.jsonl`）をやめ、MulmoTerminal のファイルを読む方式にした（2 章 5、4.7、6 章 M3、10 章 4・7。社長の判断）
+  - snapshot に `sessions` を足し、`schemaVersion` を 2 に上げた（4.2）
+  - collector は 5 秒ごとに回り、GitHub は 60 秒ごとのまま。GitHub に失敗しても最後の正常な結果でセッションの部分を書き直す（4.1）
+  - 状態の優先順位に「許可待ち」「いま作業中」を足した（4.6）
+  - 画面の再取得を 30 秒から 5 秒にした。古さの印は GitHub の取得時刻で、セッションの古さ（30 秒）は別に見る（4.3、4.7）
 - **M2（2026-10-12）** Canvas の社屋を入れた
   - タイルを CC0 素材から codex 生成に変えた（8 章、10 章 3。社長の判断）
   - 論理解像度を 1024×576（32px タイル）にした（6 章。社長の判断で 2 倍に）。キャラのコマは 64px で始め、同日に原画の比率に合わせて 80px にした
