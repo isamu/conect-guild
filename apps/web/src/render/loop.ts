@@ -51,7 +51,7 @@ export interface RenderLoopOptions {
 }
 
 export interface RenderLoop {
-  /** Starts the scene for an event now (or when its cast is free). */
+  /** Starts the scene for an event now (or when its cast is free); dropped while not shown. */
   play(event: GuildEvent): void;
   setBubbles(bubbles: Bubbles): void;
   /** The members' ambient moves (from the party state). */
@@ -76,9 +76,22 @@ function staticLayer(art: GuildArt): HTMLCanvasElement {
   return layer;
 }
 
+/** False while narrow screens hide the canvas (display: none gives it no width). */
+export function isShown(cssWidth: number): boolean {
+  return cssWidth > 0;
+}
+
+/**
+ * The scenes to keep: none while the canvas is out of sight, so they never play late when it comes
+ * back (the message queue drops them too and does not wait for them).
+ */
+export function scenesShown(director: Director, cssWidth: number): Director {
+  return isShown(cssWidth) ? director : EMPTY_DIRECTOR;
+}
+
 /** True while drawing would not be seen: the page is hidden or the canvas has no width. */
 export function isPaused(pageHidden: boolean, cssWidth: number): boolean {
-  return pageHidden || cssWidth <= 0;
+  return pageHidden || !isShown(cssWidth);
 }
 
 export interface Scheduler {
@@ -185,19 +198,20 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
     const frame = frameAt(director, t, DEFAULT_SEATS, { moods, seeds });
     paint(ctx, { background, art, scale }, t, { frame, bubbles });
     director = prune(director, t);
-    const next = nextDraw({
-      hidden: paused(),
-      animating: isAnimating(director, t),
-      ambient: Object.keys(moods).length > 0 || ANIMATED_DECOR.length > 0,
-    });
+    const ambient = Object.keys(moods).length > 0 || ANIMATED_DECOR.length > 0;
+    const next = nextDraw({ hidden: paused(), animating: isAnimating(director, t), ambient });
     if (next === 'frame') schedule.now();
     if (next === 'ambient') schedule.later();
   }
 
   const paused = () => isPaused(visibility.isHidden(), cssWidth);
   const schedule = createScheduler(draw, paused);
-  /** Stops or restarts the stage clock with the paused state, then draws (or not) to match. */
+  /**
+   * Drops the scenes nobody can see, stops or restarts the stage clock with the paused state, then
+   * draws (or not) to match.
+   */
   function refresh(): void {
+    director = scenesShown(director, cssWidth);
     clock = withPaused(clock, paused(), now());
     schedule.refresh();
   }
@@ -206,7 +220,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   return {
     play(event) {
       director = scheduleEvent(director, event, stageNow(), { seats: DEFAULT_SEATS, random });
-      schedule.now();
+      refresh();
     },
     setBubbles(next) {
       bubbles = next;
