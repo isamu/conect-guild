@@ -79,7 +79,8 @@ export function sessionStateOf(entry: ActivityEntry | undefined): SessionState {
   return 'idle';
 }
 
-export type SessionsFailureKind = 'missing' | 'read-failed' | 'parse-failed' | 'invalid';
+export type SessionsFailureKind =
+  'missing' | 'read-failed' | 'too-large' | 'parse-failed' | 'invalid';
 
 export type SessionsReading =
   | {
