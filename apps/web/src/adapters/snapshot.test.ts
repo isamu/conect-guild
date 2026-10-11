@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadSnapshot, validateSnapshot, defaultSnapshotUrl, type FetchFn } from './snapshot';
 
 const validSnapshot = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   fetchedAt: '2026-10-12T00:00:00Z',
   repo: 'example/guild',
   issues: [
@@ -17,6 +17,11 @@ const validSnapshot = {
     },
   ],
   prs: [],
+  sessions: {
+    status: 'ok',
+    checkedAt: '2026-10-12T00:00:05Z',
+    members: [{ department: null, state: 'working' }],
+  },
 };
 
 function respondWith(body: string, status = 200): FetchFn {
@@ -104,7 +109,7 @@ describe('loadSnapshot: timeouts', () => {
 });
 
 describe('loadSnapshot: bodies', () => {
-  it.each(['', '{', '{"schemaVersion":1,', '<html>404</html>'])(
+  it.each(['', '{', '{"schemaVersion":2,', '<html>404</html>'])(
     'reports broken JSON %j as parse',
     async (body) => {
       const result = await loadSnapshot({ url: '/s.json', fetchFn: respondWith(body) });
@@ -112,8 +117,9 @@ describe('loadSnapshot: bodies', () => {
     },
   );
 
-  it('reports a different schemaVersion', async () => {
-    const body = JSON.stringify({ ...validSnapshot, schemaVersion: 2 });
+  it('reports a v1 snapshot from an old collector as schema-version', async () => {
+    // JSON.stringify drops the undefined sessions, as an old collector wrote no sessions key.
+    const body = JSON.stringify({ ...validSnapshot, schemaVersion: 1, sessions: undefined });
     const result = await loadSnapshot({ url: '/s.json', fetchFn: respondWith(body) });
     expect(result).toEqual({ ok: false, reason: 'schema-version' });
   });
@@ -131,7 +137,8 @@ describe('loadSnapshot: bodies', () => {
 
 describe('validateSnapshot', () => {
   it.each([
-    ['a newer version', { ...validSnapshot, schemaVersion: 2 }],
+    ['the previous version', { ...validSnapshot, schemaVersion: 1 }],
+    ['a newer version', { ...validSnapshot, schemaVersion: 3 }],
     ['version 0', { ...validSnapshot, schemaVersion: 0 }],
     ['an otherwise empty object with another version', { schemaVersion: 99 }],
   ])('reports schema-version for %s', (_label, value) => {
@@ -145,6 +152,11 @@ describe('validateSnapshot', () => {
     ['a missing schemaVersion', { ...validSnapshot, schemaVersion: undefined }],
     ['a string schemaVersion', { ...validSnapshot, schemaVersion: '1' }],
     ['a missing issues array', { ...validSnapshot, issues: undefined }],
+    ['missing sessions', { ...validSnapshot, sessions: undefined }],
+    [
+      'a session id in the sessions',
+      { ...validSnapshot, sessions: { ...validSnapshot.sessions, id: 'x' } },
+    ],
     ['an unknown top-level key', { ...validSnapshot, body: 'secret' }],
     ['a bad fetchedAt', { ...validSnapshot, fetchedAt: 'yesterday' }],
     [

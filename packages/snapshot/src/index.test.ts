@@ -23,8 +23,10 @@ describe('snapshotSchema', () => {
     expect(result.data?.schemaVersion).toBe(SNAPSHOT_SCHEMA_VERSION);
   });
 
-  it('rejects another schemaVersion', () => {
-    expect(snapshotSchema.safeParse({ ...sampleRecord(), schemaVersion: 2 }).success).toBe(false);
+  it.each([1, 3])('rejects schemaVersion %i', (version) => {
+    expect(snapshotSchema.safeParse({ ...sampleRecord(), schemaVersion: version }).success).toBe(
+      false,
+    );
   });
 
   it('rejects unknown keys so bodies cannot slip in', () => {
@@ -48,5 +50,65 @@ describe('snapshotSchema', () => {
     ['a missing prs array', { prs: undefined }],
   ])('rejects %s', (_label, patch) => {
     expect(snapshotSchema.safeParse({ ...sampleRecord(), ...patch }).success).toBe(false);
+  });
+});
+
+const CHECKED_AT = '2026-10-12T09:00:05.000Z';
+
+describe('snapshotSchema: sessions', () => {
+  function withSessions(sessions: unknown) {
+    return snapshotSchema.safeParse({ ...sampleRecord(), sessions });
+  }
+
+  it('accepts unavailable sessions and an empty member list', () => {
+    expect(withSessions({ status: 'unavailable', checkedAt: CHECKED_AT }).success).toBe(true);
+    expect(withSessions({ status: 'ok', checkedAt: CHECKED_AT, members: [] }).success).toBe(true);
+  });
+
+  it('accepts かなめ as department null', () => {
+    const members = [{ department: null, state: 'awaiting-permission' }];
+    expect(withSessions({ status: 'ok', checkedAt: CHECKED_AT, members }).success).toBe(true);
+  });
+
+  it.each([
+    ['missing sessions', undefined],
+    ['an unknown status', { status: 'maybe', checkedAt: CHECKED_AT }],
+    ['a missing checkedAt', { status: 'unavailable' }],
+    ['members on unavailable', { status: 'unavailable', checkedAt: CHECKED_AT, members: [] }],
+    [
+      'an unknown state',
+      { status: 'ok', checkedAt: CHECKED_AT, members: [{ department: '経理', state: 'busy' }] },
+    ],
+    [
+      'an unknown department',
+      { status: 'ok', checkedAt: CHECKED_AT, members: [{ department: '営業', state: 'idle' }] },
+    ],
+    [
+      'a session id slipped into a member',
+      {
+        status: 'ok',
+        checkedAt: CHECKED_AT,
+        members: [
+          { department: '経理', state: 'idle', id: '00000000-0000-0000-0000-000000000000' },
+        ],
+      },
+    ],
+    [
+      'a path slipped into the sessions',
+      { status: 'unavailable', checkedAt: CHECKED_AT, cwd: '/home/someone' },
+    ],
+    [
+      'two entries for one department',
+      {
+        status: 'ok',
+        checkedAt: CHECKED_AT,
+        members: [
+          { department: null, state: 'idle' },
+          { department: null, state: 'working' },
+        ],
+      },
+    ],
+  ])('rejects %s', (_label, sessions) => {
+    expect(withSessions(sessions).success).toBe(false);
   });
 });
