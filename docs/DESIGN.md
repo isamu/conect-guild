@@ -121,7 +121,7 @@ packages/collector ──検証して一時ファイルに書き rename──▶
 - **PR**: open は全部、closed / merged は直近 7 日のもの。全ページ取る
 - **PR と Issue の結び付け**: PR の題名と本文から、同じリポジトリを指す参照（`#番号` と `<対象リポジトリ>#番号`）を正規表現で拾い、`linkedIssues: number[]` として持つ。別リポジトリの参照（`owner/other#番号`）は拾わない。`Closes`・`Fixes`・`Resolves` の後の参照が 1 つでもあれば、それだけを使う。本文そのものは保存しない
 - **変更ファイル**: open PR だけ、`gh api --paginate --jq` で `repos/<r>/pulls/<n>/files` の `filename` だけを取り、`changedFiles: string[]` として持つ（差分の中身は取らない）
-- **間隔**: GitHub は 60 秒ごと（`gh` のレート制限に十分収まる）。collector 自体は 5 秒ごとに回り、セッションの状態（4.7）を読むたびに、GitHub の最後の正常な結果と合わせて snapshot を書き直す。`--once` で 1 回だけ（GitHub とセッションを 1 回ずつ）実行もできる
+- **間隔**: GitHub は 60 秒ごと（`gh` のレート制限に十分収まる）。collector 自体は 5 秒ごとに回り、セッションの状態（4.7）を読むたびに、GitHub の最後の正常な結果と合わせて snapshot を書き直す。GitHub の取得は裏で走らせ、遅くてもセッションの 5 秒の周期を止めない（最初の 1 回だけは、書くものが無いので待つ）。`--once` で 1 回だけ（GitHub とセッションを 1 回ずつ）実行もできる
 - **書き込み**: 取得した結果を zod で検証してから、同じディレクトリの一時ファイルに 0600 で書き、`rename` で `apps/web/.data/snapshot.json` を原子的に置き換える。画面が書きかけの JSON を読むことはない
 - **失敗したとき**: GitHub の取得や検証に 1 つでも失敗したら、GitHub の部分は直前の正常なもの（`fetchedAt` も直前のまま）を使い、空の配列で上書きしない。起動してから GitHub が一度も成功していなければ snapshot を書かない。セッションの状態が読めないときは `sessions` を `unavailable` にし、GitHub の部分の書き込みは妨げない
 - **ログ**: 出すのは件数・時刻・エラーの種類だけ。題名・本文・ブランチ名・パス・セッション ID はログに出さない。セッションの行（`sessions=5 ok` / `sessions unavailable: parse-failed`）は 5 秒ごとには出さず、変わったときだけ出す
@@ -143,7 +143,7 @@ packages/collector ──検証して一時ファイルに書き rename──▶
 }
 ```
 
-本文とコメントは保存しない。MulmoTerminal のセッション ID とパスも保存しない（部門と状態だけ）。
+本文とコメントは保存しない。MulmoTerminal のセッション ID とパスも保存しない（部門と状態だけ）。`members` はかなめと 4 部門のちょうど 5 件（セッションが無い席は `idle`）。
 
 `schemaVersion` は M3 で 2 に上げた（`sessions` を足したため）。v1 の snapshot（古い collector が書いたもの）は、画面が「収集スクリプトを更新してください」で止める。
 
@@ -230,7 +230,8 @@ M3 からは、セッションの状態（4.7）を混ぜる。優先順位は �
 **読めないとき**
 
 - 行ログか activity-state.json が無い、読めない、JSON として壊れている（MulmoTerminal は `fs.writeFile` で書き直すので、空や途中の JSON が見えることがある）、会社のエントリの形が違う → その周期の `sessions` は `unavailable`。GitHub の部分はそのまま書く。次の周期（5 秒後）に読み直す
-- ログは種類だけ（`missing`・`read-failed`・`parse-failed`・`invalid`）
+- 行ログが 16 MB、activity-state.json が 1 MB を超えていたら、読まずに `unavailable` にする（どちらもふだんは数十 KB 以下。5 秒ごとに全部読むので上限を置く）
+- ログは種類だけ（`missing`・`read-failed`・`too-large`・`parse-failed`・`invalid`）
 - 画面は `sessions.checkedAt` が 30 秒より古ければ（collector が止まった）リアルタイムの状態を使わず、GitHub だけで決める。`unavailable` か古いときは取得の窓に小さく出す
 
 **制約**（画面に出る状態の限界）
