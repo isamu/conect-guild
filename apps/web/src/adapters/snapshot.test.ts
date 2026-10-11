@@ -20,7 +20,13 @@ const validSnapshot = {
   sessions: {
     status: 'ok',
     checkedAt: '2026-10-12T00:00:05Z',
-    members: [{ department: null, state: 'working' }],
+    members: [
+      { department: null, state: 'working' },
+      { department: '経理', state: 'awaiting-permission' },
+      { department: '広報', state: 'resting' },
+      { department: '企画', state: 'idle' },
+      { department: '総務', state: 'idle' },
+    ],
   },
 };
 

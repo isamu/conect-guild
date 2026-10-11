@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { snapshotSchema } from '@conect-guild/snapshot';
 import { describe, expect, it } from 'vitest';
+import type { CompanySeat } from '../collector.config.ts';
 import { CollectorError } from './errors.ts';
 import { collectOnce, runCollector } from './run.ts';
 import {
@@ -14,6 +15,17 @@ import {
   SESSIONS_OK,
 } from './run.fixtures.test-util.ts';
 import { readCompanySessions } from './sessionFiles.ts';
+
+/** The five company seats under `root`, as collector.config.ts fixes them under the home. */
+function seatsUnder(root: string): CompanySeat[] {
+  return [
+    { department: null, cwd: root },
+    { department: '経理', cwd: join(root, 'accounting') },
+    { department: '広報', cwd: join(root, 'pr') },
+    { department: '企画', cwd: join(root, 'planning') },
+    { department: '総務', cwd: join(root, 'general-affairs') },
+  ];
+}
 
 describe('collectOnce', () => {
   it('writes one validated snapshot built from every page', async () => {
@@ -174,12 +186,13 @@ describe('runCollector --once: sessions', () => {
       const deps = harness(fakeGh(), {
         readSessions: () =>
           readCompanySessions({
-            seats: [{ department: null, cwd: root }],
+            seats: seatsUnder(root),
             cwdLogPath,
             activityStatePath,
           }),
       });
       await expect(runCollector(['--once'], deps)).resolves.toBe(0);
+      expect(deps.writes).toHaveLength(1);
       const output = [...deps.logs, ...deps.errors, ...deps.writes].join('\n');
       for (const secret of [other, otherPath, company, root, dir]) {
         expect(output).not.toContain(secret);

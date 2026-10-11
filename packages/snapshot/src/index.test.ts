@@ -55,18 +55,31 @@ describe('snapshotSchema', () => {
 
 const CHECKED_AT = '2026-10-12T09:00:05.000Z';
 
-describe('snapshotSchema: sessions', () => {
-  function withSessions(sessions: unknown) {
-    return snapshotSchema.safeParse({ ...sampleRecord(), sessions });
-  }
+const FIVE: readonly Record<string, unknown>[] = [
+  { department: null, state: 'awaiting-permission' },
+  { department: '経理', state: 'working' },
+  { department: '広報', state: 'resting' },
+  { department: '企画', state: 'idle' },
+  { department: '総務', state: 'idle' },
+];
 
-  it('accepts unavailable sessions and an empty member list', () => {
+function withSessions(sessions: unknown) {
+  return snapshotSchema.safeParse({ ...sampleRecord(), sessions });
+}
+
+/** `ok` sessions with the five members, the first one patched. */
+function okWithFirst(patch: Record<string, unknown>) {
+  const [first, ...rest] = FIVE;
+  return { status: 'ok', checkedAt: CHECKED_AT, members: [{ ...first, ...patch }, ...rest] };
+}
+
+describe('snapshotSchema: sessions', () => {
+  it('accepts unavailable sessions', () => {
     expect(withSessions({ status: 'unavailable', checkedAt: CHECKED_AT }).success).toBe(true);
-    expect(withSessions({ status: 'ok', checkedAt: CHECKED_AT, members: [] }).success).toBe(true);
   });
 
-  it('accepts かなめ as department null', () => {
-    const members = [{ department: null, state: 'awaiting-permission' }];
+  it('accepts かなめ (department null) and the four departments in any order', () => {
+    const members = [...FIVE].reverse();
     expect(withSessions({ status: 'ok', checkedAt: CHECKED_AT, members }).success).toBe(true);
   });
 
@@ -76,39 +89,30 @@ describe('snapshotSchema: sessions', () => {
     ['a missing checkedAt', { status: 'unavailable' }],
     ['members on unavailable', { status: 'unavailable', checkedAt: CHECKED_AT, members: [] }],
     [
-      'an unknown state',
-      { status: 'ok', checkedAt: CHECKED_AT, members: [{ department: '経理', state: 'busy' }] },
-    ],
-    [
-      'an unknown department',
-      { status: 'ok', checkedAt: CHECKED_AT, members: [{ department: '営業', state: 'idle' }] },
-    ],
-    [
-      'a session id slipped into a member',
-      {
-        status: 'ok',
-        checkedAt: CHECKED_AT,
-        members: [
-          { department: '経理', state: 'idle', id: '00000000-0000-0000-0000-000000000000' },
-        ],
-      },
-    ],
-    [
       'a path slipped into the sessions',
       { status: 'unavailable', checkedAt: CHECKED_AT, cwd: '/home/someone' },
     ],
-    [
-      'two entries for one department',
-      {
-        status: 'ok',
-        checkedAt: CHECKED_AT,
-        members: [
-          { department: null, state: 'idle' },
-          { department: null, state: 'working' },
-        ],
-      },
-    ],
   ])('rejects %s', (_label, sessions) => {
     expect(withSessions(sessions).success).toBe(false);
+  });
+});
+
+describe('snapshotSchema: session members', () => {
+  it.each([
+    ['an empty member list', []],
+    ['a missing department', FIVE.slice(1)],
+    ['a sixth entry', [...FIVE, { department: '経理', state: 'idle' }]],
+    ['two entries for one department', [...FIVE.slice(0, 4), { department: null, state: 'idle' }]],
+  ])('rejects %s', (_label, members) => {
+    expect(withSessions({ status: 'ok', checkedAt: CHECKED_AT, members }).success).toBe(false);
+  });
+
+  it.each([
+    ['an unknown state', { state: 'busy' }],
+    ['an unknown department', { department: '営業' }],
+    ['a session id slipped into a member', { id: '00000000-0000-0000-0000-000000000000' }],
+  ])('rejects %s', (_label, patch) => {
+    expect(withSessions(okWithFirst(patch)).success).toBe(false);
+    expect(withSessions(okWithFirst({})).success).toBe(true);
   });
 });
