@@ -19,8 +19,8 @@ import { DEFAULT_SEATS } from './scenes';
 /**
  * The requestAnimationFrame loop. It runs every frame while a scene plays; between scenes it
  * redraws only every AMBIENT.frameMs for the members' small moves (or sleeps when there are none)
- * until the bubbles change, a scene starts or the canvas is resized. While the page is hidden it
- * does not run at all.
+ * until the bubbles change, a scene starts or the canvas is resized. While the page is hidden or
+ * the canvas has no width (narrow screens hide it) it does not run at all.
  */
 
 /** Whether the page is shown, and a way to hear when that changes. */
@@ -87,17 +87,23 @@ function staticLayer(art: GuildArt): HTMLCanvasElement {
   return layer;
 }
 
-interface Scheduler {
+/** True while drawing would not be seen: the page is hidden or the canvas has no width. */
+export function isPaused(pageHidden: boolean, cssWidth: number): boolean {
+  return pageHidden || cssWidth <= 0;
+}
+
+export interface Scheduler {
   /** Draws on the next animation frame (sooner than any ambient wait). */
   now(): void;
   /** Draws after AMBIENT.frameMs unless a draw is already on the way. */
   later(): void;
-  isHidden(): boolean;
+  /** Cancels what is pending when paused, otherwise draws soon (after a pause ends). */
+  refresh(): void;
   stop(): void;
 }
 
-/** One pending draw at most; nothing runs while the page is hidden or after stop(). */
-function createScheduler(draw: () => void, visibility: PageVisibility): Scheduler {
+/** One pending draw at most; nothing runs while `paused()` is true or after stop(). */
+export function createScheduler(draw: () => void, paused: () => boolean): Scheduler {
   let pending: number | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
@@ -110,7 +116,7 @@ function createScheduler(draw: () => void, visibility: PageVisibility): Schedule
   }
 
   function now(): void {
-    if (stopped || visibility.isHidden() || pending !== null) return;
+    if (stopped || paused() || pending !== null) return;
     if (timer !== null) clearTimeout(timer);
     timer = null;
     pending = requestAnimationFrame(() => {
@@ -120,28 +126,38 @@ function createScheduler(draw: () => void, visibility: PageVisibility): Schedule
   }
 
   function later(): void {
-    if (stopped || pending !== null || timer !== null) return;
+    if (stopped || paused() || pending !== null || timer !== null) return;
     timer = setTimeout(() => {
       timer = null;
       now();
     }, AMBIENT.frameMs);
   }
 
-  const unsubscribe = visibility.subscribe(() => {
-    if (visibility.isHidden()) cancel();
-    else now();
-  });
-
   return {
     now,
     later,
-    isHidden: () => visibility.isHidden(),
+    refresh() {
+      if (paused()) cancel();
+      else now();
+    },
     stop() {
       stopped = true;
       cancel();
-      unsubscribe();
     },
   };
+}
+
+/**
+ * Matches the backing store to the displayed width; returns the new scale, or null when nothing
+ * changed or the canvas is not shown (width 0).
+ */
+function fitCanvas(canvas: HTMLCanvasElement, cssWidth: number, pixelRatio: number): number | null {
+  if (cssWidth <= 0) return null;
+  const width = Math.max(Math.round(cssWidth * pixelRatio), 1);
+  if (canvas.width === width) return null;
+  canvas.width = width;
+  canvas.height = Math.round((width * LOGICAL_HEIGHT) / LOGICAL_WIDTH);
+  return width / LOGICAL_WIDTH;
 }
 
 export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
@@ -151,6 +167,9 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   const ctx = context2d(canvas);
   const background = staticLayer(art);
   const seeds = createAmbientSeeds(random);
+  const visibility = options.visibility ?? documentVisibility;
+  // Narrow screens hide the canvas (display: none): its width is 0 and nothing is drawn.
+  let cssWidth = 1;
   let director: Director = EMPTY_DIRECTOR;
   let bubbles: Bubbles = {};
   let moods: AmbientMoods = {};
@@ -164,7 +183,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
     drawActors(ctx, frameAt(director, t, DEFAULT_SEATS, { moods, seeds }), bubbles, art);
     director = prune(director, t);
     const next = nextDraw({
-      hidden: schedule.isHidden(),
+      hidden: paused(),
       animating: isAnimating(director, t),
       ambient: Object.keys(moods).length > 0,
     });
@@ -172,7 +191,11 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
     if (next === 'ambient') schedule.later();
   }
 
-  const schedule = createScheduler(draw, options.visibility ?? documentVisibility);
+  const paused = () => isPaused(visibility.isHidden(), cssWidth);
+  const schedule = createScheduler(draw, paused);
+  const unsubscribe = visibility.subscribe(() => {
+    schedule.refresh();
+  });
   schedule.now();
   return {
     play(event) {
@@ -187,16 +210,14 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
       moods = next;
       schedule.now();
     },
-    resize(cssWidth, pixelRatio) {
-      const width = Math.max(Math.round(cssWidth * pixelRatio), 1);
-      if (canvas.width === width) return;
-      canvas.width = width;
-      canvas.height = Math.round((width * LOGICAL_HEIGHT) / LOGICAL_WIDTH);
-      scale = width / LOGICAL_WIDTH;
-      schedule.now();
+    resize(nextCssWidth, pixelRatio) {
+      cssWidth = nextCssWidth;
+      scale = fitCanvas(canvas, cssWidth, pixelRatio) ?? scale;
+      schedule.refresh();
     },
     stop() {
       schedule.stop();
+      unsubscribe();
     },
   };
 }

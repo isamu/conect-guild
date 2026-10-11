@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { nextDraw } from './loop';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AMBIENT } from './metrics';
+import { createScheduler, isPaused, nextDraw } from './loop';
 
 describe('nextDraw', () => {
   it('draws every frame while a scene plays', () => {
@@ -18,5 +19,106 @@ describe('nextDraw', () => {
   it('sleeps while the page is hidden, even during a scene', () => {
     expect(nextDraw({ hidden: true, animating: true, ambient: true })).toBe('sleep');
     expect(nextDraw({ hidden: true, animating: false, ambient: true })).toBe('sleep');
+  });
+});
+
+describe('isPaused', () => {
+  it('pauses while the page is hidden', () => {
+    expect(isPaused(true, 800)).toBe(true);
+  });
+
+  it('pauses while the canvas has no width (hidden on narrow screens)', () => {
+    expect(isPaused(false, 0)).toBe(true);
+  });
+
+  it('runs on a shown page with a visible canvas', () => {
+    expect(isPaused(false, 800)).toBe(false);
+  });
+});
+
+function useFakeFrames(): void {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal('requestAnimationFrame', (cb: () => void) => setTimeout(cb, 16));
+    vi.stubGlobal('cancelAnimationFrame', (id: ReturnType<typeof setTimeout>) => {
+      clearTimeout(id);
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+}
+
+/** A scheduler whose draw keeps asking for the next ambient move, like the loop between scenes. */
+function ambientLoop(paused: () => boolean) {
+  const counter = { draws: 0 };
+  const schedule = createScheduler(() => {
+    counter.draws += 1;
+    schedule.later();
+  }, paused);
+  return { schedule, counter };
+}
+
+describe('createScheduler: drawing', () => {
+  useFakeFrames();
+
+  it('redraws about every AMBIENT.frameMs between scenes', () => {
+    const { schedule, counter } = ambientLoop(() => false);
+    schedule.now();
+    vi.advanceTimersByTime(1_000);
+    const perSecond = 1_000 / (AMBIENT.frameMs + 16);
+    expect(counter.draws).toBeGreaterThanOrEqual(Math.floor(perSecond));
+    expect(counter.draws).toBeLessThanOrEqual(Math.ceil(perSecond) + 1);
+  });
+
+  it('draws once for several requests in the same frame', () => {
+    const draw = vi.fn();
+    const schedule = createScheduler(draw, () => false);
+    schedule.now();
+    schedule.now();
+    schedule.later();
+    vi.advanceTimersByTime(1_000);
+    expect(draw).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('createScheduler: pausing and stopping', () => {
+  useFakeFrames();
+
+  it('stops drawing while paused and starts again on refresh', () => {
+    let paused = false;
+    const { schedule, counter } = ambientLoop(() => paused);
+    schedule.now();
+    vi.advanceTimersByTime(500);
+    paused = true;
+    schedule.refresh();
+    const before = counter.draws;
+    vi.advanceTimersByTime(2_000);
+    expect(counter.draws).toBe(before);
+    expect(vi.getTimerCount()).toBe(0);
+    schedule.now();
+    schedule.later();
+    vi.advanceTimersByTime(500);
+    expect(counter.draws).toBe(before);
+    paused = false;
+    schedule.refresh();
+    vi.advanceTimersByTime(500);
+    expect(counter.draws).toBeGreaterThan(before);
+  });
+
+  it('does nothing after stop, leaving no timer behind', () => {
+    const { schedule, counter } = ambientLoop(() => false);
+    schedule.now();
+    vi.advanceTimersByTime(300);
+    schedule.stop();
+    const before = counter.draws;
+    expect(vi.getTimerCount()).toBe(0);
+    schedule.now();
+    schedule.later();
+    schedule.refresh();
+    vi.advanceTimersByTime(2_000);
+    expect(counter.draws).toBe(before);
   });
 });
