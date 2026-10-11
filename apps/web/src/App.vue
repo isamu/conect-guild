@@ -1,20 +1,20 @@
 <script setup lang="ts">
-// The concept art (repository file, bundled by Vite) is the M1 background; M2 replaces it with Canvas.
-import conceptArt from '../../../assets/concept/rpg-company-ui.png';
 import { useGuild } from './app/useGuild';
 import FetchStatus from './ui/FetchStatus.vue';
+import GuildCanvas from './ui/GuildCanvas.vue';
 import KingBubble from './ui/KingBubble.vue';
 import MessageWindow from './ui/MessageWindow.vue';
 import PartyStatus from './ui/PartyStatus.vue';
 import QuestBoard from './ui/QuestBoard.vue';
 
-const { state, board, party, king, fetchStatus, message, nextMessage, clearBaseline } = useGuild();
+const { state, board, party, king, fetchStatus, message, cue, nextMessage, clearBaseline } =
+  useGuild();
 </script>
 
 <template>
   <main class="guild">
     <div class="stage" :class="{ 'stage--halted': state.halted }">
-      <img class="stage__art" :src="conceptArt" alt="ギルドの社屋" />
+      <GuildCanvas class="stage__art" :party="party" :cue="cue" />
       <section v-if="state.halted" class="rpg-window stage__halt" role="alert">
         <h2 class="rpg-window__title">収集スクリプトを更新してください</h2>
         <p>snapshot.json の形（schemaVersion）が画面の想定と違うため、表示を止めています。</p>
@@ -51,12 +51,12 @@ const { state, board, party, king, fetchStatus, message, nextMessage, clearBasel
 }
 
 /*
- * The windows sit where the concept art paints its mock windows (1672 x 940 px), so they cover
- * the painted text. Sizes follow the stage width through container query units.
+ * The windows sit over the canvas (logical 512 x 288, 16:9) where the map keeps nobody
+ * (render/map.ts HIDDEN_AREAS). Sizes follow the stage width through container query units.
  */
 .stage {
   position: relative;
-  width: min(100%, 1672px, calc(100vh * 1672 / 940));
+  width: min(100%, 1672px, calc(100vh * 16 / 9));
   min-width: 320px;
   container-type: inline-size;
   font-size: clamp(9px, 1.15cqw, 19px);
@@ -64,13 +64,9 @@ const { state, board, party, king, fetchStatus, message, nextMessage, clearBasel
 
 .stage__art {
   display: block;
-  width: 100%;
-  height: auto;
-  image-rendering: pixelated;
-  user-select: none;
 }
 
-/* Halted: the painted mock windows must not pass for real data. */
+/* Halted: the stage must not pass for live data. */
 .stage--halted .stage__art {
   filter: blur(4px) brightness(0.35);
 }
@@ -87,7 +83,7 @@ const { state, board, party, king, fetchStatus, message, nextMessage, clearBasel
   left: 1.2%;
   top: 1.6%;
   width: 29%;
-  /* Heights in cqw (stage width) because the stage height is 940/1672 of it. */
+  /* Heights in cqw (stage width) because the stage height is 9/16 of it. */
   min-height: 17.7cqw;
   max-height: 34cqw;
 }
@@ -106,9 +102,10 @@ const { state, board, party, king, fetchStatus, message, nextMessage, clearBasel
   min-height: 21.1cqw;
 }
 
+/* Above the king on the throne (render/map.ts: seat col 16, row 3), tail towards him. */
 .stage__king {
-  left: 51.5%;
-  top: 3%;
+  left: 52.5%;
+  top: 0.8%;
   width: 9.6%;
   height: 7%;
 }
@@ -128,8 +125,8 @@ const { state, board, party, king, fetchStatus, message, nextMessage, clearBasel
 }
 
 /*
- * Narrow screens: stack the windows. The art is hidden because its painted mock windows (fake
- * quests and messages) would no longer be covered; the king's row still shows 承認まち.
+ * Narrow screens: stack the windows. The canvas is hidden because the windows no longer leave
+ * its stage free; the king's row still shows 承認まち.
  */
 @container (max-width: 760px) {
   .stage__art,

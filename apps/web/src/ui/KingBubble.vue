@@ -8,7 +8,7 @@ defineProps<{
 </script>
 
 <template>
-  <!-- Always drawn: it also covers the 承認まち bubble painted into the concept art. -->
+  <!-- Always drawn over the throne; the canvas draws no bubble for the king. -->
   <div class="bubble" :class="{ 'bubble--waiting': waiting }" :title="detail ?? undefined">
     {{ waiting ? '承認まち' : '……' }}
   </div>
