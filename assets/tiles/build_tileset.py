@@ -10,10 +10,12 @@ them, shrink them into w*16 x h*16 and turn the magenta into transparency.
 Keep LAYOUT in sync with tiles.ts.
 """
 
+import os
 import sys
 
 from PIL import Image
 
+RAW_SIZE = (1024, 512)
 TILE = 16
 SHEET_COLS = 8
 SHEET_ROWS = 4
@@ -113,6 +115,27 @@ def drawn_bbox(boxes, slot):
     )
 
 
+def slot_bbox(img, slot):
+    """Bounding box of opaque pixels clipped to slot (textures fill their cell
+    edge to edge, so neighbours may touch and global components would merge)."""
+    bbox = img.crop(slot).getchannel("A").getbbox()
+    if bbox is None:
+        raise SystemExit(f"empty slot at {slot}")
+    return (slot[0] + bbox[0], slot[1] + bbox[1], slot[0] + bbox[2], slot[1] + bbox[3])
+
+
+def checked_source_box(img, name, min_opaque=0.5):
+    """SOURCE_BOX entry, refusing boxes outside the image or mostly empty."""
+    box = SOURCE_BOX[name]
+    if not (0 <= box[0] < box[2] <= img.width and 0 <= box[1] < box[3] <= img.height):
+        raise SystemExit(f"SOURCE_BOX[{name!r}] {box} is outside the {img.size} image")
+    alpha = img.crop(box).getchannel("A")
+    opaque = alpha.histogram()[255] / (alpha.width * alpha.height)
+    if opaque < min_opaque:
+        raise SystemExit(f"SOURCE_BOX[{name!r}] is only {opaque:.0%} opaque; wrong source image?")
+    return box
+
+
 def shrink(img, size):
     """Area-average resize with premultiplied alpha, then binary alpha."""
     small = img.convert("RGBa").resize(size, Image.Resampling.BOX).convert("RGBA")
@@ -145,7 +168,11 @@ def build_object(img, bbox, size):
 
 
 def main(src, dst):
+    if os.path.realpath(src) == os.path.realpath(dst):
+        raise SystemExit("output path must differ from the source image")
     raw = keyed(Image.open(src))
+    if raw.size != RAW_SIZE:
+        raise SystemExit(f"expected a {RAW_SIZE} source image, got {raw.size}")
     cell_w = raw.width / SHEET_COLS
     cell_h = raw.height / SHEET_ROWS
     boxes = components(raw)
@@ -157,15 +184,17 @@ def main(src, dst):
             round((col + w) * cell_w),
             round((row + h) * cell_h),
         )
-        bbox = SOURCE_BOX.get(name) or drawn_bbox(boxes, box)
         size = (w * TILE, h * TILE)
         if kind == "texture":
-            tile = build_texture(raw, bbox, name, size)
+            tile = build_texture(raw, slot_bbox(raw, box), name, size)
         else:
+            bbox = checked_source_box(raw, name) if name in SOURCE_BOX else drawn_bbox(boxes, box)
             tile = build_object(raw, bbox, size)
         sheet.paste(tile, (col * TILE, row * TILE))
     sheet.save(dst)
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        raise SystemExit("usage: python build_tileset.py <tiles_raw.png> <tileset.png>")
     main(sys.argv[1], sys.argv[2])
