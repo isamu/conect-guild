@@ -275,3 +275,19 @@ describe('messageQueue: a message that arrives later', () => {
     queue.dispose();
   });
 });
+
+describe('messageQueue: halted screen', () => {
+  it('lets the scenes go on while halted, as the canvas does, and waits for them after', async () => {
+    const { queue, shown } = setup();
+    const opened = event('issue-opened', '企画', 1);
+    const sceneMs = scheduleEvent(EMPTY_DIRECTOR, opened, 0, context).busyUntil.kaname ?? 0;
+    queue.push([entry(opened), entry(event('pr-merged', '広報', 2))]);
+    queue.pause();
+    await vi.advanceTimersByTimeAsync(1_000);
+    queue.resume();
+    // The hold starts over at 1 s; かなめ is back at sceneMs (the scene did not stop).
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(shown.map((s) => s.at - T0)).toEqual([0, Math.max(1_000 + HOLD_MS, sceneMs)]);
+    queue.dispose();
+  });
+});
