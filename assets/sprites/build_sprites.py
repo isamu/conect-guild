@@ -2,7 +2,7 @@
 
 Input: a 1024x1536 sheet of 4 columns x 6 rows on a magenta (#ff00ff) background (see prompt.txt).
 Default input is source-sheet.png next to this script; default output directory is this script's.
-Output: <out_dir>/<memberId>.png, four FRAME x FRAME frames (64x64, so 256x64) side by side
+Output: <out_dir>/<memberId>.png, four FRAME x FRAME frames (80x80, so 320x80) side by side
 (0 = front idle, 1 = facing right, 2 = walk right 1, 3 = walk right 2), transparent background,
 feet on the bottom edge, centred horizontally. Optionally a 2x preview of all frames.
 
@@ -21,7 +21,7 @@ COLS = 4
 SHEET_SIZE = (1024, 1536)
 HERE = Path(__file__).resolve().parent
 # Frame size in pixels. Change it here only; everything else derives from it.
-FRAME = 64
+FRAME = 80
 # Leave a 1px margin on top and both sides so outlines are never clipped.
 MAX_H = FRAME - 1
 MAX_W = FRAME - 2
