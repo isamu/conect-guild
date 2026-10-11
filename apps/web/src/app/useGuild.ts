@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, onMounted } from 'vue';
 import { createGuildStore, type GuildStoreOptions } from './guildStore';
-import { buildBoard, buildFetchStatus, buildParty } from './guildView';
+import { buildBoard, buildFetchStatus, buildKingBubble, buildParty } from './guildView';
 
 /** Binds the guild store to a component's lifetime and exposes what the windows render. */
 export function useGuild(options: GuildStoreOptions = {}) {
@@ -19,7 +19,7 @@ export function useGuild(options: GuildStoreOptions = {}) {
   const party = computed(() =>
     state.snapshot === null ? [] : buildParty(state.snapshot, checkedAt.value),
   );
-  const king = computed(() => party.value.find((row) => row.id === 'yukihiro') ?? null);
+  const king = computed(() => buildKingBubble(state.snapshot));
   const fetchStatus = computed(() =>
     buildFetchStatus(state.snapshot, state.failure, checkedAt.value),
   );

@@ -161,6 +161,23 @@ export function buildParty(snapshot: SnapshotLists, now: number): PartyRow[] {
   return [kanameRow(waits), ...members, kingRow(waits)];
 }
 
+export interface KingBubbleView {
+  /** True while a rule-changing PR waits for the president's merge. */
+  readonly waiting: boolean;
+  /** Tooltip text; null before the first snapshot. */
+  readonly detail: string | null;
+}
+
+/** The bubble over the throne. Before the first snapshot nothing is waiting. */
+export function buildKingBubble(snapshot: SnapshotLists | null): KingBubbleView {
+  if (snapshot === null) return { waiting: false, detail: null };
+  const president = countWaits(snapshot).president;
+  return {
+    waiting: president > 0,
+    detail: president > 0 ? `承認まち ${String(president)} 件` : '承認まちの PR はありません',
+  };
+}
+
 const FAILURE_LABELS: Readonly<Record<SnapshotLoadFailure, string>> = {
   network: 'つながりません',
   timeout: '時間切れ',

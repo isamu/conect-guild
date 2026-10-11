@@ -21,11 +21,7 @@ const { state, board, party, king, fetchStatus, message, nextMessage, clearBasel
       </section>
       <template v-else>
         <QuestBoard class="stage__board" :groups="board" :loaded="state.snapshot !== null" />
-        <KingBubble
-          class="stage__king"
-          :waiting="king?.state === 'awaiting-president'"
-          :detail="king?.stateLabel ?? null"
-        />
+        <KingBubble class="stage__king" :waiting="king.waiting" :detail="king.detail" />
         <MessageWindow
           class="stage__message"
           :message="message"
