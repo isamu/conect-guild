@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import type { GuildEvent, GuildEventKind } from '../domain/events';
 import type { DepartmentLabel } from '../guild.config';
+import { ambientPose, createAmbientSeeds } from './ambient';
 import { CONFETTI_MS } from './confetti';
 import {
   EMPTY_DIRECTOR,
   frameAt,
+  inScene,
   isAnimating,
   poseAt,
   prune,
   scheduleEvent,
   trackEnd,
+  type AmbientContext,
   type Director,
 } from './director';
 import { PLACES } from './map';
@@ -167,5 +170,104 @@ describe('director: animating and pruning', () => {
     expect(middle.tracks).toHaveLength(1);
     expect(middle.busyUntil).toEqual({ minori: end });
     expect(prune(director, end)).toEqual(EMPTY_DIRECTOR);
+  });
+});
+
+describe('director: ambient moves', () => {
+  const seeds = createAmbientSeeds(() => 0);
+  // Every cycle starts at 0 with phase 0, so t = 0 is the start of a move.
+  const ambient: AmbientContext = {
+    moods: { minori: 'idle', sasae: 'desk-work', yukihiro: 'fidget', kaname: 'tidy-scroll' },
+    seeds,
+  };
+  const member = (frame: ReturnType<typeof frameAt>, id: string) =>
+    frame.members.find((m) => m.id === id);
+
+  it('applies the move to members at their seats', () => {
+    const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS, ambient);
+    const move = ambientPose('fidget', seeds.yukihiro, 0);
+    const seat = tileToPoint(DEFAULT_SEATS.yukihiro);
+    expect(member(frame, 'yukihiro')?.pose.point).toEqual({
+      x: seat.x + move.offset.x,
+      y: seat.y + move.offset.y,
+    });
+    expect(member(frame, 'minori')?.pose).toMatchObject({ frame: 1, flip: false });
+  });
+
+  it('places かなめ’s scroll at hand and nobody else holds anything', () => {
+    const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS, ambient);
+    expect(member(frame, 'kaname')?.hand?.prop).toBe('scroll');
+    expect(member(frame, 'kaname')?.pose.prop).toBeNull();
+    expect(frame.members.filter((m) => m.hand !== null)).toHaveLength(1);
+  });
+
+  it('leaves members without a mood standing still', () => {
+    const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS, ambient);
+    expect(member(frame, 'hibiki')?.pose).toEqual(standingPose(DEFAULT_SEATS.hibiki));
+    expect(member(frame, 'hibiki')?.hand).toBeNull();
+  });
+
+  it('matches the plain frame when no ambient is given', () => {
+    const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS);
+    for (const m of frame.members) {
+      expect(m.pose).toEqual(standingPose(DEFAULT_SEATS[m.id]));
+      expect(m.hand).toBeNull();
+    }
+  });
+
+  it('keeps the back-to-front order of the seats under the offsets', () => {
+    const plain = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS).members.map((m) => m.id);
+    for (const t of [0, 100, 300, 600, 900]) {
+      const ids = frameAt(EMPTY_DIRECTOR, t, DEFAULT_SEATS, ambient).members.map((m) => m.id);
+      expect(ids).toEqual(plain);
+    }
+  });
+});
+
+describe('director: no ambient move during scenes', () => {
+  const seeds = createAmbientSeeds(() => 0);
+  const ambient: AmbientContext = {
+    moods: { minori: 'idle', sasae: 'desk-work', kaname: 'tidy-scroll' },
+    seeds,
+  };
+  const member = (frame: ReturnType<typeof frameAt>, id: string) =>
+    frame.members.find((m) => m.id === id);
+
+  it('gives no ambient move to a member walking, away or holding something in a scene', () => {
+    const director = play(EMPTY_DIRECTOR, event('pr-merged', '総務'), 0);
+    const end = director.busyUntil.sasae ?? 0;
+    for (const t of [1, 300, end - 1]) {
+      const sasae = member(frameAt(director, t, DEFAULT_SEATS, ambient), 'sasae');
+      expect(sasae?.pose).toEqual(poseAt(director, 'sasae', t, DEFAULT_SEATS.sasae));
+      expect(sasae?.hand).toBeNull();
+    }
+    expect(inScene(director, 'sasae', end - 1)).toBe(true);
+    expect(inScene(director, 'sasae', end)).toBe(false);
+  });
+
+  it('gives none to かなめ while she holds the scroll out in a handover', () => {
+    const director = play(EMPTY_DIRECTOR, event('issue-opened', '経理'), 0);
+    const kaname = member(frameAt(director, 10, DEFAULT_SEATS, ambient), 'kaname');
+    expect(kaname?.hand).toBeNull();
+    expect(kaname?.pose.prop).toBe('scroll');
+  });
+
+  it('gives none while confetti is over the member, and again afterwards', () => {
+    const director = play(EMPTY_DIRECTOR, event('issue-closed', '総務'), 0);
+    expect(inScene(director, 'sasae', 0)).toBe(true);
+    expect(member(frameAt(director, 0, DEFAULT_SEATS, ambient), 'sasae')?.pose).toEqual(
+      standingPose(DEFAULT_SEATS.sasae),
+    );
+    expect(inScene(director, 'sasae', CONFETTI_MS)).toBe(false);
+    const after = member(frameAt(director, CONFETTI_MS, DEFAULT_SEATS, ambient), 'sasae');
+    expect(after?.pose).toEqual(
+      expect.objectContaining({ frame: ambientPose('desk-work', seeds.sasae, CONFETTI_MS).frame }),
+    );
+  });
+
+  it('applies the move before a scene queued for later starts', () => {
+    const director = play(EMPTY_DIRECTOR, event('pr-merged', '経理'), 5_000);
+    expect(inScene(director, 'minori', 0)).toBe(false);
+    expect(member(frameAt(director, 0, DEFAULT_SEATS, ambient), 'minori')?.pose.frame).toBe(1);
   });
 });
