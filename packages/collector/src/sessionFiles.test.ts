@@ -3,7 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CompanySeat } from '../collector.config.ts';
-import { readCompanySessions, type SessionFilePaths } from './sessionFiles.ts';
+import {
+  MAX_ACTIVITY_STATE_BYTES,
+  MAX_CWD_LOG_BYTES,
+  readCompanySessions,
+  type SessionFilePaths,
+} from './sessionFiles.ts';
 
 const KANAME = 'aaaaaaaa-0000-4000-8000-000000000001';
 const OTHER = 'bbbbbbbb-0000-4000-8000-00000000000f';
@@ -84,6 +89,20 @@ describe('readCompanySessions: failures', () => {
       ok: false,
       kind: 'read-failed',
     });
+  });
+
+  it('is too-large when the cwd log passes its limit', async () => {
+    await writeFile(paths.cwdLogPath, Buffer.alloc(MAX_CWD_LOG_BYTES + 1, 0x61));
+    await writeFile(paths.activityStatePath, '{}');
+    await expect(readCompanySessions(paths)).resolves.toEqual({ ok: false, kind: 'too-large' });
+  });
+
+  it('is too-large when the activity file passes its limit, and reads it at the limit', async () => {
+    await writeCwdLog();
+    await writeFile(paths.activityStatePath, `{}${' '.repeat(MAX_ACTIVITY_STATE_BYTES - 2)}`);
+    await expect(readCompanySessions(paths)).resolves.toMatchObject({ ok: true });
+    await writeFile(paths.activityStatePath, `{}${' '.repeat(MAX_ACTIVITY_STATE_BYTES - 1)}`);
+    await expect(readCompanySessions(paths)).resolves.toEqual({ ok: false, kind: 'too-large' });
   });
 
   it.each([
