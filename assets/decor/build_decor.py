@@ -247,7 +247,9 @@ def build_piece(crop, name, size):
 
 def check_slots():
     taken = {}
-    for name, (_, _, col, row, w, h) in LAYOUT.items():
+    for name, (sheet_id, _, col, row, w, h) in LAYOUT.items():
+        if sheet_id not in RAW:
+            raise SystemExit(f"{name}: unknown raw sheet {sheet_id!r}")
         if col < 0 or row < 0 or col + w > SHEET_COLS or row + h > SHEET_ROWS:
             raise SystemExit(f"{name}: slot is outside the {SHEET_COLS}x{SHEET_ROWS} sheet")
         for c in range(col, col + w):
@@ -296,10 +298,14 @@ def main(src_a, src_b, dst):
     check_decor_ts()
     raws = {"a": load_raw("a", src_a), "b": load_raw("b", src_b)}
     sheet = Image.new("RGBA", (SHEET_COLS * TILE, SHEET_ROWS * TILE), (0, 0, 0, 0))
+    placed = set()
     for sheet_id, raw in raws.items():
         for name, crop in find_pieces(sheet_id, raw).items():
             _, _, col, row, w, h = LAYOUT[name]
             sheet.paste(build_piece(crop, name, (w * TILE, h * TILE)), (col * TILE, row * TILE))
+            placed.add(name)
+    if placed != set(LAYOUT):
+        raise SystemExit(f"pieces not placed: {sorted(set(LAYOUT) - placed)}")
     sheet.save(dst)
 
 
