@@ -1,15 +1,32 @@
+import { setTimeout as delay } from 'node:timers/promises';
 import { COLLECTOR_CONFIG } from '../collector.config.ts';
+import { createGhRunner } from './gh.ts';
 import { runCollector } from './run.ts';
+import { writeFileAtomic } from './write.ts';
 
-// Reading the config proves it loads under Node's type stripping.
-const intervalSeconds = COLLECTOR_CONFIG.intervalMs / 1000;
+const controller = new AbortController();
+process.once('SIGINT', () => {
+  controller.abort();
+});
 
-process.exitCode = runCollector(process.argv.slice(2), {
+async function sleepUnlessAborted(ms: number): Promise<void> {
+  try {
+    await delay(ms, undefined, { signal: controller.signal });
+  } catch (error) {
+    if (!controller.signal.aborted) throw error;
+  }
+}
+
+process.exitCode = await runCollector(process.argv.slice(2), {
   now: () => new Date(),
   log: (line) => {
-    console.log(`${line} interval=${String(intervalSeconds)}s`);
+    console.log(line);
   },
   error: (line) => {
     console.error(line);
   },
+  gh: createGhRunner(controller.signal),
+  writeSnapshot: (content) => writeFileAtomic(COLLECTOR_CONFIG.snapshotPath, content),
+  sleep: sleepUnlessAborted,
+  signal: controller.signal,
 });
