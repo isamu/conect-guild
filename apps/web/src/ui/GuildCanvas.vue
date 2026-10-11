@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, useTemplateRef, watch } from 'vue';
-import { cueToPlay, type PartyRow, type SceneCue } from '../app/guildView';
+import {
+  EMPTY_CUE_QUEUE,
+  receiveCue,
+  takeCues,
+  type PartyRow,
+  type SceneCue,
+} from '../app/guildView';
 import { ambientMoodsOf } from '../render/ambient';
 import type { GuildArt } from '../render/art';
 import { bubblesOf } from '../render/bubbles';
@@ -18,15 +24,15 @@ const canvas = useTemplateRef<HTMLCanvasElement>('canvas');
 let loop: RenderLoop | null = null;
 let observer: ResizeObserver | null = null;
 let unmounted = false;
-/** The message id whose scene was started last, so no scene starts twice. */
-let playedId: number | null = null;
+/** Cues seen so far; those that arrive while the pictures load wait for the loop. */
+let cues = EMPTY_CUE_QUEUE;
 
-/** Starts the current cue's scene unless it was already started (or the loop is not running). */
-function playCue(): void {
-  const next = cueToPlay(props.cue, playedId);
-  if (loop === null || next === null) return;
-  playedId = next.id;
-  loop.play(next.event);
+/** Starts the queued scenes in order, once the loop runs. */
+function playCues(): void {
+  if (loop === null) return;
+  const taken = takeCues(cues);
+  cues = taken.queue;
+  for (const cue of taken.play) loop.play(cue.event);
 }
 
 function start(element: HTMLCanvasElement, art: GuildArt): void {
@@ -39,8 +45,8 @@ function start(element: HTMLCanvasElement, art: GuildArt): void {
     running.resize(width, globalThis.devicePixelRatio);
   });
   observer.observe(element);
-  // A message may have reached the window while the pictures were loading.
-  playCue();
+  // Messages may have reached the window while the pictures were loading.
+  playCues();
 }
 
 onMounted(() => {
@@ -67,7 +73,15 @@ watch(
   },
 );
 
-watch(() => props.cue?.id, playCue);
+watch(
+  () => props.cue?.id,
+  () => {
+    cues = receiveCue(cues, props.cue);
+    playCues();
+  },
+  // The message in the window at mount counts too.
+  { immediate: true },
+);
 </script>
 
 <template>

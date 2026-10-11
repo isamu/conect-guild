@@ -193,13 +193,26 @@ export function sceneCue(message: GuildMessage | null): SceneCue | null {
   return message === null || event === null ? null : { id: message.id, event };
 }
 
+/** Cues the canvas has seen: the last one, and those waiting for its loop to start. */
+export interface CueQueue {
+  readonly lastId: number | null;
+  readonly waiting: readonly SceneCue[];
+}
+
+export const EMPTY_CUE_QUEUE: CueQueue = { lastId: null, waiting: [] };
+
 /**
- * The cue the canvas should start now, given the id of the last cue it started: the current cue
- * unless it was already played. The canvas asks both when the cue changes and when its loop
- * starts (the pictures may still be loading when a cue arrives), so no scene is lost or doubled.
+ * Queues a cue that reached the window, once per message. The canvas plays the queue as soon as
+ * its loop runs, so cues that arrive while the pictures load are played in order, not lost.
  */
-export function cueToPlay(cue: SceneCue | null, playedId: number | null): SceneCue | null {
-  return cue === null || cue.id === playedId ? null : cue;
+export function receiveCue(queue: CueQueue, cue: SceneCue | null): CueQueue {
+  if (cue === null || cue.id === queue.lastId) return queue;
+  return { lastId: cue.id, waiting: [...queue.waiting, cue] };
+}
+
+/** The queued cues to play now (oldest first), and the queue without them. */
+export function takeCues(queue: CueQueue): { queue: CueQueue; play: readonly SceneCue[] } {
+  return { queue: { ...queue, waiting: [] }, play: queue.waiting };
 }
 
 const FAILURE_LABELS: Readonly<Record<SnapshotLoadFailure, string>> = {
