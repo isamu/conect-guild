@@ -67,12 +67,15 @@ describe('toSnapshotIssues', () => {
     expect(toSnapshotIssues(items, CUTOFF).map((i) => i.number)).toEqual([1, 4]);
   });
 
-  it('keeps one entry per number when an issue appears in both lists', () => {
-    const items = [
-      issue({ number: 5 }),
-      issue({ number: 5, state: 'closed', closed_at: '2026-10-11T00:00:00Z' }),
-    ];
-    expect(toSnapshotIssues(items, CUTOFF)).toHaveLength(1);
+  it('keeps the closed copy when an issue closed while the lists were fetched', () => {
+    const closed = issue({ number: 5, state: 'closed', closed_at: '2026-10-11T00:00:00Z' });
+    for (const items of [
+      [issue({ number: 5 }), closed],
+      [closed, issue({ number: 5 })],
+    ]) {
+      const result = toSnapshotIssues(items, CUTOFF);
+      expect(result.map((i) => [i.number, i.state])).toEqual([[5, 'closed']]);
+    }
   });
 });
 
@@ -91,6 +94,21 @@ describe('selectRecentPrs', () => {
       pr({ number: 1 }),
     ];
     expect(selectRecentPrs(items, CUTOFF).map((p) => p.number)).toEqual([1, 2, 3]);
+  });
+
+  it('keeps the closed copy when a PR was merged while the lists were fetched', () => {
+    const merged = pr({
+      number: 7,
+      state: 'closed',
+      merged_at: '2026-10-11T00:00:00Z',
+      closed_at: '2026-10-11T00:00:00Z',
+    });
+    for (const items of [
+      [pr({ number: 7 }), merged],
+      [merged, pr({ number: 7 })],
+    ]) {
+      expect(selectRecentPrs(items, CUTOFF)).toEqual([merged]);
+    }
   });
 });
 

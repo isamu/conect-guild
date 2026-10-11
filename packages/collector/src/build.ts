@@ -17,13 +17,18 @@ function isOpenOrRecentlyClosed(
   return item.closed_at !== null && Date.parse(item.closed_at) >= cutoff.getTime();
 }
 
-/** Keep the first item per number (an item can appear in both the open and closed lists). */
-function uniqueByNumber<T extends { readonly number: number }>(items: readonly T[]): T[] {
-  const seen = new Map<number, T>();
+/**
+ * One item per number. An item fetched from both the open and the closed list
+ * was closed while we were fetching, so the closed copy wins.
+ */
+function uniquePreferClosed<
+  T extends { readonly number: number; readonly state: 'open' | 'closed' },
+>(items: readonly T[]): T[] {
+  const byNumber = new Map<number, T>();
   for (const item of items) {
-    if (!seen.has(item.number)) seen.set(item.number, item);
+    if (!byNumber.has(item.number) || item.state === 'closed') byNumber.set(item.number, item);
   }
-  return [...seen.values()];
+  return [...byNumber.values()];
 }
 
 function isoOrNull(value: string | null): string | null {
@@ -32,10 +37,10 @@ function isoOrNull(value: string | null): string | null {
 
 /** Issues without PRs: all open ones and those closed since `cutoff`. */
 export function toSnapshotIssues(raw: readonly RawIssue[], cutoff: Date): SnapshotIssue[] {
-  const issues = raw.filter(
-    (issue) => issue.pull_request === undefined && isOpenOrRecentlyClosed(issue, cutoff),
+  const issues = uniquePreferClosed(raw.filter((issue) => issue.pull_request === undefined)).filter(
+    (issue) => isOpenOrRecentlyClosed(issue, cutoff),
   );
-  return uniqueByNumber(issues).map((issue) => ({
+  return issues.map((issue) => ({
     number: issue.number,
     title: issue.title,
     labels: issue.labels.map((label) => label.name),
@@ -48,7 +53,7 @@ export function toSnapshotIssues(raw: readonly RawIssue[], cutoff: Date): Snapsh
 
 /** All open PRs and those closed or merged since `cutoff`. */
 export function selectRecentPrs(raw: readonly RawPr[], cutoff: Date): RawPr[] {
-  return uniqueByNumber(raw.filter((pr) => isOpenOrRecentlyClosed(pr, cutoff)));
+  return uniquePreferClosed(raw).filter((pr) => isOpenOrRecentlyClosed(pr, cutoff));
 }
 
 /** Snapshot form of a PR. The body is read for links only and dropped here. */
