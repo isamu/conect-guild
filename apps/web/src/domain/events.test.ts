@@ -106,6 +106,24 @@ describe('diffSnapshot: Issue events', () => {
     );
     expect(result.events).toEqual([]);
   });
+});
+
+describe('diffSnapshot: Issues closed between fetches', () => {
+  it('clears again an Issue reopened and closed again between fetches', () => {
+    const result = diffSnapshot(
+      baselineOf({ issues: [closedIssue(1, minutesAfter(T0, -60))] }),
+      snapshot({ fetchedAt: LATER, issues: [closedIssue(1, T1)] }),
+    );
+    expect(ids(result)).toEqual(['issue-closed#1']);
+  });
+
+  it('does not clear an Issue still open after being closed in the baseline', () => {
+    const result = diffSnapshot(
+      baselineOf({ issues: [closedIssue(1, T0)] }),
+      snapshot({ fetchedAt: T1, issues: [issue(1)] }),
+    );
+    expect(result.events).toEqual([]);
+  });
 
   it('shows only the clear for an Issue opened and closed between fetches', () => {
     const result = diffSnapshot(
