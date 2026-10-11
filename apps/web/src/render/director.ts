@@ -49,7 +49,12 @@ export function trackEnd(track: Track): number {
   return track.segments.at(-1)?.end ?? Number.NEGATIVE_INFINITY;
 }
 
-/** Adds the scene for an event, starting at `now` or when its cast is free, whichever is later. */
+/**
+ * Adds the scene for an event, starting at `now` or when its cast is free, whichever is later.
+ * Trade-off (kept on purpose): when the same member has several events in a row, a later scene
+ * starts after their message has already appeared, so the stage may lag the message window.
+ * Starting it on time would make the member jump from wherever they are; members never teleport.
+ */
 export function scheduleEvent(
   director: Director,
   event: GuildEvent,
