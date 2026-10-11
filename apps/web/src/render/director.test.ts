@@ -217,7 +217,8 @@ describe('director: animating and pruning', () => {
     event('issue-closed', '広報'),
     0,
   );
-  const end = director.busyUntil.minori ?? 0;
+  // The later of the two: みのり walking back, or かなめ holding the chest up.
+  const end = Math.max(director.busyUntil.minori ?? 0, director.busyUntil.kaname ?? 0);
 
   it('animates until the last track and burst are over', () => {
     expect(isAnimating(director, 0)).toBe(true);
@@ -234,7 +235,7 @@ describe('director: animating and pruning', () => {
     const middle = prune(director, CONFETTI_MS);
     expect(middle.bursts).toEqual([]);
     expect(middle.tracks.map((t) => t.actor)).toEqual(['minori', 'kaname']);
-    expect(middle.busyUntil).toEqual({ minori: end, kaname: director.busyUntil.kaname });
+    expect(middle.busyUntil).toEqual(director.busyUntil);
     expect(prune(director, end)).toEqual(EMPTY_DIRECTOR);
   });
 });

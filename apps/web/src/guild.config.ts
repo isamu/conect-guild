@@ -23,7 +23,10 @@ export interface MemberConfig {
   readonly role: string;
   /** Accent colour for the name plate and speech bubble. */
   readonly color: string;
-  /** Where the member stands when at home: the tile under their feet (src/render/map.ts). */
+  /**
+   * Where the member is when at home: the tile under their feet (src/render/map.ts). Department
+   * members sit on the chair right behind their desk; render/seating.ts sinks them into it.
+   */
   readonly seat: TilePos;
 }
 
@@ -54,22 +57,22 @@ export const MEMBERS: Readonly<Record<MemberId, MemberConfig>> = {
     name: 'ひらめ',
     role: '企画',
     color: '#2196f3',
-    seat: { col: 11, row: 13 },
+    seat: { col: 11, row: 10 },
   },
   sasae: {
     id: 'sasae',
     name: 'ささえ',
     role: '総務',
     color: '#9c6b3f',
-    seat: { col: 21, row: 13 },
+    seat: { col: 21, row: 10 },
   },
   yukihiro: {
     id: 'yukihiro',
     name: 'ゆきひろ',
     role: '社長',
     color: '#8e44ad',
-    // The throne is three tiles wide (cols 15-17): the king sits on its middle.
-    seat: { col: 16, row: 4 },
+    // The throne is three tiles wide and high (cols 15-17, rows 2-4): the king sits in its middle.
+    seat: { col: 16, row: 3 },
   },
 };
 

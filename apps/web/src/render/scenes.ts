@@ -25,7 +25,7 @@ export const PICK_UP_MS = 2_000;
 /** Giver and receiver side by side; the item changes hands halfway. */
 export const HANDOVER_MS = 3_000;
 /** The receiver holds the item up after taking it. */
-export const HOLD_UP_MS = 5_000;
+export const HOLD_UP_MS = 5_500;
 export const RECEPTION_MS = 2_500;
 
 /** One member's part in a scene: back-to-back segments. */
