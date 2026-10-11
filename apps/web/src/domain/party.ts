@@ -8,6 +8,7 @@ import {
   type MemberId,
 } from '../guild.config';
 import { departmentLabelsOf, pickDepartment } from './quest';
+import { NO_LIVE_STATES, type LiveState, type LiveStates } from './session';
 
 export type PrAssignment =
   | { readonly department: DepartmentLabel; readonly source: 'linked-issue' | 'branch-prefix' }
@@ -16,7 +17,18 @@ export type PrAssignment =
 /** Who an open PR waits for: the president (rule change) or かなめ (everything else). */
 export type PrWaitKind = 'president' | 'kaname';
 
-export type MemberState = 'awaiting-president' | 'awaiting-kaname' | 'working' | 'done' | 'idle';
+/**
+ * `awaiting-permission` and `busy` come from the live session (docs/DESIGN.md 4.7): the session
+ * asks for a tool permission / is in a turn right now. The others come from GitHub.
+ */
+export type MemberState =
+  | 'awaiting-permission'
+  | 'awaiting-president'
+  | 'awaiting-kaname'
+  | 'busy'
+  | 'working'
+  | 'done'
+  | 'idle';
 
 export interface MemberStatus {
   readonly department: DepartmentLabel;
@@ -101,9 +113,11 @@ function addPr(load: Workload, pr: SnapshotPr): void {
   if (wait === 'president') load.awaitingPresident = true;
 }
 
-function stateOf(load: Workload): MemberState {
+function stateOf(load: Workload, live: LiveState | undefined): MemberState {
+  if (live === 'awaiting-permission') return 'awaiting-permission';
   if (load.awaitingPresident) return 'awaiting-president';
   if (load.openPrs > 0) return 'awaiting-kaname';
+  if (live === 'working') return 'busy';
   if (load.openIssues > 0) return 'working';
   if (load.recentlyClosed > 0) return 'done';
   return 'idle';
@@ -137,13 +151,15 @@ function countUnassigned(
 
 /**
  * Each department member's state, in the fixed department order. The first match wins:
- * 社長の承認まち > かなめの確認まち > working > done (Issue closed within `doneWindowMs`) > idle.
+ * 許可待ち (live) > 社長の承認まち > かなめの確認まち > いま作業中 (live) > working >
+ * done (Issue closed within `doneWindowMs`) > idle. Without `live` it is GitHub only.
  * `now` is epoch milliseconds.
  */
 export function deriveMemberStatuses(
   snapshot: Pick<Snapshot, 'issues' | 'prs'>,
   now: number,
   doneWindowMs: number = DONE_WINDOW_MS,
+  live: LiveStates = NO_LIVE_STATES,
 ): MemberStatus[] {
   const index = indexIssues(snapshot.issues);
   const loads: Record<DepartmentLabel, Workload> = {
@@ -163,7 +179,7 @@ export function deriveMemberStatuses(
   const unassigned = countUnassigned(snapshot, index);
   return DEPARTMENT_LABELS.map((department) => {
     const load = loads[department];
-    const state = stateOf(load);
+    const state = stateOf(load, live[DEPARTMENT_MEMBER[department]]);
     return {
       department,
       memberId: DEPARTMENT_MEMBER[department],

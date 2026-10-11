@@ -112,5 +112,10 @@ export const DONE_WINDOW_MS = 30 * MINUTE_MS;
 export const RECENT_REWARD_WINDOW_MS = 7 * DAY_MS;
 /** A snapshot older than this gets the "information is old" mark. */
 export const STALE_AFTER_MS = 5 * MINUTE_MS;
+/**
+ * Session states older than this are ignored (the collector reads them every 5 seconds), so a
+ * stopped collector does not leave 許可待ち or いま作業中 on screen.
+ */
+export const SESSION_STALE_AFTER_MS = 30_000;
 /** A gap between baselines longer than this may have lost events (the collector keeps 7 days). */
 export const EVENT_GAP_LIMIT_MS = 7 * DAY_MS;
