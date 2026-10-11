@@ -33,27 +33,35 @@ export function createGhRunner(signal?: AbortSignal): GhRunner {
     });
 }
 
-const slurpedPagesSchema = z.array(z.array(z.unknown()));
-
-function parseJson(text: string): unknown {
+function parseJsonLine(line: string): unknown {
   try {
-    return JSON.parse(text);
+    return JSON.parse(line);
   } catch {
     throw new CollectorError('validation-failed');
   }
 }
 
-/** Flatten `gh api --paginate --slurp` output (an array of page arrays). */
-export function flattenPages(stdout: string): unknown[] {
-  const result = slurpedPagesSchema.safeParse(parseJson(stdout));
-  if (!result.success) throw new CollectorError('validation-failed');
-  return result.data.flat();
+/** Parse output with one JSON value per line (what `--jq '... | @json'` prints). */
+export function parseJsonLines(stdout: string): unknown[] {
+  return stdout
+    .split('\n')
+    .filter((line) => line !== '')
+    .map(parseJsonLine);
 }
 
-/** GET every page of a list endpoint and return the items of all pages. */
-export async function ghApiAll(gh: GhRunner, path: string): Promise<unknown[]> {
-  const stdout = await gh(['api', '--paginate', '--slurp', path]);
-  return flattenPages(stdout);
+/**
+ * GET every page of a list endpoint and keep only `projection` of each item.
+ * The projection runs inside gh (`--jq`), so fields it leaves out (bodies,
+ * diffs) never reach this process. `--slurp` cannot be combined with `--jq`;
+ * gh applies the filter to each page, so the lines of all pages are the items.
+ */
+export async function ghApiProjected(
+  gh: GhRunner,
+  path: string,
+  projection: string,
+): Promise<unknown[]> {
+  const stdout = await gh(['api', '--paginate', '--jq', `.[] | ${projection} | @json`, path]);
+  return parseJsonLines(stdout);
 }
 
 /** Validate with zod; a mismatch becomes a validation-failed error. */

@@ -13,8 +13,13 @@ function openPr(number: number): object {
     state: 'open',
     merged_at: null,
     closed_at: null,
-    head: { ref: 'b' },
+    head_ref: 'b',
   };
+}
+
+/** What `gh api --jq '... | @json'` prints: one JSON value per line. */
+function lines(items: readonly unknown[]): string {
+  return items.map((item) => `${JSON.stringify(item)}\n`).join('');
 }
 
 describe('collectSnapshot', () => {
@@ -25,15 +30,15 @@ describe('collectSnapshot', () => {
     const gh: GhRunner = async (args) => {
       const path = args.at(-1) ?? '';
       if (path.includes('pulls?state=open')) {
-        return JSON.stringify([Array.from({ length: OPEN_PR_COUNT }, (_, i) => openPr(i + 1))]);
+        return lines(Array.from({ length: OPEN_PR_COUNT }, (_, i) => openPr(i + 1)));
       }
-      if (!path.includes('/files')) return '[[]]';
+      if (!path.includes('/files')) return '';
       fileCalls += 1;
       inFlight += 1;
       peak = Math.max(peak, inFlight);
       await new Promise((resolve) => setImmediate(resolve));
       inFlight -= 1;
-      return JSON.stringify([[{ filename: 'a.md' }]]);
+      return lines(['a.md']);
     };
     const snapshot = await collectSnapshot(gh, REPO, new Date('2026-10-12T00:00:00.000Z'));
     expect(fileCalls).toBe(OPEN_PR_COUNT);

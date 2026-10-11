@@ -10,7 +10,8 @@ function issue(patch: Partial<RawIssue>): RawIssue {
     number: 1,
     title: 'Issue',
     state: 'open',
-    labels: [{ name: '経理' }],
+    labels: ['経理'],
+    is_pull_request: false,
     created_at: '2026-10-01T00:00:00Z',
     updated_at: '2026-10-02T00:00:00Z',
     closed_at: null,
@@ -26,7 +27,7 @@ function pr(patch: Partial<RawPr>): RawPr {
     state: 'open',
     merged_at: null,
     closed_at: null,
-    head: { ref: 'accounting/x' },
+    head_ref: 'accounting/x',
     ...patch,
   };
 }
@@ -53,7 +54,7 @@ describe('toSnapshotIssues', () => {
   });
 
   it('drops pull requests mixed into the issues list', () => {
-    const items = [issue({ number: 1 }), issue({ number: 2, pull_request: { url: 'x' } })];
+    const items = [issue({ number: 1 }), issue({ number: 2, is_pull_request: true })];
     expect(toSnapshotIssues(items, CUTOFF).map((i) => i.number)).toEqual([1]);
   });
 

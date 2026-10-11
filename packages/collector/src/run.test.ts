@@ -12,12 +12,13 @@ const ISSUE = {
   number: 1,
   title: SECRET_TITLE,
   state: 'open',
-  labels: [{ name: '経理' }],
+  labels: ['経理'],
   created_at: '2026-10-10T00:00:00Z',
   updated_at: '2026-10-11T00:00:00Z',
   closed_at: null,
+  is_pull_request: false,
 };
-const PR_AS_ISSUE = { ...ISSUE, number: 2, pull_request: { url: 'x' } };
+const PR_AS_ISSUE = { ...ISSUE, number: 2, is_pull_request: true };
 const OLD_CLOSED_ISSUE = {
   ...ISSUE,
   number: 3,
@@ -31,7 +32,7 @@ const OPEN_PR = {
   state: 'open',
   merged_at: null,
   closed_at: null,
-  head: { ref: SECRET_BRANCH },
+  head_ref: SECRET_BRANCH,
 };
 const MERGED_PR = {
   ...OPEN_PR,
@@ -41,13 +42,13 @@ const MERGED_PR = {
   closed_at: '2026-10-11T00:00:00Z',
 };
 
-/** Slurped gh output per endpoint; issues and files arrive in two pages. */
-const OUTPUTS: Record<string, unknown> = {
+/** Projected items per endpoint, one array per page; issues and files span two pages. */
+const OUTPUTS: Record<string, unknown[][]> = {
   'issues?state=open': [[ISSUE], [PR_AS_ISSUE]],
   'issues?state=closed': [[OLD_CLOSED_ISSUE]],
   'pulls?state=open': [[OPEN_PR]],
   'pulls?state=closed': [[MERGED_PR]],
-  'pulls/2/files': [[{ filename: 'a/CLAUDE.md' }], [{ filename: 'b.md' }]],
+  'pulls/2/files': [['a/CLAUDE.md'], ['b.md']],
 };
 
 function fakeGh(overrides: Record<string, string | Error> = {}): GhRunner & { calls: string[] } {
@@ -58,7 +59,13 @@ function fakeGh(overrides: Record<string, string | Error> = {}): GhRunner & { ca
     const key = Object.keys(OUTPUTS).find((k) => path.includes(k)) ?? 'missing';
     const override = overrides[key];
     if (override instanceof Error) return Promise.reject(override);
-    return Promise.resolve(override ?? JSON.stringify(OUTPUTS[key] ?? null));
+    const pages = OUTPUTS[key] ?? [];
+    // gh --paginate --jq prints the lines of every page one after another.
+    const stdout = pages
+      .flat()
+      .map((item) => `${JSON.stringify(item)}\n`)
+      .join('');
+    return Promise.resolve(override ?? stdout);
   };
   return Object.assign(gh, { calls });
 }
@@ -122,13 +129,13 @@ describe('collectOnce', () => {
       { 'pulls/2/files': new CollectorError('gh-failed') },
       'gh-failed',
     ],
-    ['gh prints broken JSON', { 'issues?state=open': '[[{' }, 'validation-failed'],
+    ['gh prints broken JSON', { 'issues?state=open': '{"number":\n' }, 'validation-failed'],
     [
       'an item has the wrong shape',
-      { 'pulls?state=open': '[[{"number":"x"}]]' },
+      { 'pulls?state=open': '{"number":"x"}\n' },
       'validation-failed',
     ],
-    ['a page is not slurped', { 'issues?state=closed': '{"message":"x"}' }, 'validation-failed'],
+    ['a file entry is not a path', { 'pulls/2/files': '{"filename":"a"}\n' }, 'validation-failed'],
   ])('does not write when %s', async (_label, overrides, kind) => {
     const deps = harness(fakeGh(overrides));
     await expect(collectOnce(deps)).resolves.toEqual({ ok: false, kind });

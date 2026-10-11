@@ -37,13 +37,13 @@ function isoOrNull(value: string | null): string | null {
 
 /** Issues without PRs: all open ones and those closed since `cutoff`. */
 export function toSnapshotIssues(raw: readonly RawIssue[], cutoff: Date): SnapshotIssue[] {
-  const issues = uniquePreferClosed(raw.filter((issue) => issue.pull_request === undefined)).filter(
-    (issue) => isOpenOrRecentlyClosed(issue, cutoff),
+  const issues = uniquePreferClosed(raw.filter((issue) => !issue.is_pull_request)).filter((issue) =>
+    isOpenOrRecentlyClosed(issue, cutoff),
   );
   return issues.map((issue) => ({
     number: issue.number,
     title: issue.title,
-    labels: issue.labels.map((label) => label.name),
+    labels: [...issue.labels],
     state: issue.state,
     createdAt: new Date(issue.created_at).toISOString(),
     updatedAt: new Date(issue.updated_at).toISOString(),
@@ -64,7 +64,7 @@ export function toSnapshotPr(pr: RawPr, repo: string, changedFiles: readonly str
     state: pr.state,
     mergedAt: isoOrNull(pr.merged_at),
     closedAt: isoOrNull(pr.closed_at),
-    headRef: pr.head.ref,
+    headRef: pr.head_ref,
     linkedIssues: extractLinkedIssues(pr.title, pr.body, repo),
     changedFiles: pr.state === 'open' ? [...changedFiles] : [],
   };

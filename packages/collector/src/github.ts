@@ -1,20 +1,27 @@
 import { z } from 'zod';
-import { ghApiAll, parseOrThrow, type GhRunner } from './gh.ts';
+import { ghApiProjected, parseOrThrow, type GhRunner } from './gh.ts';
 
-// Only the fields the snapshot needs are kept; zod strips everything else.
-const rawIssueSchema = z.object({
+// Each list is projected inside gh (jq) to exactly these fields, so issue
+// bodies and file diffs never reach the collector. strictObject catches a
+// projection that lets anything else through.
+const ISSUE_PROJECTION =
+  '{number, title, state, labels: [.labels[].name], created_at, updated_at, closed_at, is_pull_request: has("pull_request")}';
+const PR_PROJECTION = '{number, title, body, state, merged_at, closed_at, head_ref: .head.ref}';
+const FILE_PROJECTION = '.filename';
+
+const rawIssueSchema = z.strictObject({
   number: z.number().int().positive(),
   title: z.string(),
   state: z.enum(['open', 'closed']),
-  labels: z.array(z.object({ name: z.string() })),
+  labels: z.array(z.string()),
   created_at: z.iso.datetime(),
   updated_at: z.iso.datetime(),
   closed_at: z.iso.datetime().nullable(),
-  // Present only on pull requests mixed into the issues list.
-  pull_request: z.unknown().optional(),
+  // The issues list also returns pull requests; they carry a pull_request key.
+  is_pull_request: z.boolean(),
 });
 
-const rawPrSchema = z.object({
+const rawPrSchema = z.strictObject({
   number: z.number().int().positive(),
   title: z.string(),
   // Read only to find linked issue numbers; never stored.
@@ -22,10 +29,8 @@ const rawPrSchema = z.object({
   state: z.enum(['open', 'closed']),
   merged_at: z.iso.datetime().nullable(),
   closed_at: z.iso.datetime().nullable(),
-  head: z.object({ ref: z.string() }),
+  head_ref: z.string(),
 });
-
-const rawFileSchema = z.object({ filename: z.string() });
 
 export type RawIssue = z.infer<typeof rawIssueSchema>;
 export type RawPr = z.infer<typeof rawPrSchema>;
@@ -36,8 +41,12 @@ const PER_PAGE = 'per_page=100';
 export async function fetchIssues(gh: GhRunner, repo: string, since: Date): Promise<RawIssue[]> {
   const sinceParam = encodeURIComponent(since.toISOString());
   const [open, closed] = await Promise.all([
-    ghApiAll(gh, `repos/${repo}/issues?state=open&${PER_PAGE}`),
-    ghApiAll(gh, `repos/${repo}/issues?state=closed&since=${sinceParam}&${PER_PAGE}`),
+    ghApiProjected(gh, `repos/${repo}/issues?state=open&${PER_PAGE}`, ISSUE_PROJECTION),
+    ghApiProjected(
+      gh,
+      `repos/${repo}/issues?state=closed&since=${sinceParam}&${PER_PAGE}`,
+      ISSUE_PROJECTION,
+    ),
   ]);
   return parseOrThrow(z.array(rawIssueSchema), [...open, ...closed]);
 }
@@ -45,8 +54,12 @@ export async function fetchIssues(gh: GhRunner, repo: string, since: Date): Prom
 /** Every open PR and every closed PR (the pulls API has no `since`). */
 export async function fetchPrs(gh: GhRunner, repo: string): Promise<RawPr[]> {
   const [open, closed] = await Promise.all([
-    ghApiAll(gh, `repos/${repo}/pulls?state=open&${PER_PAGE}`),
-    ghApiAll(gh, `repos/${repo}/pulls?state=closed&sort=updated&direction=desc&${PER_PAGE}`),
+    ghApiProjected(gh, `repos/${repo}/pulls?state=open&${PER_PAGE}`, PR_PROJECTION),
+    ghApiProjected(
+      gh,
+      `repos/${repo}/pulls?state=closed&sort=updated&direction=desc&${PER_PAGE}`,
+      PR_PROJECTION,
+    ),
   ]);
   return parseOrThrow(z.array(rawPrSchema), [...open, ...closed]);
 }
@@ -57,6 +70,10 @@ export async function fetchChangedFiles(
   repo: string,
   prNumber: number,
 ): Promise<string[]> {
-  const files = await ghApiAll(gh, `repos/${repo}/pulls/${String(prNumber)}/files?${PER_PAGE}`);
-  return parseOrThrow(z.array(rawFileSchema), files).map((file) => file.filename);
+  const files = await ghApiProjected(
+    gh,
+    `repos/${repo}/pulls/${String(prNumber)}/files?${PER_PAGE}`,
+    FILE_PROJECTION,
+  );
+  return parseOrThrow(z.array(z.string()), files);
 }
