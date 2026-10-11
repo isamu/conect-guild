@@ -4,9 +4,9 @@ import {
   contains,
   GROUND,
   groundAt,
-  coveredTiles,
-  HIDDEN_AREAS,
-  isHidden,
+  isUnderWindow,
+  overlaps,
+  spriteRect,
   isInsideMap,
   isWalkable,
   LOGICAL_HEIGHT,
@@ -18,8 +18,8 @@ import {
   TILE_NAMES,
   WINDOW_EXTENTS,
 } from './map';
-import { AMBIENT, SPRITE_SIZE } from './metrics';
-import { findPath, tileToPoint } from './path';
+import { AMBIENT } from './metrics';
+import { findPath } from './path';
 
 const WALKERS: readonly MemberId[] = ['kaname', 'minori', 'hibiki', 'hirame', 'sasae'];
 const DEPARTMENT_MEMBERS: readonly MemberId[] = ['minori', 'hibiki', 'hirame', 'sasae'];
@@ -84,14 +84,13 @@ describe('map: places and seats', () => {
   it.each(WALKERS)('seats %s where they can walk and are not under a window', (id) => {
     const seat = MEMBERS[id].seat;
     expect(isWalkable(seat)).toBe(true);
-    // The sprite is two tiles tall: the head must be visible too.
-    expect(isHidden({ col: seat.col, row: seat.row - 1 })).toBe(false);
+    // The whole sprite, head included, must be visible.
+    expect(isUnderWindow(seat)).toBe(false);
   });
 
   it('keeps the king visible', () => {
     const seat = MEMBERS.yukihiro.seat;
-    expect(isHidden(seat)).toBe(false);
-    expect(isHidden({ col: seat.col, row: seat.row - 1 })).toBe(false);
+    expect(isUnderWindow(seat)).toBe(false);
   });
 
   it('gives every member a different seat', () => {
@@ -131,27 +130,26 @@ describe('map: walkable grid', () => {
   });
 
   it('keeps everyone out from under the windows', () => {
-    for (const area of Object.values(HIDDEN_AREAS)) {
-      expect(isWalkable({ col: area.col + 1, row: area.row + 1 })).toBe(false);
-    }
-    expect(isWalkable({ col: 20, row: 15 })).toBe(false);
+    expect(isWalkable({ col: 2, row: 3 })).toBe(false); // board
+    expect(isWalkable({ col: 26, row: 3 })).toBe(false); // party
+    expect(isWalkable({ col: 20, row: 15 })).toBe(false); // message
   });
 
   it('keeps heads out from under the windows too (sprites are two tiles tall)', () => {
-    const { party, message } = HIDDEN_AREAS;
-    // Feet just below the party window: the head would be under it.
-    expect(isWalkable({ col: party.col + 1, row: party.row + party.h })).toBe(false);
-    expect(isWalkable({ col: party.col + 1, row: party.row + party.h + 1 })).toBe(true);
+    // Feet on row 11 below the party window (bottom 340 px): the head (from 320 px) is under it.
+    expect(isWalkable({ col: 24, row: 11 })).toBe(false);
+    expect(isWalkable({ col: 24, row: 12 })).toBe(true);
     // Feet just above the message window: the head is above the feet, so this is fine.
-    expect(isWalkable({ col: message.col + 3, row: message.row - 1 })).toBe(true);
+    expect(isWalkable({ col: 6, row: 13 })).toBe(true);
   });
 
-  it('decides hidden cells by the edges of each area', () => {
-    const { message } = HIDDEN_AREAS;
-    expect(isHidden({ col: message.col, row: message.row })).toBe(true);
-    expect(isHidden({ col: message.col - 1, row: message.row })).toBe(false);
-    expect(isHidden({ col: message.col + message.w, row: message.row })).toBe(false);
-    expect(isHidden({ col: message.col, row: message.row - 1 })).toBe(false);
+  it('keeps the sides of the sprite out too (64 px wide, half a tile beyond its own)', () => {
+    // Column 10 is right of the board (ends at 309 px), but the sprite reaches back to 304 px.
+    expect(isWalkable({ col: 10, row: 3 })).toBe(false);
+    expect(isWalkable({ col: 11, row: 3 })).toBe(true);
+    // Column 2 is left of the message window (from 100 px), but the sprite reaches to 112 px.
+    expect(isUnderWindow({ col: 2, row: 15 })).toBe(true);
+    expect(isUnderWindow({ col: 1, row: 15 })).toBe(false);
   });
 });
 
@@ -168,22 +166,20 @@ describe('map: windows over the canvas (App.vue)', () => {
     expect(message.bottom).toBeCloseTo(98.1 * 5.76);
   });
 
-  it('hides every tile a window touches', () => {
-    expect(HIDDEN_AREAS).toEqual({
-      // The board reaches 347 px: row 10 (320-352) is under it.
-      board: { col: 0, row: 0, w: 10, h: 11 },
-      party: { col: 23, row: 0, w: 9, h: 11 },
-      message: { col: 3, row: 14, w: 26, h: 4 },
+  it('places the sprite frame with the feet at the bottom centre of the tile', () => {
+    expect(spriteRect({ col: 4, row: 12 })).toEqual({
+      left: 112,
+      top: 352,
+      right: 176,
+      bottom: 416,
     });
   });
 
-  it('rounds outwards, and an edge on a tile line takes no extra tile', () => {
-    expect(coveredTiles({ left: 31.9, top: 0.1, right: 32.1, bottom: 64 })).toEqual({
-      col: 0,
-      row: 0,
-      w: 2,
-      h: 2,
-    });
+  it('counts overlap only when areas share some area', () => {
+    const a = { left: 0, top: 0, right: 10, bottom: 10 };
+    expect(overlaps(a, { left: 9, top: 9, right: 20, bottom: 20 })).toBe(true);
+    expect(overlaps(a, { left: 10, top: 0, right: 20, bottom: 10 })).toBe(false);
+    expect(overlaps(a, { left: 0, top: 10, right: 10, bottom: 20 })).toBe(false);
   });
 
   it('keeps feet on row 11 under the tall board off the walking grid (head under it)', () => {
@@ -192,20 +188,8 @@ describe('map: windows over the canvas (App.vue)', () => {
   });
 
   it.each(WALKERS)('keeps the whole sprite of %s clear of the windows, even mid-stretch', (id) => {
-    const feet = tileToPoint(MEMBERS[id].seat);
-    const sprite = {
-      left: feet.x - SPRITE_SIZE / 2,
-      right: feet.x + SPRITE_SIZE / 2,
-      top: feet.y - SPRITE_SIZE - AMBIENT.stretchPx,
-      bottom: feet.y,
-    };
-    for (const area of Object.values(WINDOW_EXTENTS)) {
-      const overlaps =
-        sprite.left < area.right &&
-        area.left < sprite.right &&
-        sprite.top < area.bottom &&
-        area.top < sprite.bottom;
-      expect(overlaps).toBe(false);
-    }
+    const frame = spriteRect(MEMBERS[id].seat);
+    const stretched = { ...frame, top: frame.top - AMBIENT.stretchPx };
+    for (const area of Object.values(WINDOW_EXTENTS)) expect(overlaps(stretched, area)).toBe(false);
   });
 });

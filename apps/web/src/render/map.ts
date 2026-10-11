@@ -1,11 +1,11 @@
 import type { TilePos } from '../guild.config';
-import { TILE_SIZE } from './metrics';
+import { SPRITE_SIZE, TILE_SIZE } from './metrics';
 
 /**
  * The office as a tile map: 32 x 18 tiles (render/metrics.ts sets the pixel sizes). Pure data plus the
  * walkable grid derived from it. The layout follows assets/concept/rpg-company-ui.png:
  * the throne at the back centre, かなめ's counter in the middle, a desk in each wing and the door
- * at the bottom right. Nothing that matters is placed under the HTML windows (HIDDEN_AREAS).
+ * at the bottom right. Nothing that matters is placed under the HTML windows (WINDOW_EXTENTS).
  */
 
 export { TILE_SIZE } from './metrics';
@@ -92,24 +92,23 @@ export const WINDOW_EXTENTS: Readonly<Record<'board' | 'party' | 'message', PxRe
   },
 };
 
-/** Every tile the rectangle touches (rounded outwards). */
-export function coveredTiles(rect: PxRect): TileRect {
-  const col = Math.floor(rect.left / TILE_SIZE);
-  const row = Math.floor(rect.top / TILE_SIZE);
-  return {
-    col,
-    row,
-    w: Math.ceil(rect.right / TILE_SIZE) - col,
-    h: Math.ceil(rect.bottom / TILE_SIZE) - row,
-  };
+/** The 64 x 64 frame of a member whose feet are on `pos` (bottom centre, as path.tileToPoint). */
+export function spriteRect(pos: TilePos): PxRect {
+  const x = pos.col * TILE_SIZE + TILE_SIZE / 2;
+  const y = (pos.row + 1) * TILE_SIZE;
+  return { left: x - SPRITE_SIZE / 2, top: y - SPRITE_SIZE, right: x + SPRITE_SIZE / 2, bottom: y };
 }
 
-/** Where the HTML windows sit over the canvas, in tiles. */
-export const HIDDEN_AREAS: Readonly<Record<'board' | 'party' | 'message', TileRect>> = {
-  board: coveredTiles(WINDOW_EXTENTS.board),
-  party: coveredTiles(WINDOW_EXTENTS.party),
-  message: coveredTiles(WINDOW_EXTENTS.message),
-};
+/** True when the rectangles share some area (touching edges do not count). */
+export function overlaps(a: PxRect, b: PxRect): boolean {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+}
+
+/** True when any part of a member standing on `pos` would be under a window. */
+export function isUnderWindow(pos: TilePos): boolean {
+  const sprite = spriteRect(pos);
+  return Object.values(WINDOW_EXTENTS).some((area) => overlaps(sprite, area));
+}
 
 /** Fixed places the scenes walk between. */
 export const PLACES = {
@@ -200,10 +199,6 @@ export function isInsideMap(pos: TilePos): boolean {
   return contains(rect(0, 0, MAP_COLS, MAP_ROWS), pos);
 }
 
-export function isHidden(pos: TilePos): boolean {
-  return Object.values(HIDDEN_AREAS).some((area) => contains(area, pos));
-}
-
 /** Ground tile of every cell, row by row. */
 export function buildGround(): TileName[][] {
   const ground = Array.from({ length: MAP_ROWS }, () =>
@@ -224,12 +219,13 @@ export function groundAt(pos: TilePos): TileName | null {
 }
 
 /**
- * True where a member may walk: walkable ground, no solid furniture, and neither the feet nor the
- * head (a sprite is two tiles tall) under a window, so nobody vanishes behind one on the way.
+ * True where a member may walk: walkable ground, no solid furniture, and no part of the sprite
+ * (64 px wide and tall, so it reaches into the tiles beside and above) under a window, so nobody
+ * vanishes behind one on the way.
  */
 export function isWalkable(pos: TilePos): boolean {
   const ground = groundAt(pos);
   if (ground === null || !WALKABLE_GROUND.has(ground)) return false;
   if (MAP_OBJECTS.some((object) => object.solid && contains(object, pos))) return false;
-  return !isHidden(pos) && !isHidden({ col: pos.col, row: pos.row - 1 });
+  return !isUnderWindow(pos);
 }
