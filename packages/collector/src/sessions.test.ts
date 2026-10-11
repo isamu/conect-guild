@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { CompanySeat } from '../collector.config.ts';
 import {
   latestCompanySessionIds,
-  parseCwdLine,
   readSeatStates,
   sessionStateOf,
   type ActivityEntry,
@@ -25,16 +24,17 @@ const MINORI = 'aaaaaaaa-0000-4000-8000-000000000003';
 const OTHER = 'bbbbbbbb-0000-4000-8000-00000000000f';
 const OTHER_PATH = '/home/u/secret-client-project';
 
-describe('parseCwdLine', () => {
-  it('splits at the first space, so the path keeps its spaces', () => {
-    expect(parseCwdLine(`${KANAME} /home/u/my dir/a b`)).toEqual({
-      id: KANAME,
-      cwd: '/home/u/my dir/a b',
-    });
+describe('latestCompanySessionIds: one line', () => {
+  const SPACED: readonly CompanySeat[] = [{ department: null, cwd: '/home/u/my dir/a b' }];
+
+  it('splits at the first space, so the path keeps its spaces', async () => {
+    const ids = await latestCompanySessionIds([`${KANAME} /home/u/my dir/a b`], SPACED);
+    expect(ids.get('/home/u/my dir/a b')).toBe(KANAME);
   });
 
-  it('trims the line and the path as MulmoTerminal does', () => {
-    expect(parseCwdLine(`  ${KANAME}   ${ROOT}  \r`)).toEqual({ id: KANAME, cwd: ROOT });
+  it('trims the line and the path as MulmoTerminal does', async () => {
+    const ids = await latestCompanySessionIds([`  ${KANAME}   ${ROOT}  \r`], SEATS);
+    expect(ids.get(ROOT)).toBe(KANAME);
   });
 
   it.each([
@@ -42,12 +42,17 @@ describe('parseCwdLine', () => {
     ['a blank line', '   '],
     ['an id only', KANAME],
     ['an id and a blank path', `${KANAME}    `],
-    ['a leading space before nothing', ` ${ROOT}`],
+    ['a leading space before the path', ` ${ROOT}`],
     ['a non-UUID id', `not-an-id ${ROOT}`],
     ['a truncated id', `${KANAME.slice(0, 20)} ${ROOT}`],
     ['broken bytes', '\u0000\u0001 garbage'],
-  ])('ignores %s', (_label, line) => {
-    expect(parseCwdLine(line)).toBeNull();
+  ])('ignores %s', async (_label, line) => {
+    expect((await latestCompanySessionIds([line], SEATS)).size).toBe(0);
+  });
+
+  it('does not let a broken line move a company id away', async () => {
+    const ids = await latestCompanySessionIds([`${KANAME} ${ROOT}`, `${KANAME}    `], SEATS);
+    expect(ids.get(ROOT)).toBe(KANAME);
   });
 });
 
