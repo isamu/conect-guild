@@ -30,6 +30,9 @@ PREVIEW_SCALE = 2
 # Outline pixels next to the background are blended with magenta by the generator.
 # Within this many source pixels of the background, dark magenta-tinted pixels are pulled to grey.
 SPILL_REACH = 2
+# The background has green ~3, so outline/background blends stay below this. Dark purple hair
+# shades (green 20-40) stay above it and keep their colour.
+SPILL_MAX_GREEN = 20
 
 
 def threshold(channel, test):
@@ -65,7 +68,7 @@ def despilled(cell, background):
     )
     spill = all_of(
         near_background,
-        threshold(g, lambda v: v < 40),
+        threshold(g, lambda v: v < SPILL_MAX_GREEN),
         threshold(ImageChops.subtract(r, g), lambda v: v > 30),
         threshold(ImageChops.difference(r, b), lambda v: v < 60),
     )
