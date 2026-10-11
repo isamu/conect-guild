@@ -1,14 +1,16 @@
 """Cut the codex-generated sprite sheet into one 128x32 strip per member.
 
 Input: a 1024x1536 sheet of 4 columns x 6 rows on a magenta (#ff00ff) background (see prompt.txt).
+Default input is source-sheet.png next to this script; default output directory is this script's.
 Output: <out_dir>/<memberId>.png, four 32x32 frames side by side
 (0 = front idle, 1 = facing right, 2 = walk right 1, 3 = walk right 2), transparent background,
 feet on the bottom edge, centred horizontally. Optionally a 4x preview of all frames.
 
-Usage: python build_sprites.py <sheet.png> <out_dir> [<preview.png>]
+Usage: python build_sprites.py [--sheet <sheet.png>] [--out <out_dir>] [--preview <preview.png>]
 Needs Pillow only. Not a project dependency; run it from a throwaway venv.
 """
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -17,6 +19,7 @@ from PIL import Image
 MEMBERS = ["kaname", "minori", "hibiki", "hirame", "sasae", "yukihiro"]
 COLS = 4
 SHEET_SIZE = (1024, 1536)
+HERE = Path(__file__).resolve().parent
 FRAME = 32
 # Leave a 1px margin on top and both sides so outlines are never clipped.
 MAX_H = FRAME - 1
@@ -95,6 +98,9 @@ def build(sheet_path, out_dir, preview_path=None):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) not in (3, 4):
-        sys.exit(__doc__)
-    build(Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3]) if len(sys.argv) == 4 else None)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--sheet", type=Path, default=HERE / "source-sheet.png")
+    parser.add_argument("--out", type=Path, default=HERE)
+    parser.add_argument("--preview", type=Path)
+    args = parser.parse_args()
+    build(args.sheet, args.out, args.preview)
