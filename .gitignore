@@ -5,3 +5,4 @@ dist/
 .dev.vars
 apps/web/.data/
 .DS_Store
+__pycache__/
