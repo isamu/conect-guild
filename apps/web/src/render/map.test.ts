@@ -65,6 +65,8 @@ describe('map: places and seats', () => {
     if (throne === undefined) return;
     expect(contains(throne, MEMBERS.yukihiro.seat)).toBe(true);
     expect(throne.row).toBeLessThanOrEqual(3);
+    // Centred on it: the throne's middle is the king's feet.
+    expect(MEMBERS.yukihiro.seat.col + 0.5).toBe(throne.col + throne.w / 2);
   });
 
   it('puts かなめ right behind the counter, facing the counter front', () => {

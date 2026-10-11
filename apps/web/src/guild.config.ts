@@ -68,7 +68,8 @@ export const MEMBERS: Readonly<Record<MemberId, MemberConfig>> = {
     name: 'ゆきひろ',
     role: '社長',
     color: '#8e44ad',
-    seat: { col: 16, row: 3 },
+    // The throne is two tiles wide (cols 15-16): the king sits on its middle.
+    seat: { col: 15.5, row: 3 },
   },
 };
 

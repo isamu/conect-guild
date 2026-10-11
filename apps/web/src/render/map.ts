@@ -86,8 +86,8 @@ const GROUND_FILLS: readonly GroundFill[] = [
   { tile: 'wall', ...rect(MAP_COLS - 1, 1, 1, MAP_ROWS - 1) },
   { tile: 'wall', ...rect(0, MAP_ROWS - 1, MAP_COLS, 1) },
   { tile: 'wall-top', ...rect(0, 0, MAP_COLS, 1) },
-  { tile: 'window', ...rect(13, 1, 1, 1) },
-  { tile: 'window', ...rect(19, 1, 1, 1) },
+  { tile: 'window', ...rect(14, 1, 1, 1) },
+  { tile: 'window', ...rect(18, 1, 1, 1) },
   { tile: 'window', ...rect(4, 1, 1, 1) },
   { tile: 'window', ...rect(26, 1, 1, 1) },
   { tile: 'door', ...PLACES.door, w: 1, h: 1 },
@@ -96,29 +96,33 @@ const GROUND_FILLS: readonly GroundFill[] = [
 const solid = (tile: TileName, area: TileRect): MapObject => ({ tile, solid: true, ...area });
 const flat = (tile: TileName, area: TileRect): MapObject => ({ tile, solid: false, ...area });
 
-/** Furniture. Chairs under the seats are not solid so the members can walk off them. */
+/**
+ * Furniture, sized to the pieces of assets/tiles/tiles.ts (a longer piece repeats: the counter is
+ * three counter pieces). Chairs under the seats and the door are not solid, so members walk on them.
+ */
 export const MAP_OBJECTS: readonly MapObject[] = [
-  solid('throne', rect(15, 2, 3, 2)),
-  solid('counter', rect(13, 8, 7, 1)),
+  solid('throne', rect(15, 2, 2, 2)),
+  solid('counter', rect(12, 8, 9, 1)),
+  flat('door', rect(PLACES.door.col, PLACES.door.row - 1, 1, 2)),
   // 経理 (upper left wing)
-  solid('desk', rect(10, 5, 3, 1)),
+  solid('desk', rect(10, 5, 2, 1)),
   flat('chair', rect(11, 4, 1, 1)),
-  solid('shelf', rect(9, 2, 2, 1)),
+  solid('shelf', rect(13, 2, 1, 2)),
   solid('plant', rect(12, 2, 1, 1)),
   // 広報 (upper right wing)
-  solid('desk', rect(20, 5, 3, 1)),
+  solid('desk', rect(20, 5, 2, 1)),
   flat('chair', rect(21, 4, 1, 1)),
   solid('board', rect(21, 1, 2, 1)),
   solid('plant', rect(19, 2, 1, 1)),
   // 企画 (lower left)
-  solid('desk', rect(3, 13, 3, 1)),
+  solid('desk', rect(3, 13, 2, 1)),
   flat('chair', rect(4, 12, 1, 1)),
-  solid('shelf', rect(1, 10, 2, 1)),
+  solid('shelf', rect(1, 10, 1, 2)),
   solid('plant', rect(8, 11, 1, 1)),
   // 総務 (lower right, by the door)
-  solid('desk', rect(25, 13, 3, 1)),
+  solid('desk', rect(25, 13, 2, 1)),
   flat('chair', rect(26, 12, 1, 1)),
-  solid('shelf', rect(27, 10, 2, 1)),
+  solid('shelf', rect(28, 10, 1, 2)),
   solid('crate', rect(29, 15, 1, 1)),
   solid('plant', rect(22, 12, 1, 1)),
 ];
