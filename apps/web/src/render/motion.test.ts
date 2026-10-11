@@ -14,18 +14,9 @@ const B = { col: 3, row: 2 };
 const C = { col: 3, row: 3 };
 
 describe('segments', () => {
-  it('stays for the given time, visible and empty-handed by default', () => {
-    expect(staySegment(A, 100, 500)).toEqual({
-      start: 100,
-      end: 600,
-      path: [A],
-      prop: null,
-      visible: true,
-    });
-    expect(staySegment(A, 0, 10, { prop: 'chest', visible: false })).toMatchObject({
-      prop: 'chest',
-      visible: false,
-    });
+  it('stays for the given time, empty-handed by default', () => {
+    expect(staySegment(A, 100, 500)).toEqual({ start: 100, end: 600, path: [A], prop: null });
+    expect(staySegment(A, 0, 10, 'chest').prop).toBe('chest');
   });
 
   it('walks at a fixed pace per step; a one-tile walk takes no time', () => {
@@ -39,11 +30,10 @@ describe('poseOnSegment', () => {
   const walk = walkSegment([A, B, C], 0);
 
   it('stands facing front on a stay', () => {
-    expect(poseOnSegment(staySegment(A, 0, 100, { prop: 'scroll' }), 50)).toEqual({
+    expect(poseOnSegment(staySegment(A, 0, 100, 'scroll'), 50)).toEqual({
       point: tileToPoint(A),
       frame: 0,
       flip: false,
-      visible: true,
       prop: 'scroll',
     });
   });
@@ -78,9 +68,7 @@ describe('poseOnSegment', () => {
     expect(poseOnSegment(walkSegment([B, C], 0), 10).flip).toBe(false);
   });
 
-  it('carries visibility and prop', () => {
-    const hidden = staySegment(A, 0, 100, { visible: false });
-    expect(poseOnSegment(hidden, 10).visible).toBe(false);
+  it('carries the prop', () => {
     expect(poseOnSegment(walkSegment([A, B], 0, 'chest'), 10).prop).toBe('chest');
   });
 });
@@ -91,7 +79,6 @@ describe('standingPose', () => {
       point: tileToPoint(A),
       frame: 0,
       flip: false,
-      visible: true,
       prop: null,
     });
   });

@@ -22,8 +22,6 @@ export interface Segment {
   /** One tile for a stay, two or more for a walk. */
   readonly path: TilePath;
   readonly prop: Prop | null;
-  /** False while the member is out of the office (beyond the door). */
-  readonly visible: boolean;
 }
 
 export interface Pose {
@@ -32,28 +30,16 @@ export interface Pose {
   readonly frame: SpriteFrame;
   /** True when facing left (the art draws the right-facing frame mirrored). */
   readonly flip: boolean;
-  readonly visible: boolean;
   readonly prop: Prop | null;
-}
-
-export interface StayOptions {
-  readonly prop?: Prop | null;
-  readonly visible?: boolean;
 }
 
 export function staySegment(
   at: TilePos,
   start: number,
   durationMs: number,
-  options: StayOptions = {},
+  prop: Prop | null = null,
 ): Segment {
-  return {
-    start,
-    end: start + durationMs,
-    path: [at],
-    prop: options.prop ?? null,
-    visible: options.visible ?? true,
-  };
+  return { start, end: start + durationMs, path: [at], prop };
 }
 
 /** Walks the path at MS_PER_TILE per step. A one-tile path takes no time. */
@@ -63,7 +49,6 @@ export function walkSegment(path: TilePath, start: number, prop: Prop | null = n
     end: start + (path.length - 1) * MS_PER_TILE,
     path,
     prop,
-    visible: true,
   };
 }
 
@@ -84,7 +69,7 @@ function facesLeft(path: readonly TilePos[], step: number): boolean {
 
 /** Pose on a segment at time `t` (clamped to the segment). */
 export function poseOnSegment(segment: Segment, t: number): Pose {
-  const base = { prop: segment.prop, visible: segment.visible };
+  const base = { prop: segment.prop };
   const first = segment.path[0];
   if (segment.path.length < 2) return { ...base, point: tileToPoint(first), frame: 0, flip: false };
   const elapsed = Math.min(Math.max(t - segment.start, 0), segment.end - segment.start);
@@ -103,5 +88,5 @@ export function poseOnSegment(segment: Segment, t: number): Pose {
 
 /** The member standing still on a tile (at their seat when nothing is happening). */
 export function standingPose(at: TilePos): Pose {
-  return { point: tileToPoint(at), frame: 0, flip: false, visible: true, prop: null };
+  return { point: tileToPoint(at), frame: 0, flip: false, prop: null };
 }

@@ -67,8 +67,8 @@ describe('decor layout', () => {
 });
 
 describe('decor layout: room to walk', () => {
-  it('never puts a floor thing on a seat, the counter front or the door', () => {
-    const keep = [...Object.values(MEMBERS).map((m) => m.seat), PLACES.counterFront, PLACES.door];
+  it('never puts a floor thing on a seat or the counter front', () => {
+    const keep = [...Object.values(MEMBERS).map((m) => m.seat), PLACES.counterFront];
     for (const item of DECOR_PLACEMENTS.filter((i) => i.solid)) {
       for (const pos of keep) expect(contains(item, pos)).toBe(false);
     }

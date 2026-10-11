@@ -85,8 +85,8 @@ class TrackBuilder {
     return this.push(walkSegment(route(this.at, to), this.cursor, prop), to);
   }
 
-  stay(ms: number, options: { prop?: Prop | null; visible?: boolean } = {}): this {
-    return this.push(staySegment(this.at, this.cursor, ms, options), this.at);
+  stay(ms: number, prop: Prop | null = null): this {
+    return this.push(staySegment(this.at, this.cursor, ms, prop), this.at);
   }
 
   /** The time the next segment would start. */
@@ -122,22 +122,20 @@ function delivery(
   seats: SceneContext['seats'],
 ): Track[] {
   const { giver, receiver, to, prop } = item;
-  const giving = new TrackBuilder(giver, start, seats[giver])
-    .stay(PICK_UP_MS, { prop })
-    .walk(to, prop);
+  const giving = new TrackBuilder(giver, start, seats[giver]).stay(PICK_UP_MS, prop).walk(to, prop);
   const handover = giving.time + HANDOVER_MS / 2;
   giving
-    .stay(HANDOVER_MS / 2, { prop })
+    .stay(HANDOVER_MS / 2, prop)
     .stay(HANDOVER_MS / 2)
     .walk(seats[giver]);
   const receiving = new TrackBuilder(receiver, start, seats[receiver])
     .stay(handover - start)
-    .stay(HOLD_UP_MS, { prop });
+    .stay(HOLD_UP_MS, prop);
   return [giving.build(), receiving.build()];
 }
 
 function reception(start: number, seats: SceneContext['seats'], prop: Prop): Track {
-  return new TrackBuilder('kaname', start, seats.kaname).stay(RECEPTION_MS, { prop }).build();
+  return new TrackBuilder('kaname', start, seats.kaname).stay(RECEPTION_MS, prop).build();
 }
 
 export function planScene(event: GuildEvent, start: number, context: SceneContext): Scene {

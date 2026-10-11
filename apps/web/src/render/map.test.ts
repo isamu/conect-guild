@@ -55,13 +55,14 @@ describe('map: size and contents', () => {
     expect(groundAt({ col: 5, row: 0 })).toBe('wall-top');
     // The back wall is two tiles high.
     expect(groundAt({ col: 16, row: 2 })).toBe('wall');
-    // A doorway (floor) in the right wall, with the door drawn over it.
-    expect(groundAt(PLACES.door)).toBe('floor');
-    expect(groundAt({ col: MAP_COLS - 1, row: PLACES.door.row })).toBe('floor');
-    expect(groundAt({ col: MAP_COLS - 1, row: 13 })).toBe('wall');
-    expect(PLACES.door.row).toBe(MAP_ROWS - 2);
+    // A doorway (floor) in the right wall, with the door drawn over it as decoration.
     const door = MAP_OBJECTS.find((o) => o.tile === 'door');
-    expect(door !== undefined && contains(door, PLACES.door) && !door.solid).toBe(true);
+    expect(door).toBeDefined();
+    if (door === undefined) return;
+    expect(door.col + door.w).toBe(MAP_COLS);
+    expect(door.row + door.h).toBe(MAP_ROWS - 1);
+    expect(groundAt({ col: MAP_COLS - 1, row: MAP_ROWS - 2 })).toBe('floor');
+    expect(groundAt({ col: MAP_COLS - 1, row: door.row - 1 })).toBe('wall');
   });
 
   it('draws windows and the door over the wall, not in place of it (they are see-through)', () => {
@@ -109,11 +110,18 @@ describe('map: places and seats', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it.each(DEPARTMENT_MEMBERS)('lets %s walk seat → counter → door → seat', (id) => {
+  it.each(DEPARTMENT_MEMBERS)('lets %s walk seat → counter front → seat', (id) => {
     const seat = MEMBERS[id].seat;
     expect(findPath(seat, PLACES.counterFront)).not.toBeNull();
-    expect(findPath(PLACES.counterFront, PLACES.door)).not.toBeNull();
-    expect(findPath(PLACES.door, seat)).not.toBeNull();
+    expect(findPath(PLACES.counterFront, seat)).not.toBeNull();
+  });
+
+  it.each(DEPARTMENT_MEMBERS)('lets かなめ walk from behind the counter to %s and back', (id) => {
+    const there = findPath(MEMBERS.kaname.seat, MEMBERS[id].seat);
+    const back = findPath(MEMBERS[id].seat, MEMBERS.kaname.seat);
+    expect(there).not.toBeNull();
+    expect(back).not.toBeNull();
+    for (const tile of [...(there ?? []), ...(back ?? [])]) expect(isWalkable(tile)).toBe(true);
   });
 
   it('places one desk in each corner, right next to its department member', () => {
@@ -163,12 +171,11 @@ describe('map: walkable grid', () => {
     expect(isWalkable({ col: -1, row: 10 })).toBe(false);
   });
 
-  it('lets members cross rugs, carpet, chairs and the door', () => {
+  it('lets members cross rugs, carpet and chairs', () => {
     expect(isWalkable({ col: 16, row: 10 })).toBe(true); // rug-red
     expect(isWalkable({ col: 13, row: 4 })).toBe(true); // floor-carpet
     expect(isWalkable({ col: 14, row: 13 })).toBe(true); // light patch (flat decor)
     expect(isWalkable(MEMBERS.minori.seat)).toBe(true); // chair
-    expect(isWalkable(PLACES.door)).toBe(true);
   });
 
   it('keeps everyone out from under the windows', () => {

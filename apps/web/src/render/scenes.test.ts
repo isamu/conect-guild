@@ -125,7 +125,6 @@ describe.each(['issue-opened', 'pr-merged'] as const)('planScene: %s, every depa
     const scene = planScene(event(kind, department), 0, context);
     const tiles = scene.tracks.flatMap((t) => t.segments.flatMap((s) => [...s.path]));
     expect(tiles.filter((tile) => contains(door, tile))).toEqual([]);
-    expect(scene.tracks.every((t) => t.segments.every((s) => s.visible))).toBe(true);
   });
 
   it.each(DEPARTMENTS)('takes 10 to 14 s in all for %s', (department) => {
@@ -181,7 +180,6 @@ describe('planScene: issue-opened (かなめ brings the scroll to the seat)', ()
         end: 500 + RECEPTION_MS,
         path: [DEFAULT_SEATS.kaname],
         prop: 'scroll',
-        visible: true,
       },
     ]);
   });
@@ -221,7 +219,7 @@ describe('planScene: pr-merged (the member brings the chest to the reception)', 
     const reception = planScene(event('pr-merged', null), 0, context);
     expect(reception.tracks).toHaveLength(1);
     expect(trackOf(reception, 'kaname').segments).toEqual([
-      { start: 0, end: RECEPTION_MS, path: [DEFAULT_SEATS.kaname], prop: 'chest', visible: true },
+      { start: 0, end: RECEPTION_MS, path: [DEFAULT_SEATS.kaname], prop: 'chest' },
     ]);
   });
 });

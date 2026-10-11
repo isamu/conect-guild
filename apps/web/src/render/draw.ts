@@ -86,7 +86,6 @@ export function drawActors(
   art: GuildArt,
 ): void {
   for (const { id, pose, hand } of frame.members) {
-    if (!pose.visible) continue;
     art.sprites.drawMember(ctx, id, pose, pose.point);
     if (hand !== null) {
       const at = { x: pose.point.x + hand.offset.x, y: pose.point.y + hand.offset.y };

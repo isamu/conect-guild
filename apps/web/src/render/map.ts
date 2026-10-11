@@ -130,8 +130,6 @@ export function isUnderWindow(pos: TilePos): boolean {
 export const PLACES = {
   /** Where a visitor stands in front of かなめ's counter. */
   counterFront: { col: 16, row: 10 },
-  /** The exit (in the doorway of the right wall); a member who reaches it leaves the screen. */
-  door: { col: 30, row: 16 },
 } as const satisfies Record<string, TilePos>;
 
 interface GroundFill extends TileRect {
@@ -174,8 +172,8 @@ const flat = (tile: TileName, area: TileRect): MapObject => ({ tile, solid: fals
  * assets/concept/rpg-company-ui.png within what the HTML windows leave free: the throne at the back
  * centre, かなめ's counter (left + middles + right) in front of it, a department in each corner and
  * the door at the bottom right. The upper departments sit between the quest board and the party
- * window; the lower ones just above the message window. Chairs (the seats) and the door are not
- * solid, so members walk on them. Windows and the door have see-through parts, so they go over the
+ * window; the lower ones just above the message window. Chairs (the seats) are not solid, so members
+ * walk on them; the door is only decoration (nobody leaves the room). Windows and the door have see-through parts, so they go over the
  * wall and floor, not instead.
  */
 export const MAP_OBJECTS: readonly MapObject[] = [
