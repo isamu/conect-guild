@@ -103,6 +103,35 @@ defineProps<{ rows: readonly PartyRow[] }>();
   color: var(--accent);
 }
 
+.member--awaiting-permission .member__state {
+  color: #ff6b6b;
+}
+
+/* Live states (MulmoTerminal) blink a dot, so they read as happening right now. */
+.member--awaiting-permission .member__state::before,
+.member--busy .member__state::before {
+  content: '●';
+  margin-right: 0.3em;
+  animation: member-live 1.2s ease-in-out infinite;
+}
+
+.member--busy .member__state {
+  color: #8dffb0;
+}
+
+@keyframes member-live {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .member--awaiting-permission .member__state::before,
+  .member--busy .member__state::before {
+    animation: none;
+  }
+}
+
 .member--awaiting-president .member__state {
   color: #ff9ad5;
 }
