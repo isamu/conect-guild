@@ -5,7 +5,7 @@ import type { SpriteFrame } from './motion';
 import type { Point } from './path';
 
 /**
- * The real members: one sheet per member (assets/sprites/<memberId>.png), four 64 x 64 frames in a
+ * The real members: one sheet per member (assets/sprites/<memberId>.png), four 80 x 80 frames in a
  * row (front, right standing, right walking 1 and 2), feet at the bottom centre. Facing left is the
  * right-facing frame mirrored. Held items keep the drawing passed in (no picture for them yet).
  */

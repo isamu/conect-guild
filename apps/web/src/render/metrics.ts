@@ -1,11 +1,11 @@
 /**
  * Every size of the drawing in one place (contract with assets/tiles and assets/sprites):
- * 32 x 18 tiles of 32 px (logical 1024 x 576), members drawn from 64 x 64 frames.
+ * 32 x 18 tiles of 32 px (logical 1024 x 576), members drawn from 80 x 80 frames.
  */
 
 export const TILE_SIZE = 32;
 /** One sprite frame (square); the feet are at the bottom centre. */
-export const SPRITE_SIZE = 64;
+export const SPRITE_SIZE = 80;
 /**
  * Logical px per detail pixel. Small hand-made shapes (bubbles, placeholder boxes, confetti) are
  * designed on a 16 px tile grid and scaled by this, so they keep their proportions.
@@ -43,7 +43,7 @@ export const AMBIENT = {
   scrollBurstMs: 3_360,
   scrollStepMs: 420,
   scrollShakePx: 2,
-  handHeightPx: 22,
+  handHeightPx: 28,
   /** The king with PRs to approve: a small sway on the throne. */
   fidgetBurstMs: 3_360,
   fidgetStepMs: 420,
