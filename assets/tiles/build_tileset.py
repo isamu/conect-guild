@@ -1,15 +1,19 @@
-"""Normalize the codex-generated sheet (tiles_raw.png) into a 32px tileset.
+"""Normalize the codex-generated sheets into a 32px tileset.
 
-Usage: python build_tileset.py <tiles_raw.png> <tileset.png>
+Usage: python build_tileset.py <tiles_raw.png> <counter_raw.png> <tileset.png>
 Ran with Python 3.14.7 and Pillow 12.3.0 (installed in a throwaway venv,
 not a project dependency).
 
 The raw image follows prompt.txt: an 8x4 grid of equal cells on a #FF00FF
 background. For every tile we find the drawn pixels inside its slot, crop
-them, shrink them into w*32 x h*32 and turn the magenta into transparency.
-Shrinking is a 1/4 area average (BOX) from the 128px cells; nearest-neighbour
-was tried and left magenta fringes and jagged lines.
-Keep LAYOUT in sync with tiles.ts.
+them, shrink them into their SHEET box (w*32 x h*32; objects keep their
+aspect) and turn the magenta into transparency. Shrinking is an area average
+(BOX); nearest-neighbour was tried and left magenta fringes and jagged lines.
+
+counter_raw.png follows prompt-counter.txt: one long counter across the lower
+two rows of an 8x4 grid of 128px cells. Its cells are cut as they are (no bbox
+fitting) so the left end, the repeating middle and the right end line up.
+Keep SHEET in sync with tiles.ts.
 """
 
 import hashlib
@@ -22,13 +26,17 @@ RAW_SIZE = (1024, 512)
 # SOURCE_BOX below is measured on this exact file; refuse any other input.
 # After regenerating tiles_raw.png, re-measure SOURCE_BOX and update the hash.
 RAW_SHA256 = "855e94b468a0c289ad83065c439c9c85fd21e3b1f1f2d1ab68aaec4084d278df"
+COUNTER_RAW_SIZE = (1024, 512)
+COUNTER_RAW_SHA256 = "601c0aa7a604e81b41d3b3d948376e3b3af0ddbff00e3f40af46018d69fc345a"
 TILE = 32
-SHEET_COLS = 8
-SHEET_ROWS = 4
+SHEET_COLS = 10
+SHEET_ROWS = 6
 
-# name: (col, row, w, h, kind). "texture" fills its box edge to edge and must
-# tile seamlessly; "object" keeps its aspect and sits bottom-center.
-LAYOUT = {
+# Where each piece was drawn in tiles_raw.png (prompt.txt's 8x4 grid of 128px
+# cells): name -> (col, row, w, h, kind). "texture" fills its box edge to edge
+# and must tile seamlessly; "object" keeps its aspect and sits bottom-center
+# in its SHEET box, filling it as far as the aspect allows.
+SOURCE_SLOTS = {
     "floor": (0, 0, 1, 1, "texture"),
     "floor-carpet": (1, 0, 1, 1, "texture"),
     "wall": (2, 0, 1, 1, "texture"),
@@ -40,10 +48,40 @@ LAYOUT = {
     "crate": (0, 1, 1, 1, "object"),
     "desk": (1, 1, 2, 1, "object"),
     "board": (3, 1, 2, 1, "object"),
-    "counter": (5, 1, 3, 1, "object"),
     "door": (0, 2, 1, 2, "object"),
     "shelf": (1, 2, 1, 2, "object"),
     "throne": (2, 2, 2, 2, "object"),
+}
+
+# Where each piece lands in tileset.png and how many tiles it covers:
+# name -> (col, row, w, h). Keep in sync with tiles.ts.
+SHEET = {
+    "floor": (0, 0, 1, 1),
+    "floor-carpet": (1, 0, 1, 1),
+    "wall": (2, 0, 1, 1),
+    "wall-top": (3, 0, 1, 1),
+    "rug-red": (4, 0, 1, 1),
+    "plant": (5, 0, 1, 1),
+    "crate": (6, 0, 1, 1),
+    "desk": (0, 1, 4, 2),
+    "board": (4, 1, 3, 2),
+    "chair": (7, 1, 1, 2),
+    "window": (8, 1, 2, 2),
+    "throne": (0, 3, 3, 3),
+    "shelf": (3, 3, 2, 3),
+    "door": (5, 3, 2, 3),
+    "counter-left": (7, 3, 1, 2),
+    "counter-mid": (8, 3, 1, 2),
+    "counter-right": (9, 3, 1, 2),
+}
+
+# Counter parts: name -> column of counter_raw.png's 8x4 grid. The counter
+# fills the lower two rows; columns 1-6 repeat one 128px pattern whose
+# pillars sit on the cell borders, so column 3 wraps onto itself.
+COUNTER_PARTS = {
+    "counter-left": 0,
+    "counter-mid": 3,
+    "counter-right": 7,
 }
 
 # Texture crops: (left, top, right, bottom) as fractions of the drawn bbox.
@@ -173,38 +211,80 @@ def build_object(img, bbox, size):
     return tile
 
 
-def main(src, dst):
-    if os.path.realpath(src) == os.path.realpath(dst) or (os.path.exists(dst) and os.path.samefile(src, dst)):
-        raise SystemExit("output path must differ from the source image")
-    with open(src, "rb") as f:
+def load_raw(path, size, sha256):
+    """Keyed RGBA of path, refusing any file but the one the layout was measured on."""
+    with open(path, "rb") as f:
         digest = hashlib.sha256(f.read()).hexdigest()
-    if digest != RAW_SHA256:
-        raise SystemExit(f"{src} is not the tiles_raw.png that SOURCE_BOX was measured on (sha256 {digest})")
-    raw = keyed(Image.open(src))
-    if raw.size != RAW_SIZE:
-        raise SystemExit(f"expected a {RAW_SIZE} source image, got {raw.size}")
-    cell_w = raw.width / SHEET_COLS
-    cell_h = raw.height / SHEET_ROWS
+    if digest != sha256:
+        raise SystemExit(f"{path} is not the source image this script was measured on (sha256 {digest})")
+    raw = keyed(Image.open(path))
+    if raw.size != size:
+        raise SystemExit(f"expected a {size} source image, got {raw.size}")
+    return raw
+
+
+def paste_main_tiles(sheet, raw):
+    cell = raw.width // 8
     boxes = components(raw)
-    sheet = Image.new("RGBA", (SHEET_COLS * TILE, SHEET_ROWS * TILE), (0, 0, 0, 0))
-    for name, (col, row, w, h, kind) in LAYOUT.items():
-        box = (
-            round(col * cell_w),
-            round(row * cell_h),
-            round((col + w) * cell_w),
-            round((row + h) * cell_h),
-        )
-        size = (w * TILE, h * TILE)
+    for name, (col, row, w, h, kind) in SOURCE_SLOTS.items():
+        box = (col * cell, row * cell, (col + w) * cell, (row + h) * cell)
+        dst_col, dst_row, dst_w, dst_h = SHEET[name]
+        size = (dst_w * TILE, dst_h * TILE)
         if kind == "texture":
             tile = build_texture(raw, slot_bbox(raw, box), name, size)
         else:
             bbox = checked_source_box(raw, name) if name in SOURCE_BOX else drawn_bbox(boxes, box)
-            tile = build_object(raw, bbox, size)
+            tile = drop_fringe(build_object(raw, bbox, size))
+        sheet.paste(tile, (dst_col * TILE, dst_row * TILE))
+
+
+OUTLINE = (40, 24, 16, 255)
+
+
+def fringe_fix(r, g, b, a):
+    """Pixel after cleaning magenta blends that the key missed.
+
+    Bright blends (rounded corners) become transparent; dark ones, where the
+    brown outline met the key, become the outline color.
+    """
+    if not a:
+        return (r, g, b, a)
+    if r > 100 and b > 0.7 * r and g < 0.45 * b:
+        return (0, 0, 0, 0)
+    if max(r, b) > 40 and b > 0.6 * r and r > 0.6 * b and g < 0.5 * min(r, b):
+        return OUTLINE
+    return (r, g, b, a)
+
+
+def drop_fringe(tile):
+    tile.putdata([fringe_fix(*px) for px in tile.get_flattened_data()])
+    return tile
+
+
+def paste_counter_parts(sheet, raw):
+    cell = raw.width // 8
+    for name, src_col in COUNTER_PARTS.items():
+        col, row, w, h = SHEET[name]
+        box = (src_col * cell, raw.height - h * cell, (src_col + w) * cell, raw.height)
+        if raw.crop(box).getchannel("A").getbbox() is None:
+            raise SystemExit(f"empty counter cell for {name!r} at {box}")
+        tile = drop_fringe(shrink(raw.crop(box), (w * TILE, h * TILE)))
         sheet.paste(tile, (col * TILE, row * TILE))
+
+
+def main(src, counter_src, dst):
+    for path in (src, counter_src):
+        if os.path.realpath(path) == os.path.realpath(dst) or (os.path.exists(dst) and os.path.samefile(path, dst)):
+            raise SystemExit("output path must differ from the source images")
+    raw = load_raw(src, RAW_SIZE, RAW_SHA256)
+    counter_raw = load_raw(counter_src, COUNTER_RAW_SIZE, COUNTER_RAW_SHA256)
+    sheet = Image.new("RGBA", (SHEET_COLS * TILE, SHEET_ROWS * TILE), (0, 0, 0, 0))
+    paste_main_tiles(sheet, raw)
+    paste_counter_parts(sheet, counter_raw)
     sheet.save(dst)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        raise SystemExit("usage: python build_tileset.py <tiles_raw.png> <tileset.png>")
-    main(sys.argv[1], sys.argv[2])
+    if len(sys.argv) != 4:
+        raise SystemExit("usage: python build_tileset.py <tiles_raw.png> <counter_raw.png> <tileset.png>")
+    main(sys.argv[1], sys.argv[2], sys.argv[3])
