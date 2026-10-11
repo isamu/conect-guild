@@ -1,6 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DECOR } from '../../../../assets/decor/decor';
-import { decorDraw, PROP_DECOR, propPlacement } from './decorArt';
+import { drawPlaceholderProp, type SpriteArt } from './art';
+import {
+  chooseProps,
+  decorDraw,
+  decorProps,
+  PROP_DECOR,
+  propDraw,
+  propPlacement,
+} from './decorArt';
 
 describe('decorDraw', () => {
   it('cuts a one-cell thing from its 32 px cell', () => {
@@ -25,5 +33,43 @@ describe('held items', () => {
       x: -16,
       y: -16,
     });
+  });
+});
+
+describe('held items from props.png', () => {
+  it('cuts the scroll and the chest from their 40 px cells, centred on the given point', () => {
+    expect(propDraw('scroll', { x: 100, y: 50 })).toEqual({
+      sx: 0,
+      sy: 0,
+      w: 40,
+      h: 40,
+      x: 80,
+      y: 30,
+    });
+    expect(propDraw('chest', { x: 0, y: 0 })).toEqual({
+      sx: 40,
+      sy: 0,
+      w: 40,
+      h: 40,
+      x: -20,
+      y: -20,
+    });
+  });
+});
+
+describe('chooseProps', () => {
+  const fromDecor = decorProps({ drawDecor: vi.fn() });
+
+  it('uses the props.png drawing when it loaded', () => {
+    const own: SpriteArt['drawProp'] = vi.fn();
+    expect(chooseProps(own, fromDecor)).toBe(own);
+  });
+
+  it('falls back to the decor pictures when props.png did not load', () => {
+    expect(chooseProps(null, fromDecor)).toBe(fromDecor);
+  });
+
+  it('falls back to the plain boxes when neither sheet loaded', () => {
+    expect(chooseProps(null, null)).toBe(drawPlaceholderProp);
   });
 });

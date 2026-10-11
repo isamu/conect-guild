@@ -1,5 +1,6 @@
 import { DECOR, DECOR_TILE_SIZE, type DecorName } from '../../../../assets/decor/decor';
-import type { DecorArt, SpriteArt } from './art';
+import { PROPS, PROPS_TILE_SIZE } from '../../../../assets/props/props';
+import { drawPlaceholderProp, type DecorArt, type SpriteArt } from './art';
 import type { Prop } from './motion';
 import type { Point } from './path';
 
@@ -32,7 +33,7 @@ export function createDecorArt(sheet: CanvasImageSource): DecorArt {
   };
 }
 
-/** The picture for each held item (a stand-in until Issue #9 draws them for the purpose). */
+/** The stand-in picture for each held item, used when props.png cannot be loaded. */
 export const PROP_DECOR: Readonly<Record<Prop, DecorName>> = {
   scroll: 'scroll-pile',
   chest: 'chest',
@@ -51,4 +52,35 @@ export function decorProps(decor: DecorArt): SpriteArt['drawProp'] {
     const { name, x, y } = propPlacement(prop, at);
     decor.drawDecor(ctx, name, x, y);
   };
+}
+
+/** Where a held item's own picture is in props.png and its top-left, centred on `at`. Pure. */
+export function propDraw(prop: Prop, at: Point): DecorDraw & { x: number; y: number } {
+  const piece = PROPS[prop];
+  const w = piece.w * PROPS_TILE_SIZE;
+  const h = piece.h * PROPS_TILE_SIZE;
+  return {
+    sx: piece.col * PROPS_TILE_SIZE,
+    sy: piece.row * PROPS_TILE_SIZE,
+    w,
+    h,
+    x: at.x - w / 2,
+    y: at.y - h / 2,
+  };
+}
+
+/** Held items drawn with their own pictures (assets/props/props.png, positions in props.ts). */
+export function sheetProps(sheet: CanvasImageSource): SpriteArt['drawProp'] {
+  return (ctx, prop, at) => {
+    const d = propDraw(prop, at);
+    ctx.drawImage(sheet, d.sx, d.sy, d.w, d.h, Math.round(d.x), Math.round(d.y), d.w, d.h);
+  };
+}
+
+/** The held items' drawing: their own pictures, else the small things' pictures, else boxes. */
+export function chooseProps(
+  props: SpriteArt['drawProp'] | null,
+  decorFallback: SpriteArt['drawProp'] | null,
+): SpriteArt['drawProp'] {
+  return props ?? decorFallback ?? drawPlaceholderProp;
 }

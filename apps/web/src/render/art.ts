@@ -89,7 +89,7 @@ const placeholderTiles: TileArt = {
 
 const PROP_COLORS: Readonly<Record<Prop, string>> = { scroll: '#f3e2b3', chest: '#c58b2a' };
 
-/** A plain box for a held item (no picture for scrolls and chests yet). */
+/** A plain box for a held item, when neither props.png nor decor.png can be loaded. */
 export function drawPlaceholderProp(ctx: CanvasRenderingContext2D, prop: Prop, at: Point): void {
   ctx.save();
   ctx.translate(Math.round(at.x), Math.round(at.y));
