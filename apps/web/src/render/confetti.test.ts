@@ -7,6 +7,7 @@ import {
   createConfetti,
   type Random,
 } from './confetti';
+import { DETAIL_SCALE, OVERHEAD_OFFSET } from './metrics';
 
 /** Deterministic random numbers in [0, 1). */
 function seeded(seed: number): Random {
@@ -35,9 +36,9 @@ describe('createConfetti', () => {
       expect(p).toBeDefined();
       if (p === undefined) continue;
       expect(p.vy).toBeLessThan(0);
-      expect(Math.abs(p.vx)).toBeLessThanOrEqual(60);
+      expect(Math.abs(p.vx)).toBeLessThanOrEqual(60 * DETAIL_SCALE);
       expect(p.color).toMatch(/^#[0-9a-f]{6}$/);
-      expect([1, 2]).toContain(p.size);
+      expect([DETAIL_SCALE, 2 * DETAIL_SCALE]).toContain(p.size);
     }
   });
 });
@@ -67,6 +68,6 @@ describe('confettiAt', () => {
 
 describe('burstOrigin', () => {
   it('centres over the head', () => {
-    expect(burstOrigin({ x: 100, y: 200 })).toEqual({ x: 100, y: 166 });
+    expect(burstOrigin({ x: 100, y: 200 })).toEqual({ x: 100, y: 200 - OVERHEAD_OFFSET });
   });
 });

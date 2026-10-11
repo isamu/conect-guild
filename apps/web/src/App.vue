@@ -51,7 +51,7 @@ const { state, board, party, king, fetchStatus, message, cue, nextMessage, clear
 }
 
 /*
- * The windows sit over the canvas (logical 512 x 288, 16:9) where the map keeps nobody
+ * The windows sit over the canvas (logical 1024 x 576, 16:9) where the map keeps nobody
  * (render/map.ts HIDDEN_AREAS). Sizes follow the stage width through container query units.
  */
 .stage {

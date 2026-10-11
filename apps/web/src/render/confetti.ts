@@ -1,10 +1,11 @@
+import { DETAIL_SCALE, OVERHEAD_OFFSET } from './metrics';
 import type { Point } from './path';
 
 /** Confetti over a member's head when a quest is cleared. Random numbers are injected. */
 
 export const CONFETTI_MS = 1_800;
 export const CONFETTI_COUNT = 24;
-const GRAVITY = 180; // logical px / s^2
+const GRAVITY = 180 * DETAIL_SCALE; // logical px / s^2
 const COLORS = ['#ffd84a', '#ff5f7e', '#4fd1ff', '#7ee07e', '#ffffff'] as const;
 
 /** Returns a number in [0, 1), like Math.random. */
@@ -15,7 +16,8 @@ export interface Particle {
   readonly vx: number;
   readonly vy: number;
   readonly color: string;
-  readonly size: 1 | 2;
+  /** Side of the square, logical px. */
+  readonly size: number;
 }
 
 export interface PlacedParticle {
@@ -23,7 +25,7 @@ export interface PlacedParticle {
   readonly x: number;
   readonly y: number;
   readonly color: string;
-  readonly size: 1 | 2;
+  readonly size: number;
 }
 
 function pick<T>(items: readonly [T, ...T[]], random: Random): T {
@@ -33,10 +35,10 @@ function pick<T>(items: readonly [T, ...T[]], random: Random): T {
 /** Particles fly up and out in a fan, then fall. */
 export function createConfetti(random: Random, count: number = CONFETTI_COUNT): Particle[] {
   return Array.from({ length: count }, () => ({
-    vx: (random() - 0.5) * 120,
-    vy: -60 - random() * 80,
+    vx: (random() - 0.5) * 120 * DETAIL_SCALE,
+    vy: (-60 - random() * 80) * DETAIL_SCALE,
     color: pick(COLORS, random),
-    size: random() < 0.3 ? 2 : 1,
+    size: (random() < 0.3 ? 2 : 1) * DETAIL_SCALE,
   }));
 }
 
@@ -58,5 +60,5 @@ export function confettiAt(
 
 /** Where a burst centres: a little above the head of a member standing at `feet`. */
 export function burstOrigin(feet: Point): Point {
-  return { x: feet.x, y: feet.y - 34 };
+  return { x: feet.x, y: feet.y - OVERHEAD_OFFSET };
 }

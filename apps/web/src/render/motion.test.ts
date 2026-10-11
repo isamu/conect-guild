@@ -50,7 +50,7 @@ describe('poseOnSegment', () => {
 
   it('moves from tile to tile in step with time', () => {
     expect(poseOnSegment(walk, 0).point).toEqual(tileToPoint(A));
-    expect(poseOnSegment(walk, MS_PER_TILE / 2).point).toEqual({ x: 48, y: 48 });
+    expect(poseOnSegment(walk, MS_PER_TILE / 2).point).toEqual({ x: 96, y: 96 });
     expect(poseOnSegment(walk, MS_PER_TILE).point).toEqual(tileToPoint(B));
     expect(poseOnSegment(walk, walk.end).point).toEqual(tileToPoint(C));
   });

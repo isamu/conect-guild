@@ -1,7 +1,8 @@
 import type { TilePos } from '../guild.config';
-import { isInsideMap, isWalkable, TILE_SIZE } from './map';
+import { isInsideMap, isWalkable } from './map';
+import { TILE_SIZE } from './metrics';
 
-/** A point in logical pixels (512 x 288 space). */
+/** A point in logical pixels (1024 x 576 space). */
 export interface Point {
   readonly x: number;
   readonly y: number;

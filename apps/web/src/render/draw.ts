@@ -2,6 +2,7 @@ import type { GuildArt } from './art';
 import type { BubbleKind, Bubbles } from './bubbles';
 import type { ConfettiView, StageFrame } from './director';
 import { GROUND, MAP_OBJECTS } from './map';
+import { DETAIL_SCALE, OVERHEAD_OFFSET } from './metrics';
 import type { Point } from './path';
 
 /** Canvas side effects only: every decision was made in the pure modules. Logical pixels. */
@@ -21,9 +22,13 @@ const BUBBLE_GLYPHS: Readonly<Record<BubbleKind, { glyph: string; color: string 
   'awaiting-kaname': { glyph: '…', color: '#222222' },
 };
 
+/** A small bubble to the upper right of the head, drawn in detail pixels. */
 function drawBubble(ctx: CanvasRenderingContext2D, kind: BubbleKind, feet: Point): void {
-  const x = Math.round(feet.x) + 3;
-  const y = Math.round(feet.y) - 40;
+  ctx.save();
+  ctx.translate(Math.round(feet.x), Math.round(feet.y - OVERHEAD_OFFSET));
+  ctx.scale(DETAIL_SCALE, DETAIL_SCALE);
+  const x = 3;
+  const y = -6;
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(x, y, 11, 9);
   ctx.fillRect(x + 1, y + 9, 2, 2);
@@ -36,6 +41,7 @@ function drawBubble(ctx: CanvasRenderingContext2D, kind: BubbleKind, feet: Point
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(glyph, x + 5.5, y + 5);
+  ctx.restore();
 }
 
 function drawConfetti(ctx: CanvasRenderingContext2D, view: ConfettiView): void {
@@ -57,7 +63,7 @@ export function drawActors(
     art.sprites.drawMember(ctx, id, pose, pose.point);
     const bubble = bubbles[id];
     if (pose.prop !== null) {
-      art.sprites.drawProp(ctx, pose.prop, { x: pose.point.x, y: pose.point.y - 34 });
+      art.sprites.drawProp(ctx, pose.prop, { x: pose.point.x, y: pose.point.y - OVERHEAD_OFFSET });
     } else if (bubble !== undefined) {
       drawBubble(ctx, bubble, pose.point);
     }

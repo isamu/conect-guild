@@ -58,7 +58,7 @@ watch(
 .guild-canvas {
   display: block;
   width: 100%;
-  aspect-ratio: 512 / 288;
+  aspect-ratio: 16 / 9;
   image-rendering: pixelated;
   user-select: none;
 }

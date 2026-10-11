@@ -1,5 +1,6 @@
 import { MEMBERS, type MemberId } from '../guild.config';
-import { TILE_SIZE, type TileName, type TileRect } from './map';
+import type { TileName, TileRect } from './map';
+import { DETAIL_SCALE, TILE_SIZE } from './metrics';
 import type { Prop, SpriteFrame } from './motion';
 import type { Point } from './path';
 
@@ -7,7 +8,7 @@ import type { Point } from './path';
  * The boundary between the drawing code and the pictures. Everything that decides how a tile or a
  * member looks goes through these interfaces, so the real tileset (assets/tiles/) and sprites
  * (assets/sprites/) replace `placeholderArt` without touching the rest of render/.
- * All coordinates are logical pixels (512 x 288).
+ * All coordinates are logical pixels (1024 x 576).
  */
 
 export interface TileArt {
@@ -83,8 +84,12 @@ const placeholderSprites: SpriteArt = {
   drawMember(ctx, id, pose, feet) {
     const member = MEMBERS[id];
     const bob = pose.frame === 3 ? 1 : 0;
-    const left = Math.round(feet.x) - 6;
-    const top = Math.round(feet.y) - 26 - bob;
+    // Drawn in detail pixels around the feet.
+    ctx.save();
+    ctx.translate(Math.round(feet.x), Math.round(feet.y));
+    ctx.scale(DETAIL_SCALE, DETAIL_SCALE);
+    const left = -6;
+    const top = -26 - bob;
     ctx.fillStyle = member.color;
     ctx.fillRect(left, top + 10, 12, 16);
     ctx.fillStyle = '#f2d0a9';
@@ -99,12 +104,18 @@ const placeholderSprites: SpriteArt = {
     ctx.textBaseline = 'middle';
     // Names come from guild.config.ts, not from GitHub.
     ctx.fillText(member.name.charAt(0), left + 6, top + 18);
+    ctx.restore();
   },
   drawProp(ctx, prop, at) {
+    ctx.save();
+    ctx.translate(Math.round(at.x), Math.round(at.y));
+    ctx.scale(DETAIL_SCALE, DETAIL_SCALE);
     ctx.fillStyle = PROP_COLORS[prop];
-    ctx.fillRect(Math.round(at.x) - 5, Math.round(at.y) - 3, 10, 6);
+    ctx.fillRect(-5, -3, 10, 6);
     ctx.strokeStyle = '#1b120b';
-    ctx.strokeRect(Math.round(at.x) - 4.5, Math.round(at.y) - 2.5, 9, 5);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-4.5, -2.5, 9, 5);
+    ctx.restore();
   },
 };
 

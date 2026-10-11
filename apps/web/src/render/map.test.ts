@@ -22,8 +22,8 @@ const WALKERS: readonly MemberId[] = ['kaname', 'minori', 'hibiki', 'hirame', 's
 const DEPARTMENT_MEMBERS: readonly MemberId[] = ['minori', 'hibiki', 'hirame', 'sasae'];
 
 describe('map: size and contents', () => {
-  it('is 32 x 18 tiles of 16 px (512 x 288)', () => {
-    expect([MAP_COLS, MAP_ROWS, LOGICAL_WIDTH, LOGICAL_HEIGHT]).toEqual([32, 18, 512, 288]);
+  it('is 32 x 18 tiles of 32 px (1024 x 576)', () => {
+    expect([MAP_COLS, MAP_ROWS, LOGICAL_WIDTH, LOGICAL_HEIGHT]).toEqual([32, 18, 1024, 576]);
     expect(GROUND).toHaveLength(MAP_ROWS);
     for (const row of GROUND) expect(row).toHaveLength(MAP_COLS);
   });

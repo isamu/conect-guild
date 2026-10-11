@@ -13,6 +13,7 @@ import {
   type Director,
 } from './director';
 import { PLACES } from './map';
+import { OVERHEAD_OFFSET } from './metrics';
 import { standingPose } from './motion';
 import { tileToPoint } from './path';
 import { DEFAULT_SEATS } from './scenes';
@@ -123,7 +124,7 @@ describe('director: confetti', () => {
     const frame = frameAt(director, 100, DEFAULT_SEATS);
     expect(frame.confetti).toHaveLength(1);
     const seat = tileToPoint(DEFAULT_SEATS.hirame);
-    expect(frame.confetti[0]?.origin).toEqual({ x: seat.x, y: seat.y - 34 });
+    expect(frame.confetti[0]?.origin).toEqual({ x: seat.x, y: seat.y - OVERHEAD_OFFSET });
   });
 
   it('bursts over the seat while the member is out of the door', () => {
@@ -132,7 +133,7 @@ describe('director: confetti', () => {
     const director = play(out, event('issue-closed', '企画'), awayStart + 1);
     const frame = frameAt(director, awayStart + 2, DEFAULT_SEATS);
     const seat = tileToPoint(DEFAULT_SEATS.hirame);
-    expect(frame.confetti[0]?.origin).toEqual({ x: seat.x, y: seat.y - 34 });
+    expect(frame.confetti[0]?.origin).toEqual({ x: seat.x, y: seat.y - OVERHEAD_OFFSET });
   });
 
   it('disappears when the burst is over', () => {

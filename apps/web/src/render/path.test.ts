@@ -15,8 +15,8 @@ function isConnected(path: readonly TilePos[]): boolean {
 
 describe('tile ↔ logical point', () => {
   it('stands a member on the bottom centre of the tile', () => {
-    expect(tileToPoint({ col: 0, row: 0 })).toEqual({ x: 8, y: 16 });
-    expect(tileToPoint({ col: 16, row: 7 })).toEqual({ x: 264, y: 128 });
+    expect(tileToPoint({ col: 0, row: 0 })).toEqual({ x: 16, y: 32 });
+    expect(tileToPoint({ col: 16, row: 7 })).toEqual({ x: 528, y: 256 });
   });
 
   it('maps a feet point back to its own tile', () => {
@@ -31,8 +31,8 @@ describe('tile ↔ logical point', () => {
 
   it('maps points inside a tile to that tile', () => {
     expect(pointToTile({ x: 0.5, y: 0.5 })).toEqual({ col: 0, row: 0 });
-    expect(pointToTile({ x: 15.9, y: 16 })).toEqual({ col: 0, row: 0 });
-    expect(pointToTile({ x: 16, y: 16.1 })).toEqual({ col: 1, row: 1 });
+    expect(pointToTile({ x: 31.9, y: 32 })).toEqual({ col: 0, row: 0 });
+    expect(pointToTile({ x: 32, y: 32.1 })).toEqual({ col: 1, row: 1 });
   });
 });
 

@@ -1,13 +1,14 @@
 import type { TilePos } from '../guild.config';
+import { TILE_SIZE } from './metrics';
 
 /**
- * The office as a tile map: 32 x 18 tiles of 16 px (logical 512 x 288). Pure data plus the
+ * The office as a tile map: 32 x 18 tiles (render/metrics.ts sets the pixel sizes). Pure data plus the
  * walkable grid derived from it. The layout follows assets/concept/rpg-company-ui.png:
  * the throne at the back centre, かなめ's counter in the middle, a desk in each wing and the door
  * at the bottom right. Nothing that matters is placed under the HTML windows (HIDDEN_AREAS).
  */
 
-export const TILE_SIZE = 16;
+export { TILE_SIZE } from './metrics';
 export const MAP_COLS = 32;
 export const MAP_ROWS = 18;
 export const LOGICAL_WIDTH = MAP_COLS * TILE_SIZE;
