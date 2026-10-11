@@ -76,9 +76,10 @@ conect-guild/
 │       │   ├── scenes.ts     イベント → 演出の台本（受け渡し・宝箱・紙吹雪）
 │       │   ├── director.ts   台本の再生（時刻を渡すと全員の位置とコマを返す）
 │       │   ├── motion.ts / confetti.ts / bubbles.ts  歩行のコマ送り、紙吹雪の粒子（乱数を注入）、席の上の吹き出し
+│       │   ├── ambient.ts    出来事が無い間の小さな動き（状態だけで決める。人ごとのずれは乱数を注入）
 │       │   ├── art.ts        絵の差し替え境界（TileArt / SpriteArt）と仮の矩形
 │       │   ├── tileArt.ts / spriteArt.ts / loadArt.ts  assets/ の絵で描く実装と読み込み
-│       │   └── draw.ts / loop.ts  描画と requestAnimationFrame（動くものがある間だけ回す）
+│       │   └── draw.ts / loop.ts  描画と requestAnimationFrame（演出中は毎フレーム、それ以外はアンビエントだけ約 7fps、非表示の間は止める）
 │       ├── ui/               Vue 部品: QuestBoard / PartyStatus / MessageWindow（Canvas の上に重ねる HTML）
 │       └── app/              Vue の reactive による小さなストア。Pinia は入れない
 ├── packages/collector/       収集スクリプト（TS。Node の型除去で直接実行）
@@ -264,6 +265,7 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
   - タイルを CC0 素材から codex 生成に変えた（8 章、10 章 3。社長の判断）
   - 論理解像度を 1024×576（32px タイル、キャラ 64px）にした（6 章。社長の判断で 2 倍に）
   - render/ の中身を書いた（3 章）
+  - 出来事が無い間の小さな動き（アンビエント）を足した。状態だけで決め、新しいデータや絵は足さない（3 章。社長の要望）
   - 閉じ直しの判定を「基準の closedAt より後」に改めた。基準の fetchedAt より新しい closedAt の Issue が取得のたびにクリアを出していた。closedAt が古い値に変わっただけでは閉じ直しにしない（4.4 の実装の修正）
 - **M1（2026-10-12）** collector の実装に合わせ、ページ送りを `--paginate --slurp` から `--paginate --jq`（要るフィールドだけに絞る）に改めた（4.1）
 - **v0.2（2026-10-12）** codex レビュー 1 周目を反映
