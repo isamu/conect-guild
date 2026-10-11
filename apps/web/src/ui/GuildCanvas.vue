@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, useTemplateRef, watch } from 'vue';
 import type { PartyRow, SceneCue } from '../app/guildView';
-import { placeholderArt } from '../render/art';
+import type { GuildArt } from '../render/art';
 import { bubblesOf } from '../render/bubbles';
+import { loadArt } from '../render/loadArt';
 import { startRenderLoop, type RenderLoop } from '../render/loop';
 
 const props = defineProps<{
@@ -15,11 +16,10 @@ const props = defineProps<{
 const canvas = useTemplateRef<HTMLCanvasElement>('canvas');
 let loop: RenderLoop | null = null;
 let observer: ResizeObserver | null = null;
+let unmounted = false;
 
-onMounted(() => {
-  const element = canvas.value;
-  if (element === null) return;
-  const running = startRenderLoop({ canvas: element, art: placeholderArt });
+function start(element: HTMLCanvasElement, art: GuildArt): void {
+  const running = startRenderLoop({ canvas: element, art });
   loop = running;
   running.setBubbles(bubblesOf(props.party));
   observer = new ResizeObserver((entries) => {
@@ -27,9 +27,19 @@ onMounted(() => {
     running.resize(width, globalThis.devicePixelRatio);
   });
   observer.observe(element);
+}
+
+onMounted(() => {
+  // The loop starts once the pictures are in, so the cached background has them.
+  void loadArt().then((art) => {
+    const element = canvas.value;
+    if (unmounted || element === null) return;
+    start(element, art);
+  });
 });
 
 onBeforeUnmount(() => {
+  unmounted = true;
   observer?.disconnect();
   loop?.stop();
   loop = null;
