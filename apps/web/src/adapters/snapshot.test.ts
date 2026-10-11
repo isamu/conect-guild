@@ -1,0 +1,177 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { loadSnapshot, validateSnapshot, defaultSnapshotUrl, type FetchFn } from './snapshot';
+
+const validSnapshot = {
+  schemaVersion: 1,
+  fetchedAt: '2026-10-12T00:00:00Z',
+  repo: 'example/guild',
+  issues: [
+    {
+      number: 1,
+      title: 'Fictional quest',
+      labels: ['経理'],
+      state: 'open',
+      createdAt: '2026-10-11T00:00:00Z',
+      updatedAt: '2026-10-11T00:00:00Z',
+      closedAt: null,
+    },
+  ],
+  prs: [],
+};
+
+function respondWith(body: string, status = 200): FetchFn {
+  return () => Promise.resolve(new Response(body, { status }));
+}
+
+/** A fetch that only settles when its signal aborts, like a hung server. */
+const hangingFetch: FetchFn = (_input, init) =>
+  new Promise((_resolve, reject) => {
+    init.signal?.addEventListener('abort', () => {
+      reject(new DOMException('aborted', 'AbortError'));
+    });
+  });
+
+describe('loadSnapshot', () => {
+  it('returns the validated snapshot', async () => {
+    const result = await loadSnapshot({
+      url: '/s.json',
+      fetchFn: respondWith(JSON.stringify(validSnapshot)),
+    });
+    expect(result).toEqual({ ok: true, snapshot: validSnapshot });
+  });
+
+  it('requests the given URL with no-store and an abort signal', async () => {
+    const fetchFn = vi.fn<FetchFn>(respondWith(JSON.stringify(validSnapshot)));
+    await loadSnapshot({ url: '/s.json', fetchFn });
+    expect(fetchFn).toHaveBeenCalledOnce();
+    const [input, init] = fetchFn.mock.calls[0] ?? [];
+    expect(input).toBe('/s.json');
+    expect(init?.cache).toBe('no-store');
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('reports a network error without throwing', async () => {
+    const fetchFn: FetchFn = () => Promise.reject(new TypeError('Failed to fetch'));
+    await expect(loadSnapshot({ url: '/s.json', fetchFn })).resolves.toEqual({
+      ok: false,
+      reason: 'network',
+    });
+  });
+
+  it.each([404, 500, 503])('reports HTTP %i with its status', async (status) => {
+    const result = await loadSnapshot({ url: '/s.json', fetchFn: respondWith('nope', status) });
+    expect(result).toEqual({ ok: false, reason: 'http', status });
+  });
+});
+
+describe('loadSnapshot: timeouts', () => {
+  it('times out a hung request and aborts it', async () => {
+    const fetchFn = vi.fn<FetchFn>(hangingFetch);
+    const result = await loadSnapshot({ url: '/s.json', fetchFn, timeoutMs: 5 });
+    expect(result).toEqual({ ok: false, reason: 'timeout' });
+    expect(fetchFn.mock.calls[0]?.[1].signal?.aborted).toBe(true);
+  });
+
+  it('times out while reading a hung body', async () => {
+    const fetchFn: FetchFn = (_input, init) => {
+      const body = new ReadableStream({
+        start(controller) {
+          init.signal?.addEventListener('abort', () => {
+            controller.error(new DOMException('aborted', 'AbortError'));
+          });
+        },
+      });
+      return Promise.resolve(new Response(body));
+    };
+    await expect(loadSnapshot({ url: '/s.json', fetchFn, timeoutMs: 5 })).resolves.toEqual({
+      ok: false,
+      reason: 'timeout',
+    });
+  });
+
+  it('reports a body read failure that is not a timeout as a network error', async () => {
+    const body = new ReadableStream({
+      start(controller) {
+        controller.error(new TypeError('connection reset'));
+      },
+    });
+    const fetchFn: FetchFn = () => Promise.resolve(new Response(body));
+    await expect(loadSnapshot({ url: '/s.json', fetchFn })).resolves.toEqual({
+      ok: false,
+      reason: 'network',
+    });
+  });
+});
+
+describe('loadSnapshot: bodies', () => {
+  it.each(['', '{', '{"schemaVersion":1,', '<html>404</html>'])(
+    'reports broken JSON %j as parse',
+    async (body) => {
+      const result = await loadSnapshot({ url: '/s.json', fetchFn: respondWith(body) });
+      expect(result).toEqual({ ok: false, reason: 'parse' });
+    },
+  );
+
+  it('reports a different schemaVersion', async () => {
+    const body = JSON.stringify({ ...validSnapshot, schemaVersion: 2 });
+    const result = await loadSnapshot({ url: '/s.json', fetchFn: respondWith(body) });
+    expect(result).toEqual({ ok: false, reason: 'schema-version' });
+  });
+
+  it('clears its timer after success', async () => {
+    vi.useFakeTimers();
+    try {
+      await loadSnapshot({ url: '/s.json', fetchFn: respondWith(JSON.stringify(validSnapshot)) });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('validateSnapshot', () => {
+  it.each([
+    ['a newer version', { ...validSnapshot, schemaVersion: 2 }],
+    ['version 0', { ...validSnapshot, schemaVersion: 0 }],
+    ['an otherwise empty object with another version', { schemaVersion: 99 }],
+  ])('reports schema-version for %s', (_label, value) => {
+    expect(validateSnapshot(value)).toEqual({ ok: false, reason: 'schema-version' });
+  });
+
+  it.each([
+    ['null', null],
+    ['an array', []],
+    ['a string', 'snapshot'],
+    ['a missing schemaVersion', { ...validSnapshot, schemaVersion: undefined }],
+    ['a string schemaVersion', { ...validSnapshot, schemaVersion: '1' }],
+    ['a missing issues array', { ...validSnapshot, issues: undefined }],
+    ['an unknown top-level key', { ...validSnapshot, body: 'secret' }],
+    ['a bad fetchedAt', { ...validSnapshot, fetchedAt: 'yesterday' }],
+    [
+      'a bad issue state',
+      { ...validSnapshot, issues: [{ ...validSnapshot.issues[0], state: 'x' }] },
+    ],
+  ])('reports invalid for %s', (_label, value) => {
+    expect(validateSnapshot(value)).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('accepts the current version', () => {
+    expect(validateSnapshot(validSnapshot)).toEqual({ ok: true, snapshot: validSnapshot });
+  });
+});
+
+describe('defaultSnapshotUrl', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('reads the dev-server route in dev mode', () => {
+    vi.stubEnv('DEV', true);
+    expect(defaultSnapshotUrl()).toBe('/snapshot.json');
+  });
+
+  it('reads only the fictional sample in a build', () => {
+    vi.stubEnv('DEV', false);
+    expect(defaultSnapshotUrl()).toBe('/snapshot.sample.json');
+  });
+});

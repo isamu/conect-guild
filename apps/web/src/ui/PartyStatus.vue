@@ -1,0 +1,125 @@
+<script setup lang="ts">
+import type { PartyRow } from '../app/guildView';
+
+defineProps<{ rows: readonly PartyRow[] }>();
+</script>
+
+<template>
+  <section class="rpg-window party" aria-label="パーティのようす">
+    <h2 class="rpg-window__title">パーティのようす</h2>
+    <p v-if="rows.length === 0" class="party__empty">よみこみちゅう…</p>
+    <ul class="party__rows">
+      <li
+        v-for="row in rows"
+        :key="row.id"
+        class="member"
+        :class="`member--${row.state}`"
+        :title="row.tooltip ?? undefined"
+      >
+        <span class="member__face" :style="{ background: row.color }">{{
+          row.name.charAt(0)
+        }}</span>
+        <span class="member__name">
+          {{ row.name }}<small class="member__role">{{ row.role }}</small>
+        </span>
+        <span class="member__state">{{ row.stateLabel }}</span>
+        <span v-if="row.rewards !== null" class="member__rewards" title="直近 7 日にマージされた PR"
+          >成果 {{ row.rewards }}</span
+        >
+      </li>
+    </ul>
+  </section>
+</template>
+
+<style scoped>
+.party__empty {
+  margin: 0.6em 0;
+  text-align: center;
+  color: var(--muted-text);
+}
+
+.party__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.member {
+  display: grid;
+  grid-template-columns: 1.7em minmax(0, 1fr) auto;
+  grid-template-areas:
+    'face name rewards'
+    'face state state';
+  align-items: center;
+  column-gap: 0.45em;
+  padding: 0.18em 0.35em;
+  border: 0.1em solid rgb(255 255 255 / 35%);
+  border-radius: 0.3em;
+  background: rgb(0 0 0 / 25%);
+}
+
+.member + .member {
+  margin-top: 0.2em;
+}
+
+.member[title] {
+  cursor: help;
+}
+
+.member__face {
+  grid-area: face;
+  display: grid;
+  place-items: center;
+  width: 1.6em;
+  height: 1.6em;
+  border-radius: 50%;
+  border: 0.1em solid #fff;
+  font-weight: 700;
+  font-size: 0.95em;
+  text-shadow: 0 0.05em 0.1em rgb(0 0 0 / 60%);
+}
+
+.member__name {
+  grid-area: name;
+  font-weight: 700;
+}
+
+.member__role {
+  margin-left: 0.4em;
+  font-size: 0.75em;
+  font-weight: 400;
+  color: var(--muted-text);
+}
+
+.member__state {
+  grid-area: state;
+  font-size: 0.85em;
+  font-weight: 700;
+}
+
+.member__rewards {
+  grid-area: rewards;
+  font-size: 0.75em;
+  color: var(--accent);
+}
+
+.member--awaiting-president .member__state {
+  color: #ff9ad5;
+}
+
+.member--awaiting-kaname .member__state {
+  color: var(--accent);
+}
+
+.member--working .member__state {
+  color: #6cf07a;
+}
+
+.member--done .member__state {
+  color: #6cc8ff;
+}
+
+.member--idle .member__state {
+  color: var(--muted-text);
+}
+</style>

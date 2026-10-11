@@ -1,0 +1,62 @@
+/* Shared look of the retro RPG windows. System fonts only (no external fonts). */
+:root {
+  --window-bg: #0d1a5c;
+  --window-bg-deep: #081040;
+  --window-line: #ffffff;
+  --window-text: #ffffff;
+  --muted-text: #b9c3ff;
+  --accent: #ffd84a;
+  --danger: #ff8080;
+  --scroll-paper: #f4e2b0;
+  --scroll-edge: #c9a25a;
+  --scroll-ink: #3a2410;
+  font-family:
+    'Hiragino Maru Gothic ProN', 'Hiragino Sans', 'BIZ UDGothic', 'Yu Gothic', 'Meiryo', system-ui,
+    sans-serif;
+  color-scheme: dark;
+}
+
+html,
+body {
+  margin: 0;
+  background: #05081c;
+  color: var(--window-text);
+}
+
+.rpg-window {
+  box-sizing: border-box;
+  background: linear-gradient(180deg, var(--window-bg) 0%, var(--window-bg-deep) 100%);
+  border: 0.32em double var(--window-line);
+  border-radius: 0.5em;
+  box-shadow:
+    0 0 0 0.15em #000,
+    0 0.3em 0.8em rgb(0 0 0 / 55%);
+  color: var(--window-text);
+  padding: 0.5em 0.7em;
+  line-height: 1.35;
+}
+
+.rpg-window__title {
+  margin: 0 0 0.35em;
+  font-size: 1.1em;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-align: center;
+}
+
+.rpg-button {
+  font: inherit;
+  font-size: 0.85em;
+  color: var(--window-text);
+  background: var(--window-bg-deep);
+  border: 0.15em solid var(--window-line);
+  border-radius: 0.3em;
+  padding: 0.15em 0.6em;
+  cursor: pointer;
+}
+
+.rpg-button:hover,
+.rpg-button:focus-visible {
+  background: #22348f;
+  outline: none;
+}

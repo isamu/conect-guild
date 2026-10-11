@@ -1,0 +1,50 @@
+import type { Snapshot } from '@conect-guild/snapshot';
+import { DEPARTMENT_MEMBER, MEMBERS, type DepartmentLabel } from '../guild.config';
+import type { DiffResult, GuildEvent } from './events';
+
+/** Name of the member who acts for a department; かなめ handles the reception (no department). */
+export function actorName(department: DepartmentLabel | null): string {
+  return department === null ? MEMBERS.kaname.name : MEMBERS[DEPARTMENT_MEMBER[department]].name;
+}
+
+/** `「title」` right after the number, or a plain space when the title is unknown. */
+function quoted(title: string | undefined): string {
+  return title === undefined ? ' ' : `「${title}」`;
+}
+
+function titleOf(
+  event: GuildEvent,
+  snapshot: Pick<Snapshot, 'issues' | 'prs'>,
+): string | undefined {
+  const items = event.kind === 'pr-merged' ? snapshot.prs : snapshot.issues;
+  return items.find((item) => item.number === event.number)?.title;
+}
+
+/** One line for the message window, e.g. `ささえは クエスト#98「…」を クリアした！`. */
+export function eventMessage(
+  event: GuildEvent,
+  snapshot: Pick<Snapshot, 'issues' | 'prs'>,
+): string {
+  const n = String(event.number);
+  const title = quoted(titleOf(event, snapshot));
+  const actor = actorName(event.department);
+  switch (event.kind) {
+    case 'issue-closed':
+      return `${actor}は クエスト#${n}${title}を クリアした！`;
+    case 'pr-merged':
+      return `${actor}は PR#${n}${title}を てにいれた！`;
+    case 'issue-opened':
+      return event.department === null
+        ? `かなめの受付に クエスト#${n}${title}が とどいた！`
+        : `かなめは ${actor}に クエスト#${n}${title}を わたした！`;
+  }
+}
+
+/** The diff's notice (if any) first, then one line per event, in the diff's order. */
+export function diffMessages(
+  diff: DiffResult,
+  snapshot: Pick<Snapshot, 'issues' | 'prs'>,
+): string[] {
+  const lines = diff.events.map((event) => eventMessage(event, snapshot));
+  return diff.notice === null ? lines : [diff.notice.message, ...lines];
+}
