@@ -14,8 +14,9 @@ const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 /**
  * One line of dev-terminal-cwds.json: `<id> <absolute path>`. The id holds no space, so the first
  * space splits it and the rest (spaces included) is the path. Trimmed as MulmoTerminal does.
+ * Private on purpose: it returns any line's id and path, and only the company ones may leave.
  */
-export function parseCwdLine(line: string): { id: string; cwd: string } | null {
+function parseCwdLine(line: string): { id: string; cwd: string } | null {
   const text = line.trim();
   const at = text.indexOf(' ');
   if (at <= 0) return null;
