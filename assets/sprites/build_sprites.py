@@ -1,6 +1,6 @@
 """Cut the codex-generated sprite sheet into one 128x32 strip per member.
 
-Input: a 4-column x 6-row sheet on a magenta (#ff00ff) background (see prompt.txt).
+Input: a 1024x1536 sheet of 4 columns x 6 rows on a magenta (#ff00ff) background (see prompt.txt).
 Output: <out_dir>/<memberId>.png, four 32x32 frames side by side
 (0 = front idle, 1 = facing right, 2 = walk right 1, 3 = walk right 2), transparent background,
 feet on the bottom edge, centred horizontally. Optionally a 4x preview of all frames.
@@ -16,6 +16,7 @@ from PIL import Image
 
 MEMBERS = ["kaname", "minori", "hibiki", "hirame", "sasae", "yukihiro"]
 COLS = 4
+SHEET_SIZE = (1024, 1536)
 FRAME = 32
 # Leave a 1px margin on top and both sides so outlines are never clipped.
 MAX_H = FRAME - 1
@@ -59,9 +60,14 @@ def shrink(rgba, size):
 
 def build(sheet_path, out_dir, preview_path=None):
     sheet = Image.open(sheet_path).convert("RGB")
+    if sheet.size != SHEET_SIZE:
+        sys.exit(f"{sheet_path}: expected {SHEET_SIZE[0]}x{SHEET_SIZE[1]}, got {sheet.width}x{sheet.height}")
     rows = [[keyed(cell) for cell in row] for row in cut_cells(sheet)]
     # One scale for every frame of every member so all six stand at the same size.
     boxes = [[cell.getbbox() for cell in row] for row in rows]
+    empty = [f"{MEMBERS[r]} frame {c}" for r, row in enumerate(boxes) for c, box in enumerate(row) if box is None]
+    if empty:
+        sys.exit(f"{sheet_path}: no character found in " + ", ".join(empty))
     tallest = max(box[3] - box[1] for row in boxes for box in row)
     widest = max(box[2] - box[0] for row in boxes for box in row)
     scale = min(MAX_H / tallest, MAX_W / widest)
@@ -79,6 +85,7 @@ def build(sheet_path, out_dir, preview_path=None):
         strips.append(strip)
 
     if preview_path:
+        preview_path.parent.mkdir(parents=True, exist_ok=True)
         preview = Image.new("RGBA", (FRAME * COLS, FRAME * len(MEMBERS)), (60, 60, 70, 255))
         for i, strip in enumerate(strips):
             preview.paste(strip, (0, i * FRAME), strip)
