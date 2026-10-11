@@ -2,7 +2,7 @@ import type { GuildArt } from './art';
 import type { BubbleKind, Bubbles } from './bubbles';
 import type { ConfettiView, StageFrame } from './director';
 import { GROUND, MAP_OBJECTS } from './map';
-import { DETAIL_SCALE, OVERHEAD_OFFSET } from './metrics';
+import { BUBBLE_RISE, DETAIL_SCALE, OVERHEAD_OFFSET } from './metrics';
 import type { Point } from './path';
 
 /** Canvas side effects only: every decision was made in the pure modules. Logical pixels. */
@@ -28,7 +28,7 @@ function drawBubble(ctx: CanvasRenderingContext2D, kind: BubbleKind, feet: Point
   ctx.translate(Math.round(feet.x), Math.round(feet.y - OVERHEAD_OFFSET));
   ctx.scale(DETAIL_SCALE, DETAIL_SCALE);
   const x = 3;
-  const y = -6;
+  const y = -BUBBLE_RISE;
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(x, y, 11, 9);
   ctx.fillRect(x + 1, y + 9, 2, 2);

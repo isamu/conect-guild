@@ -67,16 +67,17 @@ const CQW = LOGICAL_WIDTH / 100;
 
 /** The most each window covers (logical px), from the numbers in App.vue's styles. */
 export const WINDOW_EXTENTS: Readonly<Record<'board' | 'party' | 'message', PxRect>> = {
-  // .stage__board: left 1.2%, top 1.6%, width 29%, max-height 33cqw (it scrolls beyond that)
+  // .stage__board: left 1.2%, top 1.6%, width 29%, max-height 31cqw (it scrolls beyond that)
   board: {
     left: 1.2 * PCT_X,
     top: 1.6 * PCT_Y,
     right: (1.2 + 29) * PCT_X,
-    bottom: 1.6 * PCT_Y + 33 * CQW,
+    bottom: 1.6 * PCT_Y + 31 * CQW,
   },
   // .stage__side: right 1.1%, top 1.6%, width 24.6%. Its height is its content (party window and
   // fetch status): measured 324 px, 340 px with a failure line (Chrome, 2026-10-12). Rare extra
-  // notes (localStorage unavailable) reach 355-373 px; see the M2 report.
+  // notes (localStorage unavailable) reach 355-373 px and may cover ささえ's head and bubble;
+  // left for the president to decide (seat layout or the fetch window), see the M2 report.
   party: {
     left: (100 - 1.1 - 24.6) * PCT_X,
     top: 1.6 * PCT_Y,

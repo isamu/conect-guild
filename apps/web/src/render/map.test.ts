@@ -18,7 +18,7 @@ import {
   TILE_NAMES,
   WINDOW_EXTENTS,
 } from './map';
-import { AMBIENT } from './metrics';
+import { AMBIENT, OVERHEAD_TOP, SPRITE_SIZE } from './metrics';
 import { findPath } from './path';
 
 const WALKERS: readonly MemberId[] = ['kaname', 'minori', 'hibiki', 'hirame', 'sasae'];
@@ -156,9 +156,9 @@ describe('map: walkable grid', () => {
 describe('map: windows over the canvas (App.vue)', () => {
   it('converts App.vue’s % and cqw to logical px', () => {
     const { board, party, message } = WINDOW_EXTENTS;
-    // 1.6% of 576 down, then max-height 33cqw = 33 x 10.24.
+    // 1.6% of 576 down, then max-height 31cqw = 31 x 10.24.
     expect(board.top).toBeCloseTo(9.216);
-    expect(board.bottom).toBeCloseTo(9.216 + 337.92);
+    expect(board.bottom).toBeCloseTo(9.216 + 317.44);
     expect(board.right).toBeCloseTo(30.2 * 10.24);
     expect(party.left).toBeCloseTo(74.3 * 10.24);
     expect(party.right).toBeCloseTo(98.9 * 10.24);
@@ -191,5 +191,18 @@ describe('map: windows over the canvas (App.vue)', () => {
     const frame = spriteRect(MEMBERS[id].seat);
     const stretched = { ...frame, top: frame.top - AMBIENT.stretchPx };
     for (const area of Object.values(WINDOW_EXTENTS)) expect(overlaps(stretched, area)).toBe(false);
+  });
+
+  // The party window is left out: its rare tallest state may cover ささえ's bubble (reported).
+  it.each(WALKERS)('keeps the waiting bubble of %s clear of the board and message', (id) => {
+    const frame = spriteRect(MEMBERS[id].seat);
+    const withBubble = { ...frame, top: frame.bottom - OVERHEAD_TOP - AMBIENT.stretchPx };
+    for (const area of [WINDOW_EXTENTS.board, WINDOW_EXTENTS.message]) {
+      expect(overlaps(withBubble, area)).toBe(false);
+    }
+  });
+
+  it('puts the bubble top over the sprite top', () => {
+    expect(OVERHEAD_TOP).toBeGreaterThan(SPRITE_SIZE);
   });
 });

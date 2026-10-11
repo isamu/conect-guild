@@ -13,6 +13,10 @@ export const SPRITE_SIZE = 64;
 export const DETAIL_SCALE = TILE_SIZE / 16;
 /** How far above the feet held items and confetti are centred: just over the head. */
 export const OVERHEAD_OFFSET = SPRITE_SIZE + 2 * DETAIL_SCALE;
+/** How far a waiting bubble's top sits over OVERHEAD_OFFSET, in detail px (draw.ts). */
+export const BUBBLE_RISE = 6;
+/** The highest point drawn over a member, above the feet: the top of a bubble. */
+export const OVERHEAD_TOP = OVERHEAD_OFFSET + BUBBLE_RISE * DETAIL_SCALE;
 
 /**
  * The small moves members make when nothing happens (ambient.ts), kept quiet on purpose.
