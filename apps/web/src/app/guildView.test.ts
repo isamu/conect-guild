@@ -12,6 +12,7 @@ import {
 import {
   buildBoard,
   buildFetchStatus,
+  buildKingBubble,
   buildParty,
   countWaits,
   formatClock,
@@ -183,5 +184,23 @@ describe('formatClock', () => {
   it('pads hours and minutes in local time', () => {
     expect(formatClock(new Date(2026, 9, 12, 7, 5).getTime())).toBe('07:05');
     expect(formatClock(new Date(2026, 9, 12, 23, 59).getTime())).toBe('23:59');
+  });
+});
+
+describe('buildKingBubble', () => {
+  it('waits while a rule-changing PR is open', () => {
+    const snap = snapshot({ prs: [pr(10, { changedFiles: ['CLAUDE.md'] }), pr(11)] });
+    expect(buildKingBubble(snap)).toEqual({ waiting: true, detail: '承認まち 1 件' });
+  });
+
+  it('does not wait for PRs that only need かなめ, or for merged rule changes', () => {
+    const snap = snapshot({
+      prs: [pr(11), mergedPr(12, T0, { changedFiles: ['CLAUDE.md'] })],
+    });
+    expect(buildKingBubble(snap)).toEqual({ waiting: false, detail: '承認まちの PR はありません' });
+  });
+
+  it('does not wait before the first snapshot', () => {
+    expect(buildKingBubble(null)).toEqual({ waiting: false, detail: null });
   });
 });
