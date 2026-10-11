@@ -1,7 +1,7 @@
 import type { GuildEvent } from '../domain/events';
 import { DEPARTMENT_MEMBER, MEMBERS, type MemberId, type TilePos } from '../guild.config';
 import { createConfetti, type Particle, type Random } from './confetti';
-import { PLACES } from './map';
+import { isWalkable, PLACES } from './map';
 import { staySegment, walkSegment, type Prop, type Segment } from './motion';
 import { findPath, type TilePath } from './path';
 
@@ -107,20 +107,42 @@ class TrackBuilder {
   }
 }
 
-/** The tile next to `seat` on the way from `from` (where a visitor stands); `from` when there is no way. */
+/**
+ * Where a visitor from `from` stands to hand something to the member on `seat`: beside the seat
+ * (left or right, so neither hides the other), else in front of or behind it; the nearest one that
+ * can be reached. `from` itself when none can.
+ */
 function besideSeat(from: TilePos, seat: TilePos): TilePos {
-  return route(from, seat).at(-2) ?? from;
+  const at = (col: number, row: number): TilePos => ({ col: seat.col + col, row: seat.row + row });
+  for (const group of [
+    [at(-1, 0), at(1, 0)],
+    [at(0, 1), at(0, -1)],
+  ]) {
+    const ways = group
+      .filter(isWalkable)
+      .map((tile) => findPath(from, tile))
+      .filter((path) => path !== null)
+      .sort((a, b) => a.length - b.length);
+    const nearest = ways[0]?.at(-1);
+    if (nearest !== undefined) return nearest;
+  }
+  return from;
+}
+
+/** Who brings what to where in a handover. */
+interface Delivery {
+  readonly giver: MemberId;
+  readonly receiver: MemberId;
+  /** Where the giver stands to hand the item over. */
+  readonly to: TilePos;
+  readonly prop: Prop;
 }
 
 /**
  * The giver takes up the item at their seat, walks to `to`, hands it over halfway through the stop
  * and walks back; the receiver waits at their seat, then holds the item up a while.
  */
-function delivery(
-  item: { giver: MemberId; receiver: MemberId; to: TilePos; prop: Prop },
-  start: number,
-  seats: SceneContext['seats'],
-): Track[] {
+function deliver(item: Delivery, start: number, seats: SceneContext['seats']): Track[] {
   const { giver, receiver, to, prop } = item;
   const giving = new TrackBuilder(giver, start, seats[giver]).stay(PICK_UP_MS, prop).walk(to, prop);
   const handover = giving.time + HANDOVER_MS / 2;
@@ -138,45 +160,45 @@ function reception(start: number, seats: SceneContext['seats'], prop: Prop): Tra
   return new TrackBuilder('kaname', start, seats.kaname).stay(RECEPTION_MS, prop).build();
 }
 
+/** かなめ brings the scroll to the member's seat; the member brings the chest to the counter. */
+function deliveryOf(
+  kind: 'issue-opened' | 'pr-merged',
+  actor: MemberId,
+  seats: SceneContext['seats'],
+): Delivery {
+  return kind === 'issue-opened'
+    ? {
+        giver: 'kaname',
+        receiver: actor,
+        to: besideSeat(seats.kaname, seats[actor]),
+        prop: 'scroll',
+      }
+    : { giver: actor, receiver: 'kaname', to: PLACES.counterFront, prop: 'chest' };
+}
+
+/** The handover, or かなめ alone at the reception when there is no department or no way to meet. */
+function handoverTracks(
+  kind: 'issue-opened' | 'pr-merged',
+  actor: MemberId,
+  start: number,
+  seats: SceneContext['seats'],
+): Track[] {
+  const prop = kind === 'issue-opened' ? 'scroll' : 'chest';
+  if (actor === 'kaname') return [reception(start, seats, prop)];
+  const item = deliveryOf(kind, actor, seats);
+  const way = findPath(seats[item.giver], item.to);
+  // An item never changes hands between members who cannot meet.
+  return way === null || way.length < 2
+    ? [reception(start, seats, prop)]
+    : deliver(item, start, seats);
+}
+
 export function planScene(event: GuildEvent, start: number, context: SceneContext): Scene {
   const actor = actorOf(event);
-  const { seats } = context;
-  switch (event.kind) {
-    case 'issue-closed':
-      return {
-        tracks: [],
-        bursts: [{ actor, start, particles: createConfetti(context.random) }],
-      };
-    case 'issue-opened':
-      return {
-        tracks:
-          actor === 'kaname'
-            ? [reception(start, seats, 'scroll')]
-            : delivery(
-                {
-                  giver: 'kaname',
-                  receiver: actor,
-                  to: besideSeat(seats.kaname, seats[actor]),
-                  prop: 'scroll',
-                },
-                start,
-                seats,
-              ),
-        bursts: [],
-      };
-    case 'pr-merged':
-      return {
-        tracks:
-          actor === 'kaname'
-            ? [reception(start, seats, 'chest')]
-            : delivery(
-                { giver: actor, receiver: 'kaname', to: PLACES.counterFront, prop: 'chest' },
-                start,
-                seats,
-              ),
-        bursts: [],
-      };
+  if (event.kind === 'issue-closed') {
+    return { tracks: [], bursts: [{ actor, start, particles: createConfetti(context.random) }] };
   }
+  return { tracks: handoverTracks(event.kind, actor, start, context.seats), bursts: [] };
 }
 
 /** Seats from the guild config. */

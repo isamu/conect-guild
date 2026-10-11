@@ -142,7 +142,9 @@ describe('planScene: issue-opened (かなめ brings the scroll to the seat)', ()
     const member = trackOf(scene, id);
     const handover = handoverTime(member, 'scroll');
     expect(tileAt(member, handover)).toEqual(DEFAULT_SEATS[id]);
+    // Beside the member in the same row, so neither hides the other.
     expect(isNextTo(tileAt(kaname, handover), DEFAULT_SEATS[id])).toBe(true);
+    expect(tileAt(kaname, handover).row).toBe(DEFAULT_SEATS[id].row);
     // Side by side for the whole stop, not only at the moment of the handover.
     expect(tileAt(kaname, handover - HANDOVER_MS / 2)).toEqual(tileAt(kaname, handover));
     expect(tileAt(kaname, handover + HANDOVER_MS / 2 - 1)).toEqual(tileAt(kaname, handover));
@@ -249,15 +251,22 @@ describe('planScene: unreachable places', () => {
   // A seat boxed in by walls: no way to the counter or to かなめ.
   const seats = { ...DEFAULT_SEATS, minori: { col: 0, row: 5 } };
 
-  it.each(['issue-opened', 'pr-merged'] as const)(
-    'keeps everyone on their own seat in %s instead of jumping',
-    (kind) => {
-      const scene = planScene(event(kind, '経理'), 0, { ...context, seats });
-      for (const track of scene.tracks) {
-        for (const segment of track.segments) {
-          expect(segment.path).toEqual([seats[track.actor]]);
-        }
-      }
-    },
-  );
+  it.each([
+    ['issue-opened', 'scroll'],
+    ['pr-merged', 'chest'],
+  ] as const)('falls back to かなめ alone at the reception in %s (nobody jumps)', (kind, prop) => {
+    const scene = planScene(event(kind, '経理'), 0, { ...context, seats });
+    expect(scene.tracks).toEqual([
+      {
+        actor: 'kaname',
+        segments: [{ start: 0, end: RECEPTION_MS, path: [DEFAULT_SEATS.kaname], prop }],
+      },
+    ]);
+  });
+
+  it('falls back too when かなめ cannot leave the counter with the scroll', () => {
+    const boxed = { ...DEFAULT_SEATS, kaname: { col: 0, row: 5 } };
+    const scene = planScene(event('issue-opened', '広報'), 0, { ...context, seats: boxed });
+    expect(scene.tracks.map((t) => [t.actor, t.segments.length])).toEqual([['kaname', 1]]);
+  });
 });
