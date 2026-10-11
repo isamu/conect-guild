@@ -66,7 +66,7 @@ describe('runCollector loop', () => {
     const base = fakeGh();
     const gh: GhRunner = (args) =>
       fail ? Promise.reject(new CollectorError('gh-failed')) : base(args);
-    const { deps } = clockedHarness(gh, 65_000, {});
+    const { deps } = clockedHarness(gh, 70_000);
     const sleep = deps.sleep;
     const patched = {
       ...deps,
@@ -78,8 +78,9 @@ describe('runCollector loop', () => {
     await runCollector([], patched);
     const last = snapshotSchema.parse(JSON.parse(deps.writes.at(-1) ?? ''));
     expect(last.fetchedAt).toBe('2026-10-12T00:00:00.000Z');
-    expect(last.sessions.checkedAt).toBe('2026-10-12T00:01:00.000Z');
-    expect(deps.errors).toEqual(['[collector] 2026-10-12T00:01:00.000Z failed: gh-failed']);
+    expect(last.sessions.checkedAt).toBe('2026-10-12T00:01:05.000Z');
+    // Logged when the background fetch ends, which is after the next tick here.
+    expect(deps.errors).toEqual(['[collector] 2026-10-12T00:01:05.000Z failed: gh-failed']);
   });
 });
 
@@ -140,6 +141,54 @@ describe('runCollector loop: logs', () => {
     await runCollector([], deps);
     expect(attempts).toBe(4);
     expect(deps.errors).toEqual(['[collector] 2026-10-12T00:00:00.000Z failed: write-failed']);
+  });
+});
+
+describe('runCollector loop: slow GitHub and interrupts', () => {
+  it('keeps reading the sessions while a later GitHub fetch is slow', async () => {
+    const base = fakeGh();
+    const waiting: (() => void)[] = [];
+    let slow = false;
+    const gh: GhRunner = async (args) => {
+      if (slow) {
+        await new Promise<void>((resolve) => {
+          waiting.push(resolve);
+        });
+      }
+      return base(args);
+    };
+    const { deps, sessionReads } = clockedHarness(gh, 90_000);
+    const sleep = deps.sleep;
+    let released = false;
+    await runCollector([], {
+      ...deps,
+      sleep: async (ms) => {
+        slow = !released;
+        await sleep(ms);
+        if (deps.now().getTime() >= Date.parse('2026-10-12T00:01:25.000Z')) {
+          released = true;
+          slow = false;
+          for (const resolve of waiting.splice(0)) resolve();
+        }
+      },
+    });
+    // Every 5 seconds from 0 to 85 s, also while the fetch started at 60 s hangs.
+    expect(sessionReads).toEqual(Array.from({ length: 18 }, (_, i) => i * 5_000));
+    expect(deps.writes).toHaveLength(18);
+  });
+
+  it('writes nothing when interrupted while reading the sessions', async () => {
+    const controller = new AbortController();
+    const deps = harness(fakeGh(), {
+      signal: controller.signal,
+      readSessions: () => {
+        controller.abort();
+        return Promise.resolve(SESSIONS_OK);
+      },
+    });
+    await expect(runCollector([], deps)).resolves.toBe(0);
+    expect(deps.writes).toEqual([]);
+    expect(deps.logs.filter((l) => l.includes('sessions'))).toEqual([]);
   });
 
   it('ends quietly when interrupted during a cycle', async () => {
