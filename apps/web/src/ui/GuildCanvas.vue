@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, useTemplateRef, watch } from 'vue';
-import type { PartyRow, SceneCue } from '../app/guildView';
+import { cueToPlay, type PartyRow, type SceneCue } from '../app/guildView';
 import { ambientMoodsOf } from '../render/ambient';
 import type { GuildArt } from '../render/art';
 import { bubblesOf } from '../render/bubbles';
@@ -18,6 +18,16 @@ const canvas = useTemplateRef<HTMLCanvasElement>('canvas');
 let loop: RenderLoop | null = null;
 let observer: ResizeObserver | null = null;
 let unmounted = false;
+/** The message id whose scene was started last, so no scene starts twice. */
+let playedId: number | null = null;
+
+/** Starts the current cue's scene unless it was already started (or the loop is not running). */
+function playCue(): void {
+  const next = cueToPlay(props.cue, playedId);
+  if (loop === null || next === null) return;
+  playedId = next.id;
+  loop.play(next.event);
+}
 
 function start(element: HTMLCanvasElement, art: GuildArt): void {
   const running = startRenderLoop({ canvas: element, art });
@@ -29,6 +39,8 @@ function start(element: HTMLCanvasElement, art: GuildArt): void {
     running.resize(width, globalThis.devicePixelRatio);
   });
   observer.observe(element);
+  // A message may have reached the window while the pictures were loading.
+  playCue();
 }
 
 onMounted(() => {
@@ -55,12 +67,7 @@ watch(
   },
 );
 
-watch(
-  () => props.cue?.id,
-  () => {
-    if (props.cue !== null) loop?.play(props.cue.event);
-  },
-);
+watch(() => props.cue?.id, playCue);
 </script>
 
 <template>

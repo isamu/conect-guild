@@ -15,6 +15,7 @@ import {
   buildKingBubble,
   buildParty,
   countWaits,
+  cueToPlay,
   formatClock,
   sceneCue,
   STATE_LABELS,
@@ -224,5 +225,33 @@ describe('sceneCue', () => {
   it('cues nothing for a notice or an empty window', () => {
     expect(sceneCue({ id: 8, text: 'この期間の出来事は復元できません', event: null })).toBeNull();
     expect(sceneCue(null)).toBeNull();
+  });
+});
+
+describe('cueToPlay', () => {
+  const event = {
+    id: 'pr-merged#5',
+    kind: 'pr-merged',
+    number: 5,
+    department: '経理',
+  } as const;
+  const cue = { id: 3, event };
+
+  it('plays a cue that arrived while the loop was not running yet', () => {
+    // The loop starts after the pictures load; nothing has been played so far.
+    expect(cueToPlay(cue, null)).toBe(cue);
+  });
+
+  it('plays a new message’s cue', () => {
+    expect(cueToPlay(cue, 2)).toBe(cue);
+  });
+
+  it('does not play the same message twice (loop start, then a watcher on the same cue)', () => {
+    expect(cueToPlay(cue, 3)).toBeNull();
+  });
+
+  it('plays nothing without a cue', () => {
+    expect(cueToPlay(null, null)).toBeNull();
+    expect(cueToPlay(null, 3)).toBeNull();
   });
 });

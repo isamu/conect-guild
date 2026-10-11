@@ -193,6 +193,15 @@ export function sceneCue(message: GuildMessage | null): SceneCue | null {
   return message === null || event === null ? null : { id: message.id, event };
 }
 
+/**
+ * The cue the canvas should start now, given the id of the last cue it started: the current cue
+ * unless it was already played. The canvas asks both when the cue changes and when its loop
+ * starts (the pictures may still be loading when a cue arrives), so no scene is lost or doubled.
+ */
+export function cueToPlay(cue: SceneCue | null, playedId: number | null): SceneCue | null {
+  return cue === null || cue.id === playedId ? null : cue;
+}
+
 const FAILURE_LABELS: Readonly<Record<SnapshotLoadFailure, string>> = {
   network: 'つながりません',
   timeout: '時間切れ',
