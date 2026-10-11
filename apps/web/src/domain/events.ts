@@ -43,6 +43,10 @@ function makeEvent(
   return { id: `${kind}#${String(number)}`, kind, number, department };
 }
 
+function closedAfter(issue: SnapshotIssue, baselineAt: number): boolean {
+  return issue.closedAt !== null && Date.parse(issue.closedAt) > baselineAt;
+}
+
 function issueEvent(
   issue: SnapshotIssue,
   before: Baseline['issues'][number] | undefined,
@@ -51,10 +55,11 @@ function issueEvent(
   if (before === undefined) {
     if (issue.state === 'open') return 'issue-opened';
     // Opened and closed between two fetches: show only the clear.
-    const closedAfterBaseline = issue.closedAt !== null && Date.parse(issue.closedAt) > baselineAt;
-    return closedAfterBaseline ? 'issue-closed' : null;
+    return closedAfter(issue, baselineAt) ? 'issue-closed' : null;
   }
-  return before.state === 'open' && issue.state === 'closed' ? 'issue-closed' : null;
+  if (issue.state !== 'closed') return null;
+  // Closed in the baseline too: only a reopen and re-close between fetches (newer closedAt) counts.
+  return before.state === 'open' || closedAfter(issue, baselineAt) ? 'issue-closed' : null;
 }
 
 function prMerged(
