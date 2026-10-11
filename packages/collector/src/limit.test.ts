@@ -40,4 +40,23 @@ describe('mapWithConcurrency', () => {
       ),
     ).rejects.toThrow('boom');
   });
+
+  it('starts nothing new after a failure and rejects only when running calls finish', async () => {
+    let inFlight = 0;
+    const started: number[] = [];
+    const run = mapWithConcurrency([1, 2, 3, 4, 5, 6], 2, async (n) => {
+      started.push(n);
+      inFlight += 1;
+      try {
+        if (n === 1) throw new Error('boom');
+        for (let i = 0; i < 5; i += 1) await tick();
+        return n;
+      } finally {
+        inFlight -= 1;
+      }
+    });
+    await expect(run).rejects.toThrow('boom');
+    expect(inFlight).toBe(0);
+    expect(started).toEqual([1, 2]);
+  });
 });
