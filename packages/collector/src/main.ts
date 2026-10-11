@@ -2,6 +2,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { COLLECTOR_CONFIG } from '../collector.config.ts';
 import { createGhRunner } from './gh.ts';
 import { runCollector } from './run.ts';
+import { readCompanySessions } from './sessionFiles.ts';
 import { writeFileAtomic } from './write.ts';
 
 const controller = new AbortController();
@@ -26,6 +27,7 @@ process.exitCode = await runCollector(process.argv.slice(2), {
     console.error(line);
   },
   gh: createGhRunner(controller.signal),
+  readSessions: () => readCompanySessions(COLLECTOR_CONFIG.sessions),
   writeSnapshot: (content) => writeFileAtomic(COLLECTOR_CONFIG.snapshotPath, content),
   sleep: sleepUnlessAborted,
   signal: controller.signal,

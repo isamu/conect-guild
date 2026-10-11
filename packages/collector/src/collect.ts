@@ -1,4 +1,4 @@
-import { SNAPSHOT_SCHEMA_VERSION, snapshotSchema, type Snapshot } from '@conect-guild/snapshot';
+import { SNAPSHOT_SCHEMA_VERSION, githubPartSchema, type GithubPart } from '@conect-guild/snapshot';
 import { recentCutoff, selectRecentPrs, toSnapshotIssues, toSnapshotPr } from './build.ts';
 import { parseOrThrow, type GhRunner } from './gh.ts';
 import { fetchChangedFiles, fetchIssues, fetchPrs } from './github.ts';
@@ -8,10 +8,10 @@ import { bothOrThrow, mapWithConcurrency } from './limit.ts';
 export const CHANGED_FILES_CONCURRENCY = 4;
 
 /**
- * Fetch issues and PRs of `repo` and build a validated snapshot.
+ * Fetch issues and PRs of `repo` and build the validated GitHub part of the snapshot.
  * Throws a CollectorError if any request or validation fails.
  */
-export async function collectSnapshot(gh: GhRunner, repo: string, now: Date): Promise<Snapshot> {
+export async function collectSnapshot(gh: GhRunner, repo: string, now: Date): Promise<GithubPart> {
   const cutoff = recentCutoff(now);
   const [rawIssues, rawPrs] = await bothOrThrow(fetchIssues(gh, repo, cutoff), fetchPrs(gh, repo));
   const prs = await mapWithConcurrency(
@@ -24,7 +24,7 @@ export async function collectSnapshot(gh: GhRunner, repo: string, now: Date): Pr
         pr.state === 'open' ? await fetchChangedFiles(gh, repo, pr.number) : [],
       ),
   );
-  return parseOrThrow(snapshotSchema, {
+  return parseOrThrow(githubPartSchema, {
     schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     fetchedAt: now.toISOString(),
     repo,
