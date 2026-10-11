@@ -2,6 +2,7 @@ import type { GuildEvent } from '../domain/events';
 import { createAmbientSeeds, type AmbientMoods } from './ambient';
 import type { GuildArt } from './art';
 import type { Bubbles } from './bubbles';
+import { RUNNING_CLOCK, stageTime, withPaused, type StageClock } from './clock';
 import type { Random } from './confetti';
 import {
   EMPTY_DIRECTOR,
@@ -10,6 +11,7 @@ import {
   prune,
   scheduleEvent,
   type Director,
+  type StageFrame,
 } from './director';
 import { ANIMATED_DECOR } from './decor';
 import { drawActors, drawAnimatedDecor, drawStatic } from './draw';
@@ -22,7 +24,8 @@ import { DEFAULT_SEATS } from './scenes';
  * redraws only every AMBIENT.frameMs for the small moves (members, lamps, the cat), and sleeps
  * when there are none until the bubbles change, a scene starts or the canvas is resized. While the
  * page is hidden or
- * the canvas has no width (narrow screens hide it) it does not run at all.
+ * the canvas has no width (narrow screens hide it) it does not run at all, and the stage clock
+ * (clock.ts) stands still, so a scene goes on from where it was once the canvas is shown again.
  */
 
 /** Whether the page is shown, and a way to hear when that changes. */
@@ -162,6 +165,20 @@ function fitCanvas(canvas: HTMLCanvasElement, cssWidth: number, pixelRatio: numb
   return width / LOGICAL_WIDTH;
 }
 
+/** One frame: the cached background, then the lamps and the cat, then the members. */
+function paint(
+  ctx: CanvasRenderingContext2D,
+  layer: { background: HTMLCanvasElement; art: GuildArt; scale: number },
+  t: number,
+  actors: { frame: StageFrame; bubbles: Bubbles },
+): void {
+  ctx.setTransform(layer.scale, 0, 0, layer.scale, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(layer.background, 0, 0);
+  drawAnimatedDecor(ctx, layer.art, t);
+  drawActors(ctx, actors.frame, actors.bubbles, layer.art);
+}
+
 export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   const { canvas, art } = options;
   const now = options.now ?? (() => performance.now());
@@ -176,14 +193,13 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   let bubbles: Bubbles = {};
   let moods: AmbientMoods = {};
   let scale = 1;
+  let clock: StageClock = RUNNING_CLOCK;
+  const stageNow = () => stageTime(clock, now());
 
   function draw(): void {
-    const t = now();
-    ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(background, 0, 0);
-    drawAnimatedDecor(ctx, art, t);
-    drawActors(ctx, frameAt(director, t, DEFAULT_SEATS, { moods, seeds }), bubbles, art);
+    const t = stageNow();
+    const frame = frameAt(director, t, DEFAULT_SEATS, { moods, seeds });
+    paint(ctx, { background, art, scale }, t, { frame, bubbles });
     director = prune(director, t);
     const next = nextDraw({
       hidden: paused(),
@@ -196,13 +212,16 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
 
   const paused = () => isPaused(visibility.isHidden(), cssWidth);
   const schedule = createScheduler(draw, paused);
-  const unsubscribe = visibility.subscribe(() => {
+  /** Stops or restarts the stage clock with the paused state, then draws (or not) to match. */
+  function refresh(): void {
+    clock = withPaused(clock, paused(), now());
     schedule.refresh();
-  });
-  schedule.now();
+  }
+  const unsubscribe = visibility.subscribe(refresh);
+  refresh();
   return {
     play(event) {
-      director = scheduleEvent(director, event, now(), { seats: DEFAULT_SEATS, random });
+      director = scheduleEvent(director, event, stageNow(), { seats: DEFAULT_SEATS, random });
       schedule.now();
     },
     setBubbles(next) {
@@ -216,7 +235,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
     resize(nextCssWidth, pixelRatio) {
       cssWidth = nextCssWidth;
       scale = fitCanvas(canvas, cssWidth, pixelRatio) ?? scale;
-      schedule.refresh();
+      refresh();
     },
     stop() {
       schedule.stop();
