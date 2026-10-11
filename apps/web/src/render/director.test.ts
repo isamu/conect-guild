@@ -295,7 +295,7 @@ describe('director: ambient moves', () => {
   it('places かなめ’s scroll at hand and nobody else holds anything', () => {
     const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS, ambient);
     expect(member(frame, 'kaname')?.hand?.prop).toBe('scroll');
-    expect(member(frame, 'kaname')?.pose.prop).toBeNull();
+    expect(member(frame, 'kaname')?.pose.held).toBeNull();
     expect(frame.members.filter((m) => m.hand !== null)).toHaveLength(1);
   });
 
@@ -347,7 +347,7 @@ describe('director: no ambient move during scenes', () => {
     const director = play(EMPTY_DIRECTOR, event('issue-opened', '経理'), 0);
     const kaname = member(frameAt(director, 10, DEFAULT_SEATS, ambient), 'kaname');
     expect(kaname?.hand).toBeNull();
-    expect(kaname?.pose.prop).toBe('scroll');
+    expect(kaname?.pose.held).toEqual({ prop: 'scroll', hold: 'carry' });
   });
 
   it('gives none while confetti is over the member, and again afterwards', () => {

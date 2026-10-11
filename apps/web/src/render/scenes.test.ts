@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { GuildEvent, GuildEventKind } from '../domain/events';
 import type { DepartmentLabel, MemberId, TilePos } from '../guild.config';
 import { contains, isUnderWindow, isWalkable, MAP_OBJECTS, PLACES } from './map';
-import { poseOnSegment, type Prop, type Segment } from './motion';
+import { carry, poseOnSegment, raise, type Prop, type Segment } from './motion';
 import { pointToTile } from './path';
 import {
   actorOf,
@@ -64,11 +64,12 @@ function segmentAt(track: Track, t: number): Segment {
 
 const tileAt = (track: Track, t: number) =>
   pointToTile(poseOnSegment(segmentAt(track, t), t).point);
-const propAt = (track: Track, t: number) => segmentAt(track, t).prop;
+const propAt = (track: Track, t: number) => segmentAt(track, t).held?.prop ?? null;
+const holdAt = (track: Track, t: number) => segmentAt(track, t).held?.hold ?? null;
 
 /** When the item changes hands: the first time the receiver holds it. */
 function handoverTime(receiver: Track, prop: Prop): number {
-  const segment = receiver.segments.find((s) => s.prop === prop);
+  const segment = receiver.segments.find((s) => s.held?.prop === prop);
   if (segment === undefined) throw new Error('the item never changes hands');
   return segment.start;
 }
@@ -150,26 +151,31 @@ describe('planScene: issue-opened (かなめ brings the scroll to the seat)', ()
     expect(tileAt(kaname, handover + HANDOVER_MS / 2 - 1)).toEqual(tileAt(kaname, handover));
     expect([propAt(kaname, handover - 1), propAt(member, handover - 1)]).toEqual(['scroll', null]);
     expect([propAt(kaname, handover), propAt(member, handover)]).toEqual([null, 'scroll']);
+    // かなめ carries it in her arms; the member raises it once it is theirs.
+    expect([holdAt(kaname, handover - 1), holdAt(member, handover)]).toEqual(['carry', 'raise']);
   });
 
   it('has かなめ take up the scroll at the counter first, the member wait at the seat', () => {
     const scene = planScene(event('issue-opened', '企画'), 0, context);
     const [pickUp, toSeat] = trackOf(scene, 'kaname').segments;
-    expect([pickUp?.prop, pickUp?.end, pickUp?.path]).toEqual([
-      'scroll',
+    expect([pickUp?.held, pickUp?.end, pickUp?.path]).toEqual([
+      carry('scroll'),
       PICK_UP_MS,
       [DEFAULT_SEATS.kaname],
     ]);
-    expect(toSeat?.prop).toBe('scroll');
+    expect(toSeat?.held).toEqual(carry('scroll'));
     const [waiting, holding] = trackOf(scene, 'hirame').segments;
-    expect([waiting?.prop, waiting?.path]).toEqual([null, [DEFAULT_SEATS.hirame]]);
-    expect([holding?.prop, holding && holding.end - holding.start]).toEqual(['scroll', HOLD_UP_MS]);
+    expect([waiting?.held, waiting?.path]).toEqual([null, [DEFAULT_SEATS.hirame]]);
+    expect([holding?.held, holding && holding.end - holding.start]).toEqual([
+      raise('scroll'),
+      HOLD_UP_MS,
+    ]);
   });
 
   it('walks かなめ back empty-handed', () => {
     const scene = planScene(event('issue-opened', '総務'), 0, context);
     const back = trackOf(scene, 'kaname').segments.at(-1);
-    expect([back?.prop, back && lastTile(back)]).toEqual([null, DEFAULT_SEATS.kaname]);
+    expect([back?.held, back && lastTile(back)]).toEqual([null, DEFAULT_SEATS.kaname]);
     expect(back?.path.length).toBeGreaterThan(2);
   });
 
@@ -181,7 +187,7 @@ describe('planScene: issue-opened (かなめ brings the scroll to the seat)', ()
         start: 500,
         end: 500 + RECEPTION_MS,
         path: [DEFAULT_SEATS.kaname],
-        prop: 'scroll',
+        held: raise('scroll'),
       },
     ]);
   });
@@ -198,6 +204,7 @@ describe('planScene: pr-merged (the member brings the chest to the reception)', 
     expect([propAt(member, handover - 1), propAt(kaname, handover - 1)]).toEqual(['chest', null]);
     expect([propAt(member, handover), propAt(kaname, handover)]).toEqual([null, 'chest']);
     expect(segmentAt(kaname, handover).end - handover).toBe(HOLD_UP_MS);
+    expect([holdAt(member, handover - 1), holdAt(kaname, handover)]).toEqual(['carry', 'raise']);
   });
 
   it('meets across the counter: same column, only counter between them', () => {
@@ -212,16 +219,18 @@ describe('planScene: pr-merged (the member brings the chest to the reception)', 
 
   it('has the member take up the chest at the seat first and walk back empty-handed', () => {
     const segments = trackOf(planScene(event('pr-merged', '経理'), 0, context), 'minori').segments;
-    expect([segments[0]?.prop, segments[0]?.end]).toEqual(['chest', PICK_UP_MS]);
+    expect([segments[0]?.held, segments[0]?.end]).toEqual([carry('chest'), PICK_UP_MS]);
+    // Carried all the way to the counter, never raised by the one who brings it.
+    for (const segment of segments) expect(segment.held?.hold ?? 'carry').toBe('carry');
     const back = segments.at(-1);
-    expect([back?.prop, back && lastTile(back)]).toEqual([null, DEFAULT_SEATS.minori]);
+    expect([back?.held, back && lastTile(back)]).toEqual([null, DEFAULT_SEATS.minori]);
   });
 
   it('only has かなめ take the chest when there is no department', () => {
     const reception = planScene(event('pr-merged', null), 0, context);
     expect(reception.tracks).toHaveLength(1);
     expect(trackOf(reception, 'kaname').segments).toEqual([
-      { start: 0, end: RECEPTION_MS, path: [DEFAULT_SEATS.kaname], prop: 'chest' },
+      { start: 0, end: RECEPTION_MS, path: [DEFAULT_SEATS.kaname], held: raise('chest') },
     ]);
   });
 });
@@ -259,7 +268,9 @@ describe('planScene: unreachable places', () => {
     expect(scene.tracks).toEqual([
       {
         actor: 'kaname',
-        segments: [{ start: 0, end: RECEPTION_MS, path: [DEFAULT_SEATS.kaname], prop }],
+        segments: [
+          { start: 0, end: RECEPTION_MS, path: [DEFAULT_SEATS.kaname], held: raise(prop) },
+        ],
       },
     ]);
   });

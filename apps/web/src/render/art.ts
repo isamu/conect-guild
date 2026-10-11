@@ -28,7 +28,7 @@ export interface SpriteArt {
     pose: { readonly frame: SpriteFrame; readonly flip: boolean },
     feet: Point,
   ): void;
-  /** Draws a held item centred on `at` (over the member's head). */
+  /** Draws a held item centred on `at` (in the arms or over the head: motion.heldItemPoint). */
   drawProp(ctx: CanvasRenderingContext2D, prop: Prop, at: Point): void;
 }
 

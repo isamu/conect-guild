@@ -71,3 +71,11 @@ export const SEATING = {
   /** The king deep in the throne: its seat and arms hide his legs. */
   thronePx: 26,
 } as const;
+
+/** Where a carried item is centred (motion.heldItemPoint), logical px from the feet. */
+export const HOLD = {
+  /** Up from the feet: between the chest and the waist. */
+  carryHeightPx: 30,
+  /** Forward of the middle when facing sideways: at the hands, a little out from the body. */
+  carryForwardPx: 14,
+} as const;

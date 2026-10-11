@@ -1,4 +1,5 @@
 import type { TilePos } from '../guild.config';
+import { HOLD, OVERHEAD_OFFSET } from './metrics';
 import { tileToPoint, type Point, type TilePath } from './path';
 
 /**
@@ -6,8 +7,19 @@ import { tileToPoint, type Point, type TilePath } from './path';
  * tile. All times are milliseconds on the clock the caller injects.
  */
 
-/** What a member holds up over their head. */
+/** What a member hands over in a scene. */
 export type Prop = 'scroll' | 'chest';
+
+/** How it is held: in both arms in front of the body while carried, or up over the head. */
+export type Hold = 'carry' | 'raise';
+
+export interface Held {
+  readonly prop: Prop;
+  readonly hold: Hold;
+}
+
+export const carry = (prop: Prop): Held => ({ prop, hold: 'carry' });
+export const raise = (prop: Prop): Held => ({ prop, hold: 'raise' });
 
 /** Sprite frame: 0 front, 1 side standing, 2 and 3 side walking (contract with the sprite art). */
 export type SpriteFrame = 0 | 1 | 2 | 3;
@@ -21,7 +33,7 @@ export interface Segment {
   readonly end: number;
   /** One tile for a stay, two or more for a walk. */
   readonly path: TilePath;
-  readonly prop: Prop | null;
+  readonly held: Held | null;
 }
 
 export interface Pose {
@@ -30,25 +42,25 @@ export interface Pose {
   readonly frame: SpriteFrame;
   /** True when facing left (the art draws the right-facing frame mirrored). */
   readonly flip: boolean;
-  readonly prop: Prop | null;
+  readonly held: Held | null;
 }
 
 export function staySegment(
   at: TilePos,
   start: number,
   durationMs: number,
-  prop: Prop | null = null,
+  held: Held | null = null,
 ): Segment {
-  return { start, end: start + durationMs, path: [at], prop };
+  return { start, end: start + durationMs, path: [at], held };
 }
 
 /** Walks the path at MS_PER_TILE per step. A one-tile path takes no time. */
-export function walkSegment(path: TilePath, start: number, prop: Prop | null = null): Segment {
+export function walkSegment(path: TilePath, start: number, held: Held | null = null): Segment {
   return {
     start,
     end: start + (path.length - 1) * MS_PER_TILE,
     path,
-    prop,
+    held,
   };
 }
 
@@ -69,7 +81,7 @@ function facesLeft(path: readonly TilePos[], step: number): boolean {
 
 /** Pose on a segment at time `t` (clamped to the segment). */
 export function poseOnSegment(segment: Segment, t: number): Pose {
-  const base = { prop: segment.prop };
+  const base = { held: segment.held };
   const first = segment.path[0];
   if (segment.path.length < 2) return { ...base, point: tileToPoint(first), frame: 0, flip: false };
   const elapsed = Math.min(Math.max(t - segment.start, 0), segment.end - segment.start);
@@ -88,5 +100,17 @@ export function poseOnSegment(segment: Segment, t: number): Pose {
 
 /** The member standing still on a tile (at their seat when nothing is happening). */
 export function standingPose(at: TilePos): Pose {
-  return { point: tileToPoint(at), frame: 0, flip: false, prop: null };
+  return { point: tileToPoint(at), frame: 0, flip: false, held: null };
+}
+
+/**
+ * Where a held item is centred. Raised: over the head. Carried: in front of the body at
+ * chest-to-waist height; facing front it is in the middle, facing sideways it moves forward to
+ * where the hands are, a little out from the outline of the body.
+ */
+export function heldItemPoint(pose: Pick<Pose, 'point' | 'frame' | 'flip'>, hold: Hold): Point {
+  const { x, y } = pose.point;
+  if (hold === 'raise') return { x, y: y - OVERHEAD_OFFSET };
+  const forward = pose.frame === 0 ? 0 : HOLD.carryForwardPx;
+  return { x: x + (pose.flip ? -forward : forward), y: y - HOLD.carryHeightPx };
 }

@@ -12,6 +12,7 @@ import {
 } from './layers';
 import { GROUND } from './map';
 import { BUBBLE_RISE, DETAIL_SCALE, OVERHEAD_OFFSET, TILE_SIZE } from './metrics';
+import { heldItemPoint } from './motion';
 import type { Point } from './path';
 
 /** Canvas side effects only: every decision was made in the pure modules. Logical pixels. */
@@ -123,8 +124,8 @@ function drawMemberPose(ctx: CanvasRenderingContext2D, member: MemberPose, art: 
     const at = { x: pose.point.x + hand.offset.x, y: pose.point.y + hand.offset.y };
     art.sprites.drawProp(ctx, hand.prop, at);
   }
-  if (pose.prop !== null) {
-    art.sprites.drawProp(ctx, pose.prop, { x: pose.point.x, y: pose.point.y - OVERHEAD_OFFSET });
+  if (pose.held !== null) {
+    art.sprites.drawProp(ctx, pose.held.prop, heldItemPoint(pose, pose.held.hold));
   }
 }
 
@@ -149,7 +150,7 @@ export function drawActors(
   }
   for (const { id, pose } of frame.members) {
     const bubble = bubbles[id];
-    if (pose.prop === null && bubble !== undefined) drawBubble(ctx, bubble, pose.point);
+    if (pose.held === null && bubble !== undefined) drawBubble(ctx, bubble, pose.point);
   }
   for (const view of frame.confetti) drawConfetti(ctx, view);
 }
