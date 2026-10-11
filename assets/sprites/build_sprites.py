@@ -120,7 +120,7 @@ def build(sheet_path, out_dir, preview_path=None):
         sys.exit(f"{sheet_path}: expected {SHEET_SIZE[0]}x{SHEET_SIZE[1]}, got {sheet.width}x{sheet.height}")
     rows = [[keyed(cell) for cell in row] for row in cut_cells(sheet)]
     # One scale for every frame of every member so all six stand at the same size.
-    boxes = [[cell.getbbox() for cell in row] for row in rows]
+    boxes = [[cell.getchannel("A").getbbox() for cell in row] for row in rows]
     empty = [f"{MEMBERS[r]} frame {c}" for r, row in enumerate(boxes) for c, box in enumerate(row) if box is None]
     if empty:
         sys.exit(f"{sheet_path}: no character found in " + ", ".join(empty))
