@@ -1,10 +1,10 @@
-"""Cut the codex-generated sprite sheet into one 128x32 strip per member.
+"""Cut the codex-generated sprite sheet into one strip of four square frames per member.
 
 Input: a 1024x1536 sheet of 4 columns x 6 rows on a magenta (#ff00ff) background (see prompt.txt).
 Default input is source-sheet.png next to this script; default output directory is this script's.
-Output: <out_dir>/<memberId>.png, four 32x32 frames side by side
+Output: <out_dir>/<memberId>.png, four FRAME x FRAME frames (64x64, so 256x64) side by side
 (0 = front idle, 1 = facing right, 2 = walk right 1, 3 = walk right 2), transparent background,
-feet on the bottom edge, centred horizontally. Optionally a 4x preview of all frames.
+feet on the bottom edge, centred horizontally. Optionally a 2x preview of all frames.
 
 Usage: python build_sprites.py [--sheet <sheet.png>] [--out <out_dir>] [--preview <preview.png>]
 Needs Pillow only. Not a project dependency; run it from a throwaway venv.
@@ -20,12 +20,13 @@ MEMBERS = ["kaname", "minori", "hibiki", "hirame", "sasae", "yukihiro"]
 COLS = 4
 SHEET_SIZE = (1024, 1536)
 HERE = Path(__file__).resolve().parent
-FRAME = 32
+# Frame size in pixels. Change it here only; everything else derives from it.
+FRAME = 64
 # Leave a 1px margin on top and both sides so outlines are never clipped.
 MAX_H = FRAME - 1
 MAX_W = FRAME - 2
 ALPHA_CUTOFF = 0.5
-PREVIEW_SCALE = 4
+PREVIEW_SCALE = 2
 
 
 def threshold(channel, test):
