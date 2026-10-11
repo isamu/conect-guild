@@ -122,10 +122,11 @@ function drawMemberPose(ctx: CanvasRenderingContext2D, member: MemberPose, art: 
   art.sprites.drawMember(ctx, id, pose, pose.point);
   if (hand !== null) {
     const at = { x: pose.point.x + hand.offset.x, y: pose.point.y + hand.offset.y };
-    art.sprites.drawProp(ctx, hand.prop, at);
+    art.sprites.drawProp(ctx, hand.prop, at, 'carry');
   }
   if (pose.held !== null) {
-    art.sprites.drawProp(ctx, pose.held.prop, heldItemPoint(pose, pose.held.hold));
+    const { prop, hold } = pose.held;
+    art.sprites.drawProp(ctx, prop, heldItemPoint(pose, hold), hold);
   }
 }
 

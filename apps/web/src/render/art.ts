@@ -2,7 +2,7 @@ import type { DecorName } from '../../../../assets/decor/decor';
 import { MEMBERS, type MemberId } from '../guild.config';
 import type { TileName, TileRect } from './map';
 import { DETAIL_SCALE, TILE_SIZE } from './metrics';
-import type { Prop, SpriteFrame } from './motion';
+import type { Hold, Prop, SpriteFrame } from './motion';
 import type { Point } from './path';
 
 /**
@@ -28,8 +28,11 @@ export interface SpriteArt {
     pose: { readonly frame: SpriteFrame; readonly flip: boolean },
     feet: Point,
   ): void;
-  /** Draws a held item centred on `at` (in the arms or over the head: motion.heldItemPoint). */
-  drawProp(ctx: CanvasRenderingContext2D, prop: Prop, at: Point): void;
+  /**
+   * Draws a held item centred on `at` (in the arms or over the head: motion.heldItemPoint). `hold`
+   * may pick the picture (a raised scroll is a bundle of three: decorArt.propPicture).
+   */
+  drawProp(ctx: CanvasRenderingContext2D, prop: Prop, at: Point, hold: Hold): void;
 }
 
 export interface DecorArt {
