@@ -253,3 +253,25 @@ describe('messageQueue: canvas out of sight (narrow screens)', () => {
     queue.dispose();
   });
 });
+
+describe('messageQueue: a message that arrives later', () => {
+  it('counts the hold from when the head showed, not from when the next one arrived', async () => {
+    const { queue, shown } = setup();
+    queue.push([entry(null, 'a')]);
+    await vi.advanceTimersByTimeAsync(20_000);
+    queue.push([entry(null, 'b')]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(shown.map((s) => s.at - T0)).toEqual([0, 20_000]);
+    queue.dispose();
+  });
+
+  it('still keeps the rest of the hold when the next one arrives early', async () => {
+    const { queue, shown } = setup();
+    queue.push([entry(null, 'a')]);
+    await vi.advanceTimersByTimeAsync(3_000);
+    queue.push([entry(null, 'b')]);
+    await vi.advanceTimersByTimeAsync(HOLD_MS);
+    expect(shown.map((s) => s.at - T0)).toEqual([0, HOLD_MS]);
+    queue.dispose();
+  });
+});
