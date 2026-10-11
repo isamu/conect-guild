@@ -80,7 +80,7 @@ function withHeadScene(director: Director, head: GuildMessage, t: number): Direc
  * the queue sees them), on a clock that stops with the canvas's while the page is hidden.
  */
 interface Pacer {
-  /** `head` reached the window: its hold starts over, and the canvas starts its scene now. */
+  /** `head` reached the window: its hold starts now, and so does its scene on the canvas. */
   headShown(head: GuildMessage): void;
   /** Ms until `next` may show (nextShowAt); null while stopped (hidden page or halted screen). */
   delayFor(next: GuildMessage): number | null;
@@ -97,12 +97,12 @@ function createPacer(wallNow: () => number, holdMs: number): Pacer {
   let director: Director = EMPTY_DIRECTOR;
   let stageShown = true;
   let halted = false;
-  /** Queue time when the head's hold began; null until the head has a successor to wait for. */
+  /** Queue time when the head's hold began (when it showed); null after a halt (starts over). */
   let holdStart: number | null = null;
   const now = () => stageTime(clock, wallNow());
   return {
     headShown(head) {
-      holdStart = null;
+      holdStart = now();
       if (stageShown) director = withHeadScene(director, head, now());
     },
     delayFor(next) {
