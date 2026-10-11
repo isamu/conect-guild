@@ -66,6 +66,8 @@ export function snapshot(over: Partial<Snapshot> = {}): Snapshot {
     repo: 'example/guild',
     issues: [],
     prs: [],
+    // GitHub only unless a test gives the sessions.
+    sessions: { status: 'unavailable', checkedAt: T0 },
     ...over,
   };
 }
