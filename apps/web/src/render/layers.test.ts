@@ -8,6 +8,7 @@ import {
   BACK_STILL_DECOR,
   drawSteps,
   FRONT_LAYERS,
+  stageSteps,
   type FrontLayer,
 } from './layers';
 import { contains, MAP_OBJECTS, PLACES } from './map';
@@ -131,6 +132,26 @@ describe('drawSteps', () => {
   it('draws the layers left over after the last member, and all of them with nobody', () => {
     expect(names(drawSteps([member(10)], [layer(20), layer(30)]))).toEqual(['m10', 'L20', 'L30']);
     expect(names(drawSteps([], [layer(20), layer(30)]))).toEqual(['L20', 'L30']);
-    expect(names(drawSteps([member(10), member(5)], []))).toEqual(['m10', 'm5']);
+    expect(names(drawSteps([], []))).toEqual([]);
+  });
+
+  it('orders members and layers given out of order, keeping ties as given', () => {
+    const steps = drawSteps(
+      [member(300), member(100), { depth: 100, name: 'n100' }],
+      [layer(250), layer(50)],
+    );
+    expect(names(steps)).toEqual(['L50', 'm100', 'n100', 'L250', 'm300']);
+  });
+});
+
+describe('stageSteps', () => {
+  it('draws what everyone holds after all the furniture, back to front', () => {
+    const steps = stageSteps(frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS).members, FRONT_LAYERS);
+    const lastLayer = steps.map((s) => s.kind).lastIndexOf('layer');
+    const held = steps.flatMap((s, i) => (s.kind === 'held' ? [i] : []));
+    expect(held).toHaveLength(6);
+    expect(Math.min(...held)).toBeGreaterThan(lastLayer);
+    const heldDepths = steps.flatMap((s) => (s.kind === 'held' ? [s.member.depth] : []));
+    expect(heldDepths).toEqual([...heldDepths].sort((a, b) => a - b));
   });
 });

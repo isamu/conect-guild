@@ -7,7 +7,7 @@ import {
   BACK_ANIMATED_DECOR,
   BACK_OBJECTS,
   BACK_STILL_DECOR,
-  drawSteps,
+  stageSteps,
   type FrontLayer,
 } from './layers';
 import { GROUND } from './map';
@@ -118,24 +118,32 @@ export interface CachedFrontLayer {
 }
 
 function drawMemberPose(ctx: CanvasRenderingContext2D, member: MemberPose, art: GuildArt): void {
+  const { id, pose } = member;
+  if (pose.held === null) {
+    art.sprites.drawMember(ctx, id, pose, pose.point);
+    return;
+  }
+  const look = heldLook(id, pose, pose.held, art.sprites.hasHoldFrames(id));
+  art.sprites.drawMember(ctx, id, look, look.feet);
+}
+
+/** What a member holds, in their hands: over the furniture in front, which would hide it. */
+function drawHeldItem(ctx: CanvasRenderingContext2D, member: MemberPose, art: GuildArt): void {
   const { id, pose, hand } = member;
   if (pose.held !== null) {
     const { prop, hold } = pose.held;
     const look = heldLook(id, pose, pose.held, art.sprites.hasHoldFrames(id));
-    art.sprites.drawMember(ctx, id, look, look.feet);
     art.sprites.drawProp(ctx, prop, look.item, hold);
-    return;
-  }
-  art.sprites.drawMember(ctx, id, pose, pose.point);
-  if (hand !== null) {
+  } else if (hand !== null) {
     const at = { x: pose.point.x + hand.offset.x, y: pose.point.y + hand.offset.y };
     art.sprites.drawProp(ctx, hand.prop, at, 'carry');
   }
 }
 
 /**
- * Members (back to front) with what they hold, between the front layers so the furniture in front
- * of a member covers them; then the bubbles of those holding nothing, and confetti on top.
+ * Members (back to front) between the front layers, so the furniture in front of a member covers
+ * their lower body; then what they hold (sunk into a seat, the hands are just over the desk or the
+ * counter, which would hide the item), the bubbles of those holding nothing, and confetti on top.
  */
 export function drawActors(
   ctx: CanvasRenderingContext2D,
@@ -144,11 +152,10 @@ export function drawActors(
   front: readonly CachedFrontLayer[],
 ): void {
   const { frame, bubbles, now } = stage;
-  for (const step of drawSteps(frame.members, front)) {
-    if (step.kind === 'member') {
-      drawMemberPose(ctx, step.member, art);
-      continue;
-    }
+  for (const step of stageSteps(frame.members, front)) {
+    if (step.kind === 'member') drawMemberPose(ctx, step.member, art);
+    if (step.kind === 'held') drawHeldItem(ctx, step.member, art);
+    if (step.kind !== 'layer') continue;
     ctx.drawImage(step.layer.image, 0, 0);
     drawAnimatedDecor(ctx, art, now, step.layer.layer.animated);
   }

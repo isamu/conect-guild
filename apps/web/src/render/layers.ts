@@ -102,23 +102,27 @@ export const BACK_ANIMATED_DECOR: readonly AnimatedDecor[] = ANIMATED_DECOR.filt
 );
 
 export type DrawStep<T, L> =
-  { readonly kind: 'member'; readonly member: T } | { readonly kind: 'layer'; readonly layer: L };
+  | { readonly kind: 'member'; readonly member: T }
+  | { readonly kind: 'layer'; readonly layer: L }
+  | { readonly kind: 'held'; readonly member: T };
 
 interface Deep {
   readonly depth: number;
 }
 
 /**
- * Members and front layers (each back to front by depth) in one drawing order: a layer goes before
- * every member at or below its depth, so it covers only the ones behind it.
+ * Members and front layers in one drawing order, back to front by depth: a layer goes before every
+ * member at or below its depth, so it covers only the ones behind it. Members of the same depth
+ * keep their order.
  */
 export function drawSteps<T extends Deep, L extends Deep>(
   members: readonly T[],
   layers: readonly L[],
 ): DrawStep<T, L>[] {
   const steps: DrawStep<T, L>[] = [];
-  const pending = [...layers];
-  for (const member of members) {
+  const pending = [...layers].sort((a, b) => a.depth - b.depth);
+  const ordered = [...members].sort((a, b) => a.depth - b.depth);
+  for (const member of ordered) {
     for (let layer = pending[0]; layer !== undefined && layer.depth <= member.depth;) {
       steps.push({ kind: 'layer', layer });
       pending.shift();
@@ -128,4 +132,18 @@ export function drawSteps<T extends Deep, L extends Deep>(
   }
   for (const layer of pending) steps.push({ kind: 'layer', layer });
   return steps;
+}
+
+/**
+ * drawSteps, then what each member holds over everything: a member sunk into a seat holds the item
+ * just over the desk or the counter in front, which would otherwise hide it.
+ */
+export function stageSteps<T extends Deep, L extends Deep>(
+  members: readonly T[],
+  layers: readonly L[],
+): DrawStep<T, L>[] {
+  const held = [...members]
+    .sort((a, b) => a.depth - b.depth)
+    .map((member): DrawStep<T, L> => ({ kind: 'held', member }));
+  return [...drawSteps(members, layers), ...held];
 }
