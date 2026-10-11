@@ -82,6 +82,12 @@ describe('findPath', () => {
     expect(inside).toHaveLength(MAP_COLS + MAP_ROWS - 1);
   });
 
+  it('returns null when either end is outside the map', () => {
+    expect(findPath({ col: -1, row: 0 }, { col: 3, row: 0 }, open)).toBeNull();
+    expect(findPath({ col: 0, row: MAP_ROWS }, { col: 0, row: 0 }, open)).toBeNull();
+    expect(findPath({ col: -1, row: 0 }, { col: -1, row: 0 }, open)).toBeNull();
+  });
+
   it('uses the office grid by default', () => {
     const path = findPath({ col: 11, row: 4 }, { col: 16, row: 9 });
     expect(path).not.toBeNull();
