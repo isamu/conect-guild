@@ -254,12 +254,20 @@ describe('diffSnapshot: Issues closed in both the baseline and the snapshot', ()
     }
   });
 
-  it('clears again when the closedAt changed, even to an older time', () => {
+  it('clears again when the closedAt moved later (reopened and closed again)', () => {
+    const result = diffSnapshot(
+      baselineOf({ issues: [closedIssue(1, minutesAfter(T0, -5))] }),
+      snapshot({ fetchedAt: T1, issues: [closedIssue(1, minutesAfter(T0, 600))] }),
+    );
+    expect(ids(result)).toEqual(['issue-closed#1']);
+  });
+
+  it('does not clear when the closedAt moved earlier (not a new close)', () => {
     const result = diffSnapshot(
       baselineOf({ issues: [closedIssue(1, minutesAfter(T0, 600))] }),
       snapshot({ fetchedAt: T1, issues: [closedIssue(1, minutesAfter(T0, -5))] }),
     );
-    expect(ids(result)).toEqual(['issue-closed#1']);
+    expect(result.events).toEqual([]);
   });
 
   it('does not clear when either closedAt is unknown', () => {

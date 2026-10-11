@@ -63,11 +63,13 @@ function issueEvent(
 
 /**
  * Closed in the baseline too: only a reopen and re-close between fetches counts, seen as a
- * different closedAt. Comparing with the baseline's fetchedAt instead would clear again on every
- * fetch an Issue whose closedAt is later than that fetch (clock skew, sample data).
+ * closedAt later than the baseline's. Comparing with the baseline's fetchedAt instead would clear
+ * again on every fetch an Issue whose closedAt is later than that fetch (clock skew, sample data).
+ * A closedAt that moved earlier is no new close.
  */
 function reclosed(issue: SnapshotIssue, before: Baseline['issues'][number]): boolean {
-  return issue.closedAt !== null && before.closedAt !== null && issue.closedAt !== before.closedAt;
+  if (issue.closedAt === null || before.closedAt === null) return false;
+  return Date.parse(issue.closedAt) > Date.parse(before.closedAt);
 }
 
 function prMerged(
