@@ -45,4 +45,23 @@ describe('collectSnapshot', () => {
     expect(peak).toBe(CHANGED_FILES_CONCURRENCY);
     expect(snapshot.prs.every((pr) => pr.changedFiles.length === 1)).toBe(true);
   });
+
+  it('returns a failure only after every running gh call has finished', async () => {
+    let inFlight = 0;
+    const gh: GhRunner = async (args) => {
+      const path = args.at(-1) ?? '';
+      inFlight += 1;
+      try {
+        if (path.includes('issues?state=open')) throw new Error('gh failed');
+        for (let i = 0; i < 5; i += 1) await new Promise((resolve) => setImmediate(resolve));
+        return '';
+      } finally {
+        inFlight -= 1;
+      }
+    };
+    await expect(collectSnapshot(gh, REPO, new Date('2026-10-12T00:00:00.000Z'))).rejects.toThrow(
+      'gh failed',
+    );
+    expect(inFlight).toBe(0);
+  });
 });

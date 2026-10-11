@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ghApiProjected, parseOrThrow, type GhRunner } from './gh.ts';
+import { bothOrThrow } from './limit.ts';
 
 // Each list is projected inside gh (jq) to exactly these fields, so issue
 // bodies and file diffs never reach the collector. strictObject catches a
@@ -40,27 +41,27 @@ const PER_PAGE = 'per_page=100';
 /** Open issues (all) plus closed issues updated since `since` (PRs still included). */
 export async function fetchIssues(gh: GhRunner, repo: string, since: Date): Promise<RawIssue[]> {
   const sinceParam = encodeURIComponent(since.toISOString());
-  const [open, closed] = await Promise.all([
+  const [open, closed] = await bothOrThrow(
     ghApiProjected(gh, `repos/${repo}/issues?state=open&${PER_PAGE}`, ISSUE_PROJECTION),
     ghApiProjected(
       gh,
       `repos/${repo}/issues?state=closed&since=${sinceParam}&${PER_PAGE}`,
       ISSUE_PROJECTION,
     ),
-  ]);
+  );
   return parseOrThrow(z.array(rawIssueSchema), [...open, ...closed]);
 }
 
 /** Every open PR and every closed PR (the pulls API has no `since`). */
 export async function fetchPrs(gh: GhRunner, repo: string): Promise<RawPr[]> {
-  const [open, closed] = await Promise.all([
+  const [open, closed] = await bothOrThrow(
     ghApiProjected(gh, `repos/${repo}/pulls?state=open&${PER_PAGE}`, PR_PROJECTION),
     ghApiProjected(
       gh,
       `repos/${repo}/pulls?state=closed&sort=updated&direction=desc&${PER_PAGE}`,
       PR_PROJECTION,
     ),
-  ]);
+  );
   return parseOrThrow(z.array(rawPrSchema), [...open, ...closed]);
 }
 

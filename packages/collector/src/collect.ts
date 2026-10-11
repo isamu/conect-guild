@@ -2,7 +2,7 @@ import { SNAPSHOT_SCHEMA_VERSION, snapshotSchema, type Snapshot } from '@conect-
 import { recentCutoff, selectRecentPrs, toSnapshotIssues, toSnapshotPr } from './build.ts';
 import { parseOrThrow, type GhRunner } from './gh.ts';
 import { fetchChangedFiles, fetchIssues, fetchPrs } from './github.ts';
-import { mapWithConcurrency } from './limit.ts';
+import { bothOrThrow, mapWithConcurrency } from './limit.ts';
 
 /** At most this many `gh` processes fetch changed files at once. */
 export const CHANGED_FILES_CONCURRENCY = 4;
@@ -13,10 +13,7 @@ export const CHANGED_FILES_CONCURRENCY = 4;
  */
 export async function collectSnapshot(gh: GhRunner, repo: string, now: Date): Promise<Snapshot> {
   const cutoff = recentCutoff(now);
-  const [rawIssues, rawPrs] = await Promise.all([
-    fetchIssues(gh, repo, cutoff),
-    fetchPrs(gh, repo),
-  ]);
+  const [rawIssues, rawPrs] = await bothOrThrow(fetchIssues(gh, repo, cutoff), fetchPrs(gh, repo));
   const prs = await mapWithConcurrency(
     selectRecentPrs(rawPrs, cutoff),
     CHANGED_FILES_CONCURRENCY,
