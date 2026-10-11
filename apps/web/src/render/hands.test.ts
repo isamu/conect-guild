@@ -45,7 +45,7 @@ describe('heldLook with the holding frames', () => {
   it('carries it in the middle in frame 5 when standing front', () => {
     const look = heldLook('minori', pose(0), carry('chest'), true);
     expect([look.frame, look.flip]).toEqual([5, false]);
-    expect(look.item).toEqual({ x: 300, y: 200 - HANDS.minori[5].up });
+    expect(look.item).toEqual({ x: 300 + HANDS.minori[5].forward, y: 200 - HANDS.minori[5].up });
   });
 
   it('carries it forward in frame 6 when walking, mirrored to face left', () => {
@@ -67,15 +67,29 @@ describe('heldLook with the holding frames', () => {
     expect(heldLook('sasae', pose(1), carry('chest'), true).feet.y).toBe(200);
   });
 
+  it('uses the hands measured on each member’s frames', () => {
+    // Raised: the item's bottom on the top of the hands (ひらめ's reach the top of the frame).
+    expect(HANDS.hirame[4].up - HOLD.raisedItemHalfPx).toBe(74);
+    expect(HANDS.kaname[4].up - HOLD.raisedItemHalfPx).toBe(69);
+    expect(HANDS.hibiki[5]).toEqual({ up: 34, forward: 1 });
+    expect(HANDS.minori[5]).toEqual({ up: 31, forward: -1 });
+    expect(HANDS.hibiki[6]).toEqual({ up: 35, forward: 21 });
+    expect(HANDS.yukihiro[6]).toEqual({ up: 32, forward: 15 });
+  });
+
   it('reads each member’s own hand table', () => {
     const ids: readonly MemberId[] = ['kaname', 'minori', 'hibiki', 'hirame', 'sasae', 'yukihiro'];
     for (const id of ids) {
       for (const frame of [4, 5, 6] as const) {
         expect(HANDS[id][frame].up).toBeGreaterThan(0);
-        expect(HANDS[id][frame].up).toBeLessThanOrEqual(OVERHEAD_OFFSET);
+        expect(HANDS[id][frame].up).toBeLessThanOrEqual(OVERHEAD_OFFSET + HOLD.raisedItemHalfPx);
       }
-      // The front frames hold the item in the middle.
-      expect([HANDS[id][4].forward, HANDS[id][5].forward]).toEqual([0, 0]);
+      // Raised over the head, carried far below it.
+      expect(HANDS[id][4].up).toBeGreaterThan(2 * HANDS[id][5].up);
+      // The front frames hold the item about the middle; frame 6 well forward.
+      expect(HANDS[id][4].forward).toBe(0);
+      expect(Math.abs(HANDS[id][5].forward)).toBeLessThanOrEqual(1);
+      expect(HANDS[id][6].forward).toBeGreaterThan(10);
     }
   });
 });

@@ -1,5 +1,5 @@
 import type { MemberId } from '../guild.config';
-import { HOLD, OVERHEAD_OFFSET, SPRITE_SIZE } from './metrics';
+import { HOLD, SPRITE_SIZE } from './metrics';
 import {
   heldItemPoint,
   type Held,
@@ -30,27 +30,49 @@ export function hasHoldFrames(width: number): boolean {
 export interface HandPosition {
   /** Up from the feet. */
   readonly up: number;
-  /** Toward the facing side (frame 6; the front frames keep it 0). */
+  /** Toward the facing side (mirrored when facing left). */
   readonly forward: number;
 }
 
-/**
- * 仮の値: the same for everyone, matching the fallback positions. Replace each member's numbers
- * with the ones measured on the holding frames once the sheets are drawn.
- */
-const PROVISIONAL_HANDS: Readonly<Record<HoldFrame, HandPosition>> = {
-  4: { up: OVERHEAD_OFFSET, forward: 0 },
-  5: { up: HOLD.carryHeightPx, forward: 0 },
-  6: { up: HOLD.carryHeightPx, forward: HOLD.carryForwardPx },
+/** Hands measured on each member's holding frames (frame px; feet at y 80, middle at x 40). */
+interface MeasuredHands {
+  /** Frame 4: the top of the raised hands, up from the feet. */
+  readonly raiseTop: number;
+  /** Frame 5: the centre of the carried item, up from the feet, and its x in the frame. */
+  readonly carryFront: { readonly up: number; readonly x: number };
+  /** Frame 6 (facing right): the centre of the carried item, up and forward from the feet. */
+  readonly carrySide: HandPosition;
+}
+
+/** Measured on assets/sprites/<memberId>.png, frames 4–6 (2026-10-12). */
+const MEASURED: Readonly<Record<MemberId, MeasuredHands>> = {
+  kaname: { raiseTop: 69, carryFront: { up: 32, x: 40 }, carrySide: { up: 31, forward: 15 } },
+  minori: { raiseTop: 71, carryFront: { up: 31, x: 39 }, carrySide: { up: 33, forward: 14 } },
+  hibiki: { raiseTop: 70, carryFront: { up: 34, x: 41 }, carrySide: { up: 35, forward: 21 } },
+  hirame: { raiseTop: 74, carryFront: { up: 33, x: 40 }, carrySide: { up: 33, forward: 14 } },
+  sasae: { raiseTop: 72, carryFront: { up: 32, x: 39 }, carrySide: { up: 32, forward: 16 } },
+  yukihiro: { raiseTop: 75, carryFront: { up: 34, x: 40 }, carrySide: { up: 32, forward: 15 } },
 };
 
+/**
+ * Where the item is centred in each holding frame. A raised item sits on the hands (its bottom on
+ * their top, so its centre half its height above); a carried one is centred on the arms.
+ */
+function handsOf(measured: MeasuredHands): Readonly<Record<HoldFrame, HandPosition>> {
+  return {
+    4: { up: measured.raiseTop + HOLD.raisedItemHalfPx, forward: 0 },
+    5: { up: measured.carryFront.up, forward: measured.carryFront.x - SPRITE_SIZE / 2 },
+    6: measured.carrySide,
+  };
+}
+
 export const HANDS: Readonly<Record<MemberId, Readonly<Record<HoldFrame, HandPosition>>>> = {
-  kaname: PROVISIONAL_HANDS,
-  minori: PROVISIONAL_HANDS,
-  hibiki: PROVISIONAL_HANDS,
-  hirame: PROVISIONAL_HANDS,
-  sasae: PROVISIONAL_HANDS,
-  yukihiro: PROVISIONAL_HANDS,
+  kaname: handsOf(MEASURED.kaname),
+  minori: handsOf(MEASURED.minori),
+  hibiki: handsOf(MEASURED.hibiki),
+  hirame: handsOf(MEASURED.hirame),
+  sasae: handsOf(MEASURED.sasae),
+  yukihiro: handsOf(MEASURED.yukihiro),
 };
 
 /** Raised: hands up. Carried: arms in front, facing front when standing, sideways when walking. */

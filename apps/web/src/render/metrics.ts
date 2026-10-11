@@ -80,4 +80,6 @@ export const HOLD = {
   carryForwardPx: 14,
   /** Up on every other step while walking in the carrying frame (it has no stepping legs). */
   walkBobPx: 2,
+  /** Half the height of a raised item's picture (chest 31 px, scroll bundle 32 px): it sits on the hands. */
+  raisedItemHalfPx: 16,
 } as const;
