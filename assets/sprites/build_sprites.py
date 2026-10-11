@@ -14,7 +14,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageChops
 
 MEMBERS = ["kaname", "minori", "hibiki", "hirame", "sasae", "yukihiro"]
 COLS = 4
@@ -28,9 +28,8 @@ ALPHA_CUTOFF = 0.5
 PREVIEW_SCALE = 4
 
 
-def is_background(rgb):
-    r, g, b = rgb
-    return r > 170 and b > 170 and g < 90
+def threshold(channel, test):
+    return channel.point(lambda v: 255 if test(v) else 0)
 
 
 def cut_cells(sheet):
@@ -45,20 +44,24 @@ def cut_cells(sheet):
 
 def keyed(cell):
     """Return the cell as RGBA with the magenta background made transparent."""
-    rgba = cell.convert("RGBA")
-    rgba.putdata(
-        [(r, g, b, 0) if is_background((r, g, b)) else (r, g, b, 255) for r, g, b, _ in rgba.get_flattened_data()]
+    r, g, b = cell.split()
+    background = ImageChops.multiply(
+        ImageChops.multiply(threshold(r, lambda v: v > 170), threshold(b, lambda v: v > 170)),
+        threshold(g, lambda v: v < 90),
     )
+    rgba = cell.convert("RGBA")
+    rgba.putalpha(ImageChops.invert(background))
     return rgba
 
 
 def shrink(rgba, size):
     """Area-average downscale on premultiplied colour, then make alpha binary (crisp pixel edges)."""
     small = rgba.convert("RGBa").resize(size, Image.Resampling.BOX).convert("RGBA")
-    small.putdata(
-        [(r, g, b, 255) if a >= 255 * ALPHA_CUTOFF else (0, 0, 0, 0) for r, g, b, a in small.get_flattened_data()]
-    )
-    return small
+    opaque = threshold(small.getchannel("A"), lambda v: v >= 255 * ALPHA_CUTOFF)
+    crisp = Image.new("RGBA", size, (0, 0, 0, 0))
+    crisp.paste(small.convert("RGB"), (0, 0), opaque)
+    crisp.putalpha(opaque)
+    return crisp
 
 
 def build(sheet_path, out_dir, preview_path=None):
