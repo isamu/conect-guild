@@ -16,6 +16,7 @@ Keep LAYOUT in sync with decor.ts (checked before building).
 """
 
 import hashlib
+import math
 import os
 import re
 import sys
@@ -169,8 +170,9 @@ def find_pieces(sheet_id, img):
     or regenerated sheet fails instead of yielding clipped or merged pieces;
     smaller specks outside every region are dropped. A piece must also lie
     wholly inside its region, so a region that catches only part of a piece,
-    or a neighbour that reaches far out, fails too. Two regions swapped with
-    each other still pass: check the preview after editing LAYOUT."""
+    or a neighbour that reaches far out, fails too. Two regions of same-sized
+    pieces swapped with each other still pass (check_slot_size catches swaps
+    across sizes): check the preview after editing LAYOUT."""
     regions, labels = components(img)
     names = [n for n, spec in LAYOUT.items() if spec[0] == sheet_id]
     owner = {}
@@ -216,7 +218,21 @@ def shrink(img, size):
     return small
 
 
+def check_slot_size(crop, name, size):
+    """The slot must be the tightest one the piece fits at SCALE (allowing the
+    MAX_FIT_SHRINK squeeze), so an oversized slot, or a region swapped with a
+    piece of another size, fails instead of shifting pieces around."""
+    for axis, (raw, slot) in enumerate(zip(crop.size, size)):
+        need = raw * SCALE
+        tightest = max(1, math.ceil(need * (1 - MAX_FIT_SHRINK) / TILE))
+        loosest = max(1, math.ceil(need / TILE))
+        if not tightest <= slot // TILE <= loosest:
+            dim = "wh"[axis]
+            raise SystemExit(f"{name}: {dim} is {slot // TILE} tiles, but a {need:.0f}px piece needs {tightest}..{loosest}")
+
+
 def build_piece(crop, name, size):
+    check_slot_size(crop, name, size)
     scale = SCALE
     fit = min(size[0] / (crop.width * scale), size[1] / (crop.height * scale))
     if fit < 1:
