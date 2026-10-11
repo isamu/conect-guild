@@ -134,6 +134,15 @@ describe('map: walkable grid', () => {
     expect(isWalkable({ col: 20, row: 15 })).toBe(false);
   });
 
+  it('keeps heads out from under the windows too (sprites are two tiles tall)', () => {
+    const { party, message } = HIDDEN_AREAS;
+    // Feet just below the party window: the head would be under it.
+    expect(isWalkable({ col: party.col + 1, row: party.row + party.h })).toBe(false);
+    expect(isWalkable({ col: party.col + 1, row: party.row + party.h + 1 })).toBe(true);
+    // Feet just above the message window: the head is above the feet, so this is fine.
+    expect(isWalkable({ col: message.col + 3, row: message.row - 1 })).toBe(true);
+  });
+
   it('decides hidden cells by the edges of each area', () => {
     const { message } = HIDDEN_AREAS;
     expect(isHidden({ col: message.col, row: message.row })).toBe(true);

@@ -52,8 +52,8 @@ export interface MapObject extends TileRect {
 export const HIDDEN_AREAS: Readonly<Record<'board' | 'party' | 'message', TileRect>> = {
   // left 1.2%, width 29%, up to about a third of the height (more with many quests)
   board: { col: 0, row: 0, w: 10, h: 10 },
-  // right 1.1%, width 24.6%, down to about 45% of the height
-  party: { col: 23, row: 0, w: 9, h: 9 },
+  // right 1.1%, width 24.6%: the party window and the fetch status under it reach about 62%
+  party: { col: 23, row: 0, w: 9, h: 11 },
   // 9.8% to 90.2% across, bottom 19%
   message: { col: 3, row: 14, w: 26, h: 4 },
 };
@@ -171,12 +171,12 @@ export function groundAt(pos: TilePos): TileName | null {
 }
 
 /**
- * True where a member may walk: walkable ground, no solid furniture, and not under a window
- * (so nobody vanishes behind the message window on the way to the door).
+ * True where a member may walk: walkable ground, no solid furniture, and neither the feet nor the
+ * head (a sprite is two tiles tall) under a window, so nobody vanishes behind one on the way.
  */
 export function isWalkable(pos: TilePos): boolean {
   const ground = groundAt(pos);
   if (ground === null || !WALKABLE_GROUND.has(ground)) return false;
   if (MAP_OBJECTS.some((object) => object.solid && contains(object, pos))) return false;
-  return !isHidden(pos);
+  return !isHidden(pos) && !isHidden({ col: pos.col, row: pos.row - 1 });
 }
