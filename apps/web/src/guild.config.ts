@@ -9,7 +9,7 @@ export type DepartmentLabel = (typeof DEPARTMENT_LABELS)[number];
 
 export type MemberId = 'kaname' | 'minori' | 'hibiki' | 'hirame' | 'sasae' | 'yukihiro';
 
-/** A cell on the office tile map (16 px tiles, 32 x 18; src/render/map.ts). */
+/** A cell on the office tile map (32 px tiles, 32 x 18; src/render/map.ts). */
 export interface TilePos {
   readonly col: number;
   readonly row: number;
