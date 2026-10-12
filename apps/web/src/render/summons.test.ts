@@ -333,12 +333,52 @@ describe('holdsAt: nobody moves in a call', () => {
     const first = holdsAt(NO_HOLDS, frame, row, 0);
     const sunkFrame = moved(frame, 'yukihiro', 4);
     const second = holdsAt(first, sunkFrame, row, END);
-    expect(second).toEqual({ start: END, points: { yukihiro: seatPoint('yukihiro') } });
+    expect(second).toEqual({ start: END, points: { yukihiro: seatPoint('yukihiro') }, done: [] });
     expect(holdsAt(first, sunkFrame, row, 3 * END)).toEqual(NO_HOLDS);
     // A later call after a gap, while the holds of the first call are still around (no frame was
     // drawn in between): the king is held where the new call finds him.
     const later = [order(['sasae'], END + 1)];
     const afterGap = holdsAt(first, sunkFrame, later, END + 1);
     expect(afterGap.points.yukihiro).toEqual(sunk('yukihiro'));
+  });
+});
+
+describe('holdsAt: a scene cuts an answer short', () => {
+  it('ends the answer of a member whose scene starts mid-reply: no hold, no word', () => {
+    const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS);
+    const list = [order(['minori'])];
+    // Answering at the seat, bobbing at the desk.
+    const bobbed = moved(frame, 'minori', 2);
+    let holds = holdsAt(NO_HOLDS, bobbed, list, REPLY);
+    expect(holds.points.minori).toBeDefined();
+    // A handover takes her: the scene's pose is drawn as it is, the "はっ！" goes.
+    const inScene: StageFrame = {
+      ...frame,
+      members: frame.members.map((m) => (m.id === 'minori' ? { ...m, inScene: true } : m)),
+    };
+    holds = holdsAt(holds, inScene, list, REPLY + 100);
+    expect(holds.points.minori).toBeUndefined();
+    expect(holds.done).toEqual(['minori']);
+    const next = withSummons(inScene, list, REPLY + 100, { seats: DEFAULT_SEATS, holds });
+    expect(member(next, 'minori')).toEqual(member(inScene, 'minori'));
+    expect(speechesAt(list, REPLY + 100, holds.done)).toEqual({});
+    // Back at the seat before the call ends: she does not take up the answer again.
+    holds = holdsAt(holds, frame, list, REPLY + 200);
+    expect(holds.points.minori).toBeUndefined();
+    expect(
+      member(withSummons(frame, list, REPLY + 200, { seats: DEFAULT_SEATS, holds }), 'minori'),
+    ).toEqual(member(frame, 'minori'));
+  });
+
+  it('keeps answering on the spot a member who was in a scene before the reply', () => {
+    const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS);
+    const inScene: StageFrame = {
+      ...frame,
+      members: frame.members.map((m) => (m.id === 'minori' ? { ...m, inScene: true } : m)),
+    };
+    const list = [order(['minori'])];
+    const holds = holdsAt(NO_HOLDS, inScene, list, REPLY);
+    expect(holds.done).toEqual([]);
+    expect(speechesAt(list, REPLY, holds.done)).toEqual({ minori: 'はっ！' });
   });
 });

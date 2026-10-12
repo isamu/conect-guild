@@ -76,7 +76,7 @@ export function createCalls(options: CallsOptions): Calls {
         options.onActive?.(['yukihiro'], (options.wallNow ?? Date.now)());
       const frame = build();
       holds = holdsAt(holds, frame, list, t);
-      const speeches = speechesAt(list, t);
+      const speeches = speechesAt(list, t, holds.done);
       const applied = withSummons(frame, list, t, { seats: DEFAULT_SEATS, holds });
       const started = newCallStart(list, t, announced);
       if (started !== null) {

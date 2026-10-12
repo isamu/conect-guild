@@ -85,14 +85,18 @@ function playing(list: readonly Summons[], now: number): Summons | undefined {
   return list.find((summons) => summons.start <= now && now < summonsEnd(summons));
 }
 
-/** Who says what at `now`. */
-export function speechesAt(list: readonly Summons[], now: number): Speeches {
+/** Who says what at `now`; those in `done` have stopped answering (holdsAt). */
+export function speechesAt(
+  list: readonly Summons[],
+  now: number,
+  done: readonly MemberId[] = [],
+): Speeches {
   const summons = playing(list, now);
   if (summons === undefined) return {};
   const reply = replyStart(summons);
   if (now >= reply) {
     const answers: Partial<Record<MemberId, SpeechLine>> = {};
-    for (const id of summons.members) answers[id] = 'はっ！';
+    for (const id of summons.members) if (!done.includes(id)) answers[id] = 'はっ！';
     return answers;
   }
   return { [KING]: now < summons.start + SUMMONS.callMs ? '！' : 'ゴニョゴニョ' };
@@ -113,9 +117,14 @@ export interface Holds {
   /** The start of the call they belong to; null when none plays. */
   readonly start: number | null;
   readonly points: Readonly<Partial<Record<MemberId, Point>>>;
+  /**
+   * Members whose answer at the seat a scene cut short (a scroll or a chest): they stop answering
+   * there and the scene takes them as it would from the seat, like the waiting bubbles.
+   */
+  readonly done: readonly MemberId[];
 }
 
-export const NO_HOLDS: Holds = { start: null, points: {} };
+export const NO_HOLDS: Holds = { start: null, points: {}, done: [] };
 
 /** True while `member` takes part at the seat at `now`: the king all along, a member answering. */
 function heldAt(summons: Summons, member: MemberPose, now: number): boolean {
@@ -128,6 +137,18 @@ function heldAt(summons: Summons, member: MemberPose, now: number): boolean {
   );
 }
 
+/**
+ * What a call starts with from `holds`: all of it for the same call; for the next call of a row
+ * (it starts right as the held one ends) only the king, where he was; nothing otherwise.
+ */
+function carriedOver(holds: Holds, summons: Summons): Omit<Holds, 'start'> {
+  if (summons.start === holds.start) return holds;
+  const king = holds.points[KING];
+  const follows =
+    holds.start !== null && summonsEnd({ start: holds.start, members: [] }) === summons.start;
+  return follows && king !== undefined ? { points: { [KING]: king }, done: [] } : NO_HOLDS;
+}
+
 /** The holds at `now`: those of `holds` for the same call, plus anyone whose part begins now. */
 export function holdsAt(
   holds: Holds,
@@ -137,19 +158,18 @@ export function holdsAt(
 ): Holds {
   const summons = playing(list, now);
   if (summons === undefined) return NO_HOLDS;
-  // The next call of a row (it starts right as the held one ends) keeps the king where he was.
-  const king = holds.points[KING];
-  const follows =
-    holds.start !== null && summonsEnd({ start: holds.start, members: [] }) === summons.start;
-  let points: Partial<Record<MemberId, Point>> = {};
-  if (summons.start === holds.start) points = { ...holds.points };
-  else if (follows && king !== undefined) points = { [KING]: king };
+  const before = carriedOver(holds, summons);
+  const points: Partial<Record<MemberId, Point>> = {};
+  const done = [...before.done];
   for (const member of frame.members) {
-    if (points[member.id] === undefined && heldAt(summons, member, now)) {
+    const at = before.points[member.id];
+    if (at !== undefined && member.id !== KING && member.inScene) done.push(member.id);
+    else if (at !== undefined) points[member.id] = at;
+    else if (!done.includes(member.id) && heldAt(summons, member, now)) {
       points[member.id] = member.pose.point;
     }
   }
-  return { start: summons.start, points };
+  return { start: summons.start, points, done };
 }
 
 /**
@@ -209,6 +229,7 @@ export function withSummons(
       return sitting(member, { frame: 0, flip: false, lift, at });
     }
     if (now < reply || !summons.members.includes(member.id)) return member;
+    if (holds.start === summons.start && holds.done.includes(member.id)) return member;
     return answering(member, seats, now - reply, at);
   });
   return { ...frame, members };
