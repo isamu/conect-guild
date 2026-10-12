@@ -216,6 +216,12 @@ describe('isSessionDir', () => {
     '/a\t',
     '~/a\n',
     '\u3000/a',
+    '~/a\nb',
+    '/a\rb',
+    '~/a\u0000b',
+    '/a\u001fb',
+    '~/a\u007fb',
+    '/a\tb',
   ])('rejects %j', (dir) => {
     expect(isSessionDir(dir)).toBe(false);
   });

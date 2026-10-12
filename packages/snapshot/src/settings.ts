@@ -24,15 +24,26 @@ const memberSchema = z.strictObject({
   color: z.string().regex(/^#[0-9a-f]{6}$/i, 'a colour like #4caf50'),
 });
 
+/** True when the text has a control character (U+0000–U+001F or U+007F). */
+function hasControlCharacter(text: string): boolean {
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    if (code < 0x20 || code === 0x7f) return true;
+  }
+  return false;
+}
+
 /**
  * Where a company session is started, exactly as MulmoTerminal records it: `~` or `~/...` (under
- * the home directory) or an absolute path. No surrounding whitespace, no trailing `/`, no empty,
- * `.` or `..` segments, since the collector compares the paths as plain strings (docs/DESIGN.md
- * 4.7).
+ * the home directory) or an absolute path. No surrounding whitespace, no control characters, no
+ * trailing `/`, no empty, `.` or `..` segments, since the collector compares the paths as plain
+ * strings (docs/DESIGN.md 4.7).
  */
 export function isSessionDir(dir: string): boolean {
   // The collector trims each cwd log line, so a path with surrounding whitespace never matches.
   if (dir !== dir.trim()) return false;
+  // A line break or other control character would split or garble the cwd log line.
+  if (hasControlCharacter(dir)) return false;
   if (dir === '~') return true;
   const prefix = ['~/', '/'].find((p) => dir.startsWith(p));
   if (prefix === undefined || dir === prefix) return false;
