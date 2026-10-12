@@ -20,6 +20,7 @@ import { toQuests, type Quest } from '../domain/quest';
 import { countRecentRewards } from '../domain/reward';
 import { liveStatesOf, NO_LIVE_STATES, type LiveState } from '../domain/session';
 import type { GuildMessage } from './messageQueue';
+import { buildPartyLevels, type PartyLevel } from './partyLevel';
 
 /**
  * Pure builders that turn a snapshot into what the windows show. The windows only render these;
@@ -81,7 +82,12 @@ export interface PartyRow {
   readonly tooltip: string | null;
   /** 最近の成果 (PRs merged in the last 7 days); null for かなめ and the king. */
   readonly rewards: number | null;
+  /** The cumulative level (Issue #19); the king has none and shows おうさま. */
+  readonly level: PartyLevel;
 }
+
+/** A row before its level is attached (buildParty adds it). */
+type PartyRowBase = Omit<PartyRow, 'level'>;
 
 export interface WaitCounts {
   /** Open PRs that change rules and wait for the president's merge. */
@@ -110,7 +116,7 @@ export function countWaits(snapshot: SnapshotLists): WaitCounts {
 function row(
   member: MemberConfig,
   view: Pick<PartyRow, 'state' | 'stateLabel' | 'tooltip' | 'rewards'>,
-): PartyRow {
+): PartyRowBase {
   return { id: member.id, name: member.name, role: member.role, color: member.color, ...view };
 }
 
@@ -120,7 +126,7 @@ export const LIVE_TOOLTIPS: Readonly<Record<LiveState, string>> = {
   working: 'セッションがいま動いています（MulmoTerminal より）',
 };
 
-function kanameRow(waits: WaitCounts, live: LiveState | undefined): PartyRow {
+function kanameRow(waits: WaitCounts, live: LiveState | undefined): PartyRowBase {
   const tooltip = `確認まちの PR ${String(waits.kaname)} 件・受付の巻物 ${String(waits.reception)} 件`;
   if (live === 'awaiting-permission') {
     return row(MEMBERS.kaname, {
@@ -157,7 +163,7 @@ function kanameRow(waits: WaitCounts, live: LiveState | undefined): PartyRow {
   return row(MEMBERS.kaname, { state: 'idle', stateLabel: '受付で待機', tooltip, rewards: null });
 }
 
-function kingRow(waits: WaitCounts): PartyRow {
+function kingRow(waits: WaitCounts): PartyRowBase {
   if (waits.president > 0) {
     return row(MEMBERS.yukihiro, {
       state: 'awaiting-president',
@@ -182,10 +188,11 @@ function memberTooltip(state: MemberState, reason: string | null): string | null
 
 /**
  * Six rows: かなめ, the four departments (fixed order), then the king. The live session states
- * join in while they are fresh (docs/DESIGN.md 4.7). `now` is epoch ms.
+ * join in while they are fresh (docs/DESIGN.md 4.7); the levels come from the history (4.6).
+ * `now` is epoch ms.
  */
 export function buildParty(
-  snapshot: Pick<Snapshot, 'issues' | 'prs' | 'sessions'>,
+  snapshot: Pick<Snapshot, 'issues' | 'prs' | 'sessions' | 'history'>,
   now: number,
 ): PartyRow[] {
   const waits = countWaits(snapshot);
@@ -199,7 +206,11 @@ export function buildParty(
       rewards: rewards[status.department],
     }),
   );
-  return [kanameRow(waits, live.kaname), ...members, kingRow(waits)];
+  const levels = buildPartyLevels(snapshot);
+  return [kanameRow(waits, live.kaname), ...members, kingRow(waits)].map((base) => ({
+    ...base,
+    level: levels[base.id],
+  }));
 }
 
 export interface KingBubbleView {
