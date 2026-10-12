@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { GuildEvent } from '../domain/events';
 import type { MemberId } from '../guild.config';
 import type { Bubbles } from './bubbles';
-import { EMPTY_DIRECTOR, scheduleEvent, sendHome } from './director';
+import { EMPTY_DIRECTOR, frameAt, scheduleEvent, sendHome } from './director';
+import { overheadOf } from './overhead';
 import type { IdlePose } from './idle';
 import { linesOf } from './lineBook';
 import { createLinePicker, type PickLine } from './lines';
@@ -411,5 +412,44 @@ describe('isFree', () => {
     const walk = walkSegment([away, seat], 0);
     const home = sendHome(EMPTY_DIRECTOR, 'minori', walk);
     expect(isFree(home, 1, 'minori', { minori: idleAt(away) })).toBe(false);
+  });
+});
+
+describe('remarks and the level-up (Issue #19)', () => {
+  const minoriUp: GuildEvent = {
+    id: 'level-up:経理#4',
+    kind: 'level-up',
+    number: 4,
+    department: '経理',
+  };
+  const director = scheduleEvent(EMPTY_DIRECTOR, minoriUp, 0, {
+    seats: DEFAULT_SEATS,
+    random: () => 0.5,
+  });
+  const talking = receiveParty(seen({}), party({ minori: 'awaiting-kaname' }), moment({ t: 0 }));
+
+  it('hides a remark for as long as "LEVEL UP" shows, so the words never meet', () => {
+    let banners = 0;
+    for (let t = 0; t < 4_000; t += 20) {
+      const frame = frameAt(director, t, DEFAULT_SEATS);
+      const shown = frame.confetti.some((view) => view.actor === 'minori' && view.banner !== null);
+      if (!shown) continue;
+      banners += 1;
+      const member = frame.members.find((m) => m.id === 'minori');
+      if (member === undefined) throw new Error('no minori');
+      const sources = {
+        speeches: {},
+        lines: frame.lines,
+        remarks: remarksAt(talking, t),
+        bubbles: {},
+      };
+      expect({ t, shown: overheadOf(member, sources) }).toEqual({ t, shown: null });
+      expect(seenRemarks(talking, t, { frame, speeches: {} })).toEqual([]);
+    }
+    expect(banners).toBeGreaterThan(0);
+  });
+
+  it('does not start a remark for a member hopping at the seat', () => {
+    expect(isFree(director, 100, 'minori', {})).toBe(false);
   });
 });
