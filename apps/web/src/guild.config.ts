@@ -9,6 +9,7 @@ import {
   GUILD_SETTINGS,
   departmentLabelSchema,
   memberIdSchema,
+  type BranchPrefixRule,
   type DepartmentLabel,
   type MemberId,
   type RuleChangePath,
@@ -75,11 +76,6 @@ export const MEMBERS: Readonly<Record<MemberId, MemberConfig>> = {
 export const DEPARTMENT_MEMBER: Readonly<Record<DepartmentLabel, MemberId>> = z
   .record(departmentLabelSchema, memberIdSchema)
   .parse(Object.fromEntries(GUILD_SETTINGS.departments.map((d) => [d.label, d.member])));
-
-export interface BranchPrefixRule {
-  readonly prefix: string;
-  readonly department: DepartmentLabel;
-}
 
 /**
  * Branch name prefix → department, used only when a PR links no labelled Issue.
