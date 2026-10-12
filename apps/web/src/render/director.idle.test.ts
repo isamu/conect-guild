@@ -5,14 +5,16 @@ import { createAmbientSeeds } from './ambient';
 import {
   EMPTY_DIRECTOR,
   frameAt,
+  isAtSeat,
   scheduleEvent,
   sendHome,
   type AmbientContext,
   type Director,
 } from './director';
+import type { IdlePose } from './idle';
 import { walkSegment } from './motion';
 import { tileToPoint } from './path';
-import { DEFAULT_SEATS } from './scenes';
+import { DEFAULT_SEATS, PICK_UP_MS } from './scenes';
 
 function event(kind: 'issue-opened', department: DepartmentLabel | null): GuildEvent {
   return { id: `${kind}#1`, kind, number: 1, department };
@@ -73,5 +75,66 @@ describe('director: back from play (idle.ts)', () => {
     );
     expect(inScene?.inScene).toBe(true);
     expect(inScene?.mark).toBeNull();
+  });
+});
+
+describe('isAtSeat (Issue #29)', () => {
+  const seat = DEFAULT_SEATS.minori;
+  const away = { col: seat.col + 2, row: seat.row };
+  const idleAt = (tile: { col: number; row: number }): IdlePose => ({
+    feet: tileToPoint(tile),
+    step: { from: tile, to: tile, progress: 0 },
+    frame: 0,
+    flip: false,
+    offset: { x: 0, y: 3 },
+    mark: null,
+  });
+
+  it('is at the seat with nothing going on, dozing or asleep there', () => {
+    expect(isAtSeat(EMPTY_DIRECTOR, 0, { id: 'minori', seat, idle: undefined })).toBe(true);
+    expect(isAtSeat(EMPTY_DIRECTOR, 0, { id: 'minori', seat, idle: idleAt(seat) })).toBe(true);
+  });
+
+  it('is away while out playing, unless a scene has taken the member over', () => {
+    expect(isAtSeat(EMPTY_DIRECTOR, 0, { id: 'minori', seat, idle: idleAt(away) })).toBe(false);
+    const scene = play(EMPTY_DIRECTOR, event('issue-opened', '経理'), 0);
+    expect(isAtSeat(scene, 10, { id: 'minori', seat, idle: idleAt(away) })).toBe(true);
+  });
+
+  it('stays at the seat while receiving an item there, and is away only while walking', () => {
+    const scene = play(EMPTY_DIRECTOR, event('issue-opened', '経理'), 0);
+    const end = scene.busyUntil.minori ?? 0;
+    expect(isAtSeat(scene, end - 1, { id: 'minori', seat, idle: undefined })).toBe(true);
+    expect(
+      isAtSeat(scene, PICK_UP_MS / 2, {
+        id: 'kaname',
+        seat: DEFAULT_SEATS.kaname,
+        idle: undefined,
+      }),
+    ).toBe(true);
+    expect(
+      isAtSeat(scene, PICK_UP_MS + 1, {
+        id: 'kaname',
+        seat: DEFAULT_SEATS.kaname,
+        idle: undefined,
+      }),
+    ).toBe(false);
+  });
+
+  it('stays at the seat under the confetti', () => {
+    const scene = scheduleEvent(
+      EMPTY_DIRECTOR,
+      { id: 'issue-closed#1', kind: 'issue-closed', number: 1, department: '経理' },
+      0,
+      { seats: DEFAULT_SEATS, random: () => 0.5 },
+    );
+    expect(isAtSeat(scene, 100, { id: 'minori', seat, idle: undefined })).toBe(true);
+  });
+
+  it('is reported on every member of the frame', () => {
+    const scene = play(EMPTY_DIRECTOR, event('issue-opened', '経理'), 0);
+    const members = frameAt(scene, PICK_UP_MS + 1, DEFAULT_SEATS).members;
+    const walking = members.filter((m) => !m.atSeat).map((m) => m.id);
+    expect(walking).toEqual(['kaname']);
   });
 });
