@@ -14,7 +14,7 @@ import {
   type IdleSeeds,
   type Outing,
 } from './idle';
-import { PLAY_SPOTS } from './idleSpots';
+import { PLAY_SPOTS, turnsToPet } from './idleSpots';
 import { isUnderWindow, isWalkable } from './map';
 import { IDLE } from './metrics';
 import { MS_PER_TILE, poseOnSegment } from './motion';
@@ -323,7 +323,7 @@ describe('idlePose at a spot', () => {
     ]);
   });
 
-  it('shows a "♪" by the pet now and then, facing front', () => {
+  it('shows a "♪" by the pet now and then, turned toward it', () => {
     const outing = outingFor('kaname', 'pet');
     const at = (step: number) =>
       idlePose(
@@ -332,8 +332,9 @@ describe('idlePose at a spot', () => {
         1,
         outing.out.end + step * IDLE.bubbleMs,
       );
-    expect(at(0)).toMatchObject({ frame: 0, mark: { kind: 'bubble', glyph: '♪' } });
-    expect(at(1)).toMatchObject({ frame: 0, mark: null });
+    const flip = turnsToPet(outing.spot.tile);
+    expect(at(0)).toMatchObject({ frame: 1, flip, mark: { kind: 'bubble', glyph: '♪' } });
+    expect(at(1)).toMatchObject({ frame: 1, flip, mark: null });
   });
 
   it('looks around at the window', () => {
