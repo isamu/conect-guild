@@ -90,6 +90,10 @@ export const IDLE = {
   /** At a play spot: bubbles change every `bubbleMs`; at a window, a look aside every `lookMs`. */
   bubbleMs: 1_680,
   lookMs: 2_520,
+  /** By the pet: the member crouches `crouchPx` for the last `crouchMs` of every `crouchEveryMs`. */
+  crouchEveryMs: 3_360,
+  crouchMs: 840,
+  crouchPx: 3,
   /** The last-active times are written to localStorage when one moved on by this much. */
   persistStepMs: 10_000,
 } as const;
