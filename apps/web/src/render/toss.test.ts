@@ -30,8 +30,8 @@ function counted(value: number): { random: () => number; draws: () => number } {
   };
 }
 
-const TOSSING = { seats: DEFAULT_SEATS, random: () => 0 };
-const WALKING = { seats: DEFAULT_SEATS, random: () => TOSS.share };
+const TOSSING = { seats: DEFAULT_SEATS, random: () => 0.5, tossRandom: () => 0 };
+const WALKING = { seats: DEFAULT_SEATS, random: () => 0.5, tossRandom: () => TOSS.share };
 
 const NEAR: readonly (readonly [DepartmentLabel, MemberId])[] = [
   ['経理', 'minori'],
@@ -152,6 +152,7 @@ describe('planScene: issue-opened, tossed or walked', () => {
     const scene = planScene(event('issue-opened', department), 0, {
       seats: DEFAULT_SEATS,
       random: source.random,
+      tossRandom: source.random,
     });
     expect(scene.flights).toEqual([]);
     expect(source.draws()).toBe(0);
@@ -159,10 +160,58 @@ describe('planScene: issue-opened, tossed or walked', () => {
 
   it('never tosses at the reception (no department) or a chest', () => {
     const source = counted(0);
-    const context = { seats: DEFAULT_SEATS, random: source.random };
+    const context = { seats: DEFAULT_SEATS, random: source.random, tossRandom: source.random };
     expect(planScene(event('issue-opened', null), 0, context).flights).toEqual([]);
     expect(planScene(event('pr-merged', '経理'), 0, context).flights).toEqual([]);
     expect(source.draws()).toBe(0);
+  });
+
+  it('always walks without a source for tosses', () => {
+    const scene = planScene(event('issue-opened', '経理'), 0, {
+      seats: DEFAULT_SEATS,
+      random: () => 0,
+    });
+    expect(scene.flights).toEqual([]);
+  });
+});
+
+describe('planScene: tosses leave the confetti alone', () => {
+  /** A fixed sequence of numbers in [0, 1), the same from every fresh source. */
+  function sequence(): () => number {
+    let i = 0;
+    return () => {
+      i += 1;
+      return (i * 0.618_033_988_75) % 1;
+    };
+  }
+
+  /** Confetti of the clears in a run of events, the scroll tossed or not. */
+  function confettiOf(tossRandom: (() => number) | undefined) {
+    const context = { seats: DEFAULT_SEATS, random: sequence(), tossRandom };
+    const run = [
+      event('issue-opened', '経理'),
+      event('issue-closed', '経理'),
+      event('issue-opened', '広報'),
+      event('issue-closed', '広報'),
+    ];
+    return run.flatMap((e) => planScene(e, 0, context).bursts.map((b) => b.particles));
+  }
+
+  it('draws the same confetti in a run of events whether the scrolls fly or are walked', () => {
+    const tossed = confettiOf(() => 0);
+    expect(tossed).toHaveLength(2);
+    expect(tossed).toEqual(confettiOf(() => 0.99));
+    expect(tossed).toEqual(confettiOf(undefined));
+  });
+
+  it('draws no number from the confetti source for a toss', () => {
+    const shared = counted(0.5);
+    planScene(event('issue-opened', '経理'), 0, {
+      seats: DEFAULT_SEATS,
+      random: shared.random,
+      tossRandom: () => 0,
+    });
+    expect(shared.draws()).toBe(0);
   });
 });
 
