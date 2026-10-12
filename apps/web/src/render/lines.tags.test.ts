@@ -107,6 +107,21 @@ function momentsOf(director: Director, end: number, from = 0): number[] {
   return [...new Set([...steps, ...edges])].filter((t) => t >= from && t < end);
 }
 
+/** Checks every line of `director` shown from `from` to `end`; how many were checked. */
+function checkLines(director: Director, end: number, from = 0): number {
+  let checked = 0;
+  for (const t of momentsOf(director, end, from)) {
+    const frame = frameAt(director, t, DEFAULT_SEATS);
+    for (const member of frame.members) {
+      const line = frame.lines[member.id];
+      if (line === undefined) continue;
+      expectClear(member, line, t);
+      checked += 1;
+    }
+  }
+  return checked;
+}
+
 function contextFor(toss: number): SceneContext {
   return { seats: DEFAULT_SEATS, random: () => 0.5, tossRandom: () => toss, pickLine: pick };
 }
@@ -174,4 +189,28 @@ describe('the words of the king’s call and level tags', () => {
     }
     expect(checked).toBeGreaterThan(0);
   });
+});
+
+describe('line bubbles and level tags when scenes overlap', () => {
+  const DEPARTMENTS = ['経理', '広報', '企画', '総務'] as const;
+  const COMBINED = DEPARTMENTS.flatMap((label) =>
+    (['issue-opened', 'pr-merged'] as const).flatMap((kind) =>
+      [0, 0.99].map((toss) => ({ label, kind, toss })),
+    ),
+  );
+
+  it.each(COMBINED)(
+    '$kind for $label (toss draw $toss) with a clear at any second of it: no bubble meets a tag',
+    ({ label, kind, toss }) => {
+      const first = scheduleEvent(EMPTY_DIRECTOR, event(kind, label), 0, contextFor(toss));
+      const sceneEnd = Math.max(...first.tracks.map((track) => track.segments.at(-1)?.end ?? 0));
+      let checked = 0;
+      for (let at = 0; at < sceneEnd; at += 1_000) {
+        const both = scheduleEvent(first, event('issue-closed', label), at, contextFor(toss));
+        const end = Math.max(...both.lines.map((said) => said.end));
+        checked += checkLines(both, end, at);
+      }
+      expect(checked).toBeGreaterThan(0);
+    },
+  );
 });
