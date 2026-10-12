@@ -22,6 +22,22 @@ defineProps<{ rows: readonly PartyRow[] }>();
         <span class="member__name">
           {{ row.name }}<small class="member__role">{{ row.role }}</small>
         </span>
+        <span class="member__level" :title="row.level.detail">
+          {{ row.level.label }}
+          <span
+            v-if="row.level.progress !== null"
+            class="member__gauge"
+            role="meter"
+            aria-label="つぎのレベルまで"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-valuenow="Math.round(row.level.progress * 100)"
+            ><span
+              class="member__gauge-fill"
+              :style="{ width: `${row.level.progress * 100}%` }"
+            ></span
+          ></span>
+        </span>
         <span class="member__state">{{ row.stateLabel }}</span>
         <span v-if="row.rewards !== null" class="member__rewards" title="直近 7 日にマージされた PR"
           >成果 {{ row.rewards }}</span
@@ -46,10 +62,10 @@ defineProps<{ rows: readonly PartyRow[] }>();
 
 .member {
   display: grid;
-  grid-template-columns: 1.7em minmax(0, 1fr) auto;
+  grid-template-columns: 1.7em minmax(0, 1fr) auto auto;
   grid-template-areas:
-    'face name rewards'
-    'face state state';
+    'face name level rewards'
+    'face state state state';
   align-items: center;
   column-gap: 0.45em;
   padding: 0.18em 0.35em;
@@ -95,6 +111,33 @@ defineProps<{ rows: readonly PartyRow[] }>();
   grid-area: state;
   font-size: 0.85em;
   font-weight: 700;
+}
+
+.member__level {
+  grid-area: level;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  font-size: 0.75em;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #ffe9a8;
+}
+
+/* A thin bar under 「Lv N」: the way to the next level. Its height adds nothing to the row. */
+.member__gauge {
+  display: block;
+  height: 0.25em;
+  margin-top: 0.1em;
+  border-radius: 0.1em;
+  background: rgb(255 255 255 / 20%);
+  overflow: hidden;
+}
+
+.member__gauge-fill {
+  display: block;
+  height: 100%;
+  background: #ffd75e;
 }
 
 .member__rewards {

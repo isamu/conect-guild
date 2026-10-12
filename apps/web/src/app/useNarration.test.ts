@@ -6,6 +6,7 @@ import { MEMBERS, type MemberId } from '../guild.config';
 import type { PartyRow } from './guildView';
 import type { GuildMessage } from './messageQueue';
 import { NARRATION_INTERVAL_MS } from './narrator';
+import { KING_LEVEL } from './partyLevel';
 import { globalScheduler } from './scheduler';
 import { bindNarration } from './useNarration';
 
@@ -21,6 +22,7 @@ function rows(): PartyRow[] {
     stateLabel: '作業中',
     tooltip: null,
     rewards: null,
+    level: KING_LEVEL,
   }));
 }
 
