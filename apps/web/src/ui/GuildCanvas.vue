@@ -147,6 +147,10 @@ onMounted(() => {
       {
         failed: (error) => {
           globalThis.console.error('the stage could not start', error);
+          // A loop that started but failed halfway (sizing, the first party) is not trusted: it
+          // stops, and the stage counts as failed (its cues are dropped).
+          loop?.stop();
+          loop = null;
         },
         ready: () => {
           emit('ready');
