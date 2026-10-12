@@ -69,15 +69,22 @@ describe('guildSettingsSchema', () => {
     'owner/.',
     '-owner/name',
     'own_er/name',
+    'owner-/name',
+    '-/name',
     'owner/name\n',
   ])('rejects repo %j', (repo) => {
     expect(rejects({ ...settings(), repo })).toBe(true);
   });
 
-  it.each(['o/r', 'my-org/repo.name_2', 'Owner9/.github', 'a/..x'])('accepts repo %j', (repo) => {
-    expect(rejects({ ...settings(), repo })).toBe(false);
-  });
+  it.each(['o/r', 'my-org/repo.name_2', 'Owner9/.github', 'a/..x', 'a-b-c/r', 'a--b/r'])(
+    'accepts repo %j',
+    (repo) => {
+      expect(rejects({ ...settings(), repo })).toBe(false);
+    },
+  );
+});
 
+describe('guildSettingsSchema entries', () => {
   it('rejects unknown keys at the top and in entries', () => {
     expect(rejects({ ...settings(), extra: 1 })).toBe(true);
     const [first, ...rest] = departments();

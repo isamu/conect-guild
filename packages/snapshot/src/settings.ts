@@ -2,10 +2,10 @@ import { z } from 'zod';
 import { GUILD_SETTINGS as RAW_SETTINGS } from '../../../guild.settings.ts';
 
 /**
- * owner/name of a GitHub repository: the owner is letters, digits and hyphens (not starting with a
- * hyphen), the name letters, digits, `.`, `_` and `-` but not `.` or `..` alone.
+ * owner/name of a GitHub repository: the owner is letters, digits and hyphens (not starting or
+ * ending with a hyphen), the name letters, digits, `.`, `_` and `-` but not `.` or `..` alone.
  */
-const REPO_PATTERN = /^[A-Za-z0-9][A-Za-z0-9-]*\/(?!\.{1,2}$)[\w.-]+$/;
+const REPO_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\/(?!\.{1,2}$)[\w.-]+$/;
 
 /**
  * The six member ids. They stay fixed: the sprites (`assets/sprites/<id>.png`), the hands and the
