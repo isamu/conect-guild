@@ -5,7 +5,9 @@ import { inScene, scheduleEvent, sendHome, type Director } from './director';
 import {
   createIdleSeeds,
   homeWalk,
+  idleActivities,
   idlePosesAt,
+  type IdleActivity,
   type IdlePoses,
   type IdleSeeds,
   type IdleSince,
@@ -26,6 +28,11 @@ export interface IdleCrew {
   frame(director: Director, t: number): IdlePoses;
   /** The poses of the long idle spells now, like `frame` but noting nobody active. */
   poses(): IdlePoses;
+  /** What the members in a long idle spell do now, and the wall time of it (murmurs.ts). */
+  activities(): {
+    readonly wall: number;
+    readonly activities: Partial<Record<MemberId, IdleActivity>>;
+  };
   /** New idle times; members whose time changed walk back if they are away. */
   setSince(director: Director, next: IdleSince, t: number): Director;
   /** The cast of a scene about to be scheduled: they walk back if away, and are active now. */
@@ -91,6 +98,10 @@ export function createIdleCrew(options: IdleCrewOptions): IdleCrew {
     },
     poses() {
       return idlePosesAt(current(), seeds, wallNow());
+    },
+    activities() {
+      const wall = wallNow();
+      return { wall, activities: idleActivities(current(), seeds, wall) };
     },
     setSince(director, next, t) {
       const changed = MEMBER_IDS.filter((id) => next[id] !== since[id]);
