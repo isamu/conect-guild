@@ -3,13 +3,14 @@ import type { MemberState } from '../domain/party';
 import type { MemberId } from '../guild.config';
 import type { Random } from './confetti';
 import { AMBIENT } from './metrics';
-import type { MoveFrame, Prop } from './motion';
+import type { HoldFrame, MoveFrame, Prop } from './motion';
 import type { Point } from './path';
 
 /**
  * Small moves while nothing happens, chosen from the party state only (no new data, no new
- * pictures: the four frames, mirroring, a few px of offset and the existing props). Pure: the
- * time and the per-member seed are passed in. Members in a scene get none (director.ts).
+ * pictures: the four frames, the arms-in-front frame for typing, mirroring, a few px of offset and
+ * the existing props). Pure: the time, the per-member seed and whether the member's sheet has the
+ * holding frames are passed in. Members in a scene get none (director.ts).
  */
 
 export type AmbientMood =
@@ -82,8 +83,11 @@ export interface HandProp {
   readonly offset: Point;
 }
 
+/** The standing frames, and the arms-in-front frame for typing (hands.ts). */
+export type AmbientFrame = MoveFrame | Extract<HoldFrame, 5>;
+
 export interface AmbientPose {
-  readonly frame: MoveFrame;
+  readonly frame: AmbientFrame;
   /** True when facing left (side frames only). */
   readonly flip: boolean;
   /** Added to the feet, logical px. */
@@ -119,9 +123,15 @@ function rest(offset: Point = AMBIENT_REST.offset): AmbientPose {
   return { ...AMBIENT_REST, offset };
 }
 
-function deskWork({ index, elapsed }: CycleTime): AmbientPose {
+/**
+ * Typing: the arms go back and forth over the desk (frames 0 and 5 in turn; the head stays put, as
+ * it is at the same place in both), or, on a sheet without the holding frames, an up-and-down bob.
+ */
+function deskWork({ index, elapsed }: CycleTime, withHoldFrames: boolean): AmbientPose {
   if (elapsed < AMBIENT.pageTurnMs) return { ...AMBIENT_REST, frame: 1, flip: index % 2 !== 0 };
-  return rest({ x: 0, y: -AMBIENT.typingBobPx * alternate(elapsed, AMBIENT.typingMs) });
+  const stroke = alternate(elapsed, AMBIENT.typingMs);
+  if (!withHoldFrames) return rest({ x: 0, y: -AMBIENT.typingBobPx * stroke });
+  return { ...AMBIENT_REST, frame: stroke === 0 ? 0 : 5 };
 }
 
 function idle({ index, elapsed }: CycleTime): AmbientPose {
@@ -154,7 +164,9 @@ function fidget({ elapsed }: CycleTime): AmbientPose {
   return rest({ x, y: 0 });
 }
 
-const MOVES: Readonly<Record<AmbientMood, (time: CycleTime) => AmbientPose>> = {
+const MOVES: Readonly<
+  Record<AmbientMood, (time: CycleTime, withHoldFrames: boolean) => AmbientPose>
+> = {
   'desk-work': deskWork,
   idle,
   'tidy-scroll': tidyScroll,
@@ -162,9 +174,17 @@ const MOVES: Readonly<Record<AmbientMood, (time: CycleTime) => AmbientPose>> = {
   fidget,
 };
 
-/** The frame, facing, offset and handled item of a member in `mood` at `now` (ms). */
-export function ambientPose(mood: AmbientMood, seed: AmbientSeed, now: number): AmbientPose {
-  return MOVES[mood](cycleTime(seed, now));
+/**
+ * The frame, facing, offset and handled item of a member in `mood` at `now` (ms). `withHoldFrames`
+ * tells whether the member's sheet has the holding frames (hands.hasHoldFrames).
+ */
+export function ambientPose(
+  mood: AmbientMood,
+  seed: AmbientSeed,
+  now: number,
+  withHoldFrames = false,
+): AmbientPose {
+  return MOVES[mood](cycleTime(seed, now), withHoldFrames);
 }
 
 /**
