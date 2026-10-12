@@ -77,6 +77,7 @@ export function drawAnimatedDecor(
 }
 
 const BUBBLE_GLYPHS: Readonly<Record<BubbleKind, { glyph: string; color: string }>> = {
+  'awaiting-permission': { glyph: '?', color: '#1a56b0' },
   'awaiting-president': { glyph: '!', color: '#b0103a' },
   'awaiting-kaname': { glyph: '…', color: '#222222' },
 };

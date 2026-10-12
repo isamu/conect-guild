@@ -3,16 +3,28 @@ import type { MemberId } from '../guild.config';
 
 /**
  * Small bubbles over the seats for members who are waiting on someone (docs/DESIGN.md 4.6).
+ * The state is already the one that wins by the order of 4.6 (domain/party.ts), so a member whose
+ * session waits for a permission (live, 4.7) shows that bubble even with PRs waiting.
  * The king's 承認まち bubble stays in HTML (ui/KingBubble.vue), so the canvas draws none for him.
  */
 
-export type BubbleKind = 'awaiting-president' | 'awaiting-kaname';
+export type BubbleKind = 'awaiting-permission' | 'awaiting-president' | 'awaiting-kaname';
 
 export type Bubbles = Readonly<Partial<Record<MemberId, BubbleKind>>>;
 
+const BUBBLE_STATES: ReadonlySet<MemberState> = new Set<BubbleKind>([
+  'awaiting-permission',
+  'awaiting-president',
+  'awaiting-kaname',
+]);
+
+function isBubbleKind(state: MemberState): state is BubbleKind {
+  return BUBBLE_STATES.has(state);
+}
+
 export function bubbleFor(id: MemberId, state: MemberState): BubbleKind | null {
   if (id === 'yukihiro') return null;
-  return state === 'awaiting-president' || state === 'awaiting-kaname' ? state : null;
+  return isBubbleKind(state) ? state : null;
 }
 
 export function bubblesOf(rows: readonly { id: MemberId; state: MemberState }[]): Bubbles {
