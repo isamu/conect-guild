@@ -151,8 +151,8 @@ const GROUND_FILLS: readonly GroundFill[] = [
   { tile: 'floor', ...rect(0, 0, MAP_COLS, MAP_ROWS) },
   { tile: 'floor-carpet', ...rect(10, 3, 4, 4) },
   { tile: 'floor-carpet', ...rect(19, 3, 4, 4) },
-  { tile: 'floor-carpet', ...rect(1, 11, 11, 3) },
-  { tile: 'floor-carpet', ...rect(21, 11, 9, 3) },
+  { tile: 'floor-carpet', ...rect(1, 11, 12, 3) },
+  { tile: 'floor-carpet', ...rect(20, 11, 10, 3) },
   { tile: 'rug-red', ...rect(15, 5, 3, 3) },
   { tile: 'rug-red', ...rect(13, 10, 7, 3) },
   { tile: 'wall', ...rect(0, 1, MAP_COLS, 2) },
@@ -172,8 +172,9 @@ const flat = (tile: TileName, area: TileRect): MapObject => ({ tile, solid: fals
  * assets/concept/rpg-company-ui.png within what the HTML windows leave free: the throne at the back
  * centre, かなめ's counter (left + middles + right) in front of it, a department in each corner and
  * the door at the bottom right. The upper departments sit between the quest board and the party
- * window; the lower ones just above the message window. Chairs (the seats) are not solid, so members
- * walk on them; the door is only decoration (nobody leaves the room). Windows and the door have see-through parts, so they go over the
+ * window; the lower ones just above the message window. Every member sits on the chair right behind
+ * their desk (the chair's lower cell is the seat), so the desk is in front of them. Chairs are not
+ * solid, so members walk on them; the door is only decoration (nobody leaves the room). Windows and the door have see-through parts, so they go over the
  * wall and floor, not instead.
  */
 export const MAP_OBJECTS: readonly MapObject[] = [
@@ -185,20 +186,20 @@ export const MAP_OBJECTS: readonly MapObject[] = [
   solid('counter-mid', rect(14, 8, 5, 2)),
   solid('counter-right', rect(19, 8, 1, 2)),
   flat('door', rect(30, 14, 2, 3)),
-  // 経理 (upper left): the member behind the desk
+  // 経理 (upper left): the member on the chair right behind the desk, facing it
   flat('chair', rect(12, 3, 1, 2)),
   solid('desk', rect(10, 5, 4, 2)),
   // 広報 (upper right)
   flat('chair', rect(20, 3, 1, 2)),
   solid('desk', rect(19, 5, 4, 2)),
   solid('plant', rect(22, 7, 1, 1)),
-  // 企画 (lower left): the member beside the desk, in front of the message window
+  // 企画 (lower left): behind the desk too, clear of the quest board above
   solid('shelf', rect(1, 10, 2, 3)),
-  solid('desk', rect(7, 11, 4, 2)),
-  flat('chair', rect(11, 12, 1, 2)),
-  // 総務 (lower right)
-  flat('chair', rect(21, 12, 1, 2)),
-  solid('desk', rect(22, 11, 4, 2)),
+  flat('chair', rect(11, 9, 1, 2)),
+  solid('desk', rect(9, 11, 4, 2)),
+  // 総務 (lower right), mirroring 企画 around the counter
+  flat('chair', rect(21, 9, 1, 2)),
+  solid('desk', rect(20, 11, 4, 2)),
   // the bottom-left corner, left of the message window
   solid('crate', rect(2, 14, 1, 1)),
 ];

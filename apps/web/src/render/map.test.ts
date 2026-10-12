@@ -137,6 +137,30 @@ describe('map: places and seats', () => {
   });
 });
 
+describe('map: seats behind the desks', () => {
+  it.each(DEPARTMENT_MEMBERS)('seats %s on a chair’s lower cell, right behind a desk', (id) => {
+    const seat = MEMBERS[id].seat;
+    const chair = MAP_OBJECTS.find((o) => o.tile === 'chair' && contains(o, seat));
+    expect(chair).toBeDefined();
+    expect(seat.row).toBe((chair?.row ?? Number.NaN) + (chair?.h ?? 0) - 1);
+    const below = { col: seat.col, row: seat.row + 1 };
+    const desk = MAP_OBJECTS.find((o) => o.tile === 'desk' && contains(o, below));
+    expect(desk?.row).toBe(below.row);
+    // Not at the desk's end: the desk reaches past the member on both sides.
+    if (desk === undefined) return;
+    expect(seat.col).toBeGreaterThan(desk.col);
+    expect(seat.col).toBeLessThan(desk.col + desk.w - 1);
+  });
+
+  it('gives every chair a member', () => {
+    const chairs = MAP_OBJECTS.filter((o) => o.tile === 'chair');
+    expect(chairs).toHaveLength(DEPARTMENT_MEMBERS.length);
+    for (const chair of chairs) {
+      expect(DEPARTMENT_MEMBERS.some((id) => contains(chair, MEMBERS[id].seat))).toBe(true);
+    }
+  });
+});
+
 describe('map: かなめ’s counter', () => {
   it('builds one counter of left, middle and right pieces, 7 to 9 tiles wide', () => {
     const pieces = MAP_OBJECTS.filter((o) => o.tile.startsWith('counter-'));

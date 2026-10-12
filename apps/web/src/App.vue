@@ -7,14 +7,24 @@ import MessageWindow from './ui/MessageWindow.vue';
 import PartyStatus from './ui/PartyStatus.vue';
 import QuestBoard from './ui/QuestBoard.vue';
 
-const { state, board, party, king, fetchStatus, message, cue, nextMessage, clearBaseline } =
-  useGuild();
+const {
+  state,
+  board,
+  party,
+  king,
+  fetchStatus,
+  message,
+  cue,
+  nextMessage,
+  clearBaseline,
+  setStageShown,
+} = useGuild();
 </script>
 
 <template>
   <main class="guild">
     <div class="stage" :class="{ 'stage--halted': state.halted }">
-      <GuildCanvas class="stage__art" :party="party" :cue="cue" />
+      <GuildCanvas class="stage__art" :party="party" :cue="cue" @stage-shown="setStageShown" />
       <section v-if="state.halted" class="rpg-window stage__halt" role="alert">
         <h2 class="rpg-window__title">収集スクリプトを更新してください</h2>
         <p>snapshot.json の形（schemaVersion）が画面の想定と違うため、表示を止めています。</p>

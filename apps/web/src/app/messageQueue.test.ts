@@ -170,3 +170,124 @@ describe('messageQueue: hidden page', () => {
     queue.dispose();
   });
 });
+
+describe('messageQueue: the ▼ button', () => {
+  const handovers = [event('issue-opened', '企画', 1), event('pr-merged', '広報', 2)];
+  const sceneMs = scheduleEvent(EMPTY_DIRECTOR, event('issue-opened', '企画', 1), 0, context)
+    .busyUntil.kaname;
+
+  it('keeps the press until the next scene can start', async () => {
+    const { queue, shown } = setup();
+    queue.push(handovers.map((e) => entry(e)));
+    await vi.advanceTimersByTimeAsync(1_000);
+    queue.next();
+    expect(shown).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync((sceneMs ?? 0) - 1_000 - 1);
+    expect(shown).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(shown.map((s) => s.at - T0)).toEqual([0, sceneMs]);
+    queue.dispose();
+  });
+
+  it('skips the rest of the hold at once when nobody has to wait', () => {
+    const { queue, shown } = setup();
+    queue.push([entry(handovers[0] ?? null), entry(event('issue-closed', '経理', 3))]);
+    queue.next();
+    expect(shown.map((s) => s.at - T0)).toEqual([0, 0]);
+    queue.dispose();
+  });
+
+  it('closes the last message at once, even while its scene plays', () => {
+    const published: (readonly GuildMessage[])[] = [];
+    const queue = createMessageQueue({
+      scheduler: globalScheduler,
+      now: Date.now,
+      holdMs: HOLD_MS,
+      publish: (messages) => published.push(messages),
+    });
+    queue.push([entry(handovers[0] ?? null)]);
+    queue.next();
+    expect(published.at(-1)).toEqual([]);
+    queue.dispose();
+  });
+});
+
+describe('messageQueue: canvas out of sight (narrow screens)', () => {
+  const run = [
+    event('issue-opened', '企画', 1),
+    event('pr-merged', '広報', 2),
+    event('issue-opened', null, 3),
+  ];
+
+  it('moves on every 8 seconds, as nobody sees the scenes', async () => {
+    const { queue, shown } = setup();
+    queue.setStageShown(false);
+    queue.push(run.map((e) => entry(e)));
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(shown.map((s) => s.at - T0)).toEqual([0, HOLD_MS, HOLD_MS * 2]);
+    queue.dispose();
+  });
+
+  it('stops waiting for a scene once the canvas goes out of sight', async () => {
+    const { queue, shown } = setup();
+    queue.push(run.map((e) => entry(e)));
+    await vi.advanceTimersByTimeAsync(2_000);
+    queue.setStageShown(false);
+    await vi.advanceTimersByTimeAsync(HOLD_MS - 2_000);
+    expect(shown.map((s) => s.at - T0)).toEqual([0, HOLD_MS]);
+    queue.dispose();
+  });
+
+  it('does not wait for scenes dropped while out of sight once it is back', async () => {
+    const { queue, shown } = setup();
+    queue.setStageShown(false);
+    queue.push(run.map((e) => entry(e)));
+    await vi.advanceTimersByTimeAsync(1_000);
+    queue.setStageShown(true);
+    // The head's scene was dropped, so the next one only waits for the hold.
+    await vi.advanceTimersByTimeAsync(HOLD_MS - 1_000);
+    expect(shown.map((s) => s.at - T0)).toEqual([0, HOLD_MS]);
+    // Its own scene plays (the canvas is back), so the third waits for かなめ again.
+    await vi.advanceTimersByTimeAsync(HOLD_MS);
+    expect(shown).toHaveLength(2);
+    queue.dispose();
+  });
+});
+
+describe('messageQueue: a message that arrives later', () => {
+  it('counts the hold from when the head showed, not from when the next one arrived', async () => {
+    const { queue, shown } = setup();
+    queue.push([entry(null, 'a')]);
+    await vi.advanceTimersByTimeAsync(20_000);
+    queue.push([entry(null, 'b')]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(shown.map((s) => s.at - T0)).toEqual([0, 20_000]);
+    queue.dispose();
+  });
+
+  it('still keeps the rest of the hold when the next one arrives early', async () => {
+    const { queue, shown } = setup();
+    queue.push([entry(null, 'a')]);
+    await vi.advanceTimersByTimeAsync(3_000);
+    queue.push([entry(null, 'b')]);
+    await vi.advanceTimersByTimeAsync(HOLD_MS);
+    expect(shown.map((s) => s.at - T0)).toEqual([0, HOLD_MS]);
+    queue.dispose();
+  });
+});
+
+describe('messageQueue: halted screen', () => {
+  it('lets the scenes go on while halted, as the canvas does, and waits for them after', async () => {
+    const { queue, shown } = setup();
+    const opened = event('issue-opened', '企画', 1);
+    const sceneMs = scheduleEvent(EMPTY_DIRECTOR, opened, 0, context).busyUntil.kaname ?? 0;
+    queue.push([entry(opened), entry(event('pr-merged', '広報', 2))]);
+    queue.pause();
+    await vi.advanceTimersByTimeAsync(1_000);
+    queue.resume();
+    // The hold starts over at 1 s; かなめ is back at sceneMs (the scene did not stop).
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(shown.map((s) => s.at - T0)).toEqual([0, Math.max(1_000 + HOLD_MS, sceneMs)]);
+    queue.dispose();
+  });
+});

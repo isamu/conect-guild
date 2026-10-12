@@ -4,6 +4,7 @@ import { ambientPose, type AmbientMoods, type AmbientSeeds, type HandProp } from
 import { burstOrigin, confettiAt, CONFETTI_MS, type PlacedParticle } from './confetti';
 import { poseOnSegment, standingPose, type Pose } from './motion';
 import type { Point } from './path';
+import { seatedPoint } from './seating';
 import { castOf, planScene, type Burst, type SceneContext, type Track } from './scenes';
 
 /**
@@ -32,7 +33,13 @@ export const EMPTY_DIRECTOR: Director = { tracks: [], bursts: [], busyUntil: {} 
 
 export interface MemberPose {
   readonly id: MemberId;
+  /** Drawn here: on a seat the point is sunk into it (seating.ts). */
   readonly pose: Pose;
+  /**
+   * The y of the feet on the tile, before sinking and ambient offsets: members and the furniture in
+   * front of them (layers.ts) are drawn back to front by it.
+   */
+  readonly depth: number;
   /** An item the member handles at their seat (ambient), placed from the feet; null otherwise. */
   readonly hand: HandProp | null;
 }
@@ -49,7 +56,7 @@ export interface ConfettiView {
 }
 
 export interface StageFrame {
-  /** Every member, back to front (by the y of their feet). */
+  /** Every member, back to front (by `depth`). */
   readonly members: readonly MemberPose[];
   readonly confetti: readonly ConfettiView[];
 }
@@ -122,7 +129,7 @@ function withAmbient(
   const move = ambientPose(mood, ambient.seeds[member.id], now);
   const { point } = member.pose;
   return {
-    id: member.id,
+    ...member,
     pose: {
       ...member.pose,
       point: { x: point.x + move.offset.x, y: point.y + move.offset.y },
@@ -139,18 +146,22 @@ export function frameAt(
   seats: Readonly<Record<MemberId, TilePos>>,
   ambient?: AmbientContext,
 ): StageFrame {
-  // Ordered by the seat before the ambient offsets, so a bob never swaps who is in front.
-  const members = MEMBER_IDS.map((id): MemberPose => ({
-    id,
-    pose: poseAt(director, id, now, seats[id]),
-    hand: null,
-  }))
-    .sort((a, b) => a.pose.point.y - b.pose.point.y)
+  // Ordered by the tile before sinking and the ambient offsets, so a bob never swaps who is in front.
+  const members = MEMBER_IDS.map((id): MemberPose => {
+    const pose = poseAt(director, id, now, seats[id]);
+    return {
+      id,
+      pose: { ...pose, point: seatedPoint(pose.point) },
+      depth: pose.point.y,
+      hand: null,
+    };
+  })
+    .sort((a, b) => a.depth - b.depth)
     .map((member) => withAmbient(director, member, now, ambient));
   // Over the seat, even while the member walks to the counter and back.
   const confetti = director.bursts
     .map((burst): ConfettiView => ({
-      origin: burstOrigin(standingPose(seats[burst.actor]).point),
+      origin: burstOrigin(seatedPoint(standingPose(seats[burst.actor]).point)),
       particles: confettiAt(burst.particles, now - burst.start),
     }))
     .filter((view) => view.particles.length > 0);

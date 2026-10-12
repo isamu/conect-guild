@@ -3,7 +3,7 @@ import type { MemberState } from '../domain/party';
 import type { MemberId } from '../guild.config';
 import type { Random } from './confetti';
 import { AMBIENT } from './metrics';
-import type { Prop, SpriteFrame } from './motion';
+import type { MoveFrame, Prop } from './motion';
 import type { Point } from './path';
 
 /**
@@ -78,7 +78,7 @@ export interface HandProp {
 }
 
 export interface AmbientPose {
-  readonly frame: SpriteFrame;
+  readonly frame: MoveFrame;
   /** True when facing left (side frames only). */
   readonly flip: boolean;
   /** Added to the feet, logical px. */

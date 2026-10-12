@@ -5,6 +5,7 @@ import minoriUrl from '../../../../assets/sprites/minori.png';
 import sasaeUrl from '../../../../assets/sprites/sasae.png';
 import yukihiroUrl from '../../../../assets/sprites/yukihiro.png';
 import decorUrl from '../../../../assets/decor/decor.png';
+import propsUrl from '../../../../assets/props/props.png';
 import tilesetUrl from '../../../../assets/tiles/tileset.png';
 import type { MemberId } from '../guild.config';
 import {
@@ -15,14 +16,15 @@ import {
   type SpriteArt,
   type TileArt,
 } from './art';
-import { createDecorArt, decorProps } from './decorArt';
+import { chooseProps, createDecorArt, decorProps, sheetProps } from './decorArt';
 import { createSpriteArt } from './spriteArt';
 import { createTileArt } from './tileArt';
 
 /**
  * Loads the pictures (bundled by Vite from assets/, never from another origin) and builds the art.
  * When a picture cannot be loaded, its part (tiles, members or the small things) falls back to the
- * placeholder boxes, so the stage still shows. Held items use the small things' pictures.
+ * placeholder boxes, so the stage still shows. Held items use their own pictures (props.png), then
+ * the small things' pictures, then the placeholder boxes.
  */
 
 const SPRITE_URLS: Readonly<Record<MemberId, string>> = {
@@ -75,8 +77,27 @@ async function loadDecor(): Promise<DecorArt | null> {
   }
 }
 
+async function loadProps(): Promise<SpriteArt['drawProp'] | null> {
+  try {
+    return sheetProps(await loadImage(propsUrl));
+  } catch {
+    return null;
+  }
+}
+
 export async function loadArt(): Promise<GuildArt> {
-  const [tiles, sprites, decor] = await Promise.all([loadTiles(), loadSprites(), loadDecor()]);
-  if (decor === null) return { tiles, sprites, decor: placeholderArt.decor };
-  return { tiles, sprites: { ...sprites, drawProp: decorProps(decor) }, decor };
+  const [tiles, sprites, decor, props] = await Promise.all([
+    loadTiles(),
+    loadSprites(),
+    loadDecor(),
+    loadProps(),
+  ]);
+  return {
+    tiles,
+    sprites: {
+      ...sprites,
+      drawProp: chooseProps(props, decor === null ? null : decorProps(decor)),
+    },
+    decor: decor ?? placeholderArt.decor,
+  };
 }

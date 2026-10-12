@@ -48,6 +48,9 @@ export function useGuild(options: GuildStoreOptions = {}) {
     nextMessage: () => {
       store.nextMessage();
     },
+    setStageShown: (shown: boolean) => {
+      store.setStageShown(shown);
+    },
     clearBaseline: () => {
       store.clearBaseline();
     },

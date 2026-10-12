@@ -1,12 +1,16 @@
-"""Cut the codex-generated sprite sheet into one strip of four square frames per member.
+"""Cut the two codex-generated sprite sheets into one strip of seven square frames per member.
 
-Input: a 1024x1536 sheet of 4 columns x 6 rows on a magenta (#ff00ff) background (see prompt.txt).
-Default input is source-sheet.png next to this script; default output directory is this script's.
-Output: <out_dir>/<memberId>.png, four FRAME x FRAME frames (80x80, so 320x80) side by side
-(0 = front idle, 1 = facing right, 2 = walk right 1, 3 = walk right 2), transparent background,
+Inputs, both 6 rows (one member each) on a magenta (#ff00ff) background:
+- source-sheet.png, 1024x1536, 4 columns (see prompt.txt): frames 0-3
+- source-sheet-poses.png, 768x1536, 3 columns (see prompt-poses.txt): frames 4-6
+Default inputs sit next to this script; default output directory is this script's.
+Output: <out_dir>/<memberId>.png, seven FRAME x FRAME frames (80x80, so 560x80) side by side
+(0 = front idle, 1 = facing right, 2 = walk right 1, 3 = walk right 2, 4 = front, both hands up,
+5 = front, carrying in both arms, 6 = facing right, carrying in both arms), transparent background,
 feet on the bottom edge, centred horizontally. Optionally a 2x preview of all frames.
 
-Usage: python build_sprites.py [--sheet <sheet.png>] [--out <out_dir>] [--preview <preview.png>]
+Usage: python build_sprites.py [--sheet <sheet.png>] [--poses <poses.png>] [--out <out_dir>]
+       [--preview <preview.png>]
 Needs Pillow only. Not a project dependency; run it from a throwaway venv.
 """
 
@@ -17,12 +21,16 @@ from pathlib import Path
 from PIL import Image, ImageChops, ImageFilter
 
 MEMBERS = ["kaname", "minori", "hibiki", "hirame", "sasae", "yukihiro"]
-COLS = 4
 SHEET_SIZE = (1024, 1536)
+SHEET_COLS = 4
+POSES_SIZE = (768, 1536)
+POSES_COLS = 3
+FRAMES = SHEET_COLS + POSES_COLS
 HERE = Path(__file__).resolve().parent
 # Frame size in pixels. Change it here only; everything else derives from it.
 FRAME = 80
-# Leave a 1px margin on top and both sides so outlines are never clipped.
+# The scale leaves a 1px margin on top and both sides of the main sheet's frames. The poses
+# (hands up) may use that margin, but nothing may be cut off: they must fit in FRAME x FRAME.
 MAX_H = FRAME - 1
 MAX_W = FRAME - 2
 ALPHA_CUTOFF = 0.5
@@ -41,14 +49,66 @@ def threshold(channel, test):
     return channel.point(lambda v: 255 if test(v) else 0)
 
 
-def cut_cells(sheet):
-    cell_w = sheet.width // COLS
-    cell_h = sheet.height // len(MEMBERS)
-    for row in range(len(MEMBERS)):
-        yield [
-            sheet.crop((col * cell_w, row * cell_h, (col + 1) * cell_w, (row + 1) * cell_h))
-            for col in range(COLS)
-        ]
+def row_bounds(alpha):
+    """Split the sheet between the member rows: on the grid line when it lies in the empty gap
+    between two rows, otherwise in the middle of that gap.
+
+    The generator does not always keep characters inside their grid cells (hair or a crown can
+    cross the line), so the gaps are found from the picture. Staying on the grid line whenever it
+    is clear keeps the frames of a sheet that does respect the grid exactly as before.
+    """
+    filled = [alpha.crop((0, y, alpha.width, y + 1)).getbbox() is not None for y in range(alpha.height)]
+    bands = []
+    for y, on in enumerate(filled):
+        if on and (y == 0 or not filled[y - 1]):
+            bands.append([y, y + 1])
+        elif on:
+            bands[-1][1] = y + 1
+    if len(bands) != len(MEMBERS):
+        return None
+    cell_h = alpha.height // len(MEMBERS)
+    cuts = [
+        grid if above[1] <= grid <= below[0] else (above[1] + below[0]) // 2
+        for grid, above, below in zip(range(cell_h, alpha.height, cell_h), bands, bands[1:])
+    ]
+    return list(zip([0, *cuts], [*cuts, alpha.height]))
+
+
+def load_cells(path, size, cols):
+    """Key the sheet and cut it into rows x cols cells, refusing anything that is not as expected."""
+    sheet = Image.open(path).convert("RGB")
+    if sheet.size != size:
+        sys.exit(f"{path}: expected {size[0]}x{size[1]}, got {sheet.width}x{sheet.height}")
+    bounds = row_bounds(keyed(sheet).getchannel("A"))
+    if bounds is None:
+        sys.exit(f"{path}: expected {len(MEMBERS)} rows of characters separated by background")
+    cell_w = sheet.width // cols
+    rows = [
+        [keyed(sheet.crop((c * cell_w, top, (c + 1) * cell_w, bottom))) for c in range(cols)]
+        for top, bottom in bounds
+    ]
+    boxes = [[cell.getchannel("A").getbbox() for cell in row] for row in rows]
+    empty = [f"{MEMBERS[r]} frame {c}" for r, row in enumerate(boxes) for c, box in enumerate(row) if box is None]
+    if empty:
+        sys.exit(f"{path}: no character found in " + ", ".join(empty))
+    # The cell outline should be almost all background; otherwise the key colour is not magenta.
+    off_key = [
+        f"{MEMBERS[r]} frame {c}"
+        for r, row in enumerate(rows)
+        for c, cell in enumerate(row)
+        if outline_background_ratio(cell) < MIN_OUTLINE_BACKGROUND
+    ]
+    if off_key:
+        sys.exit(f"{path}: background is not magenta in " + ", ".join(off_key))
+    return rows, boxes
+
+
+def height(box):
+    return box[3] - box[1]
+
+
+def width(box):
+    return box[2] - box[0]
 
 
 def all_of(*masks):
@@ -109,41 +169,43 @@ def shrink(rgba, size):
     return crisp
 
 
-def build(sheet_path, out_dir, preview_path=None):
+def build(sheet_path, poses_path, out_dir, preview_path=None):
+    inputs = {sheet_path.resolve(), poses_path.resolve()}
     sprite_paths = {(out_dir / f"{m}.png").resolve() for m in MEMBERS}
-    if sheet_path.resolve() in sprite_paths:
-        sys.exit(f"{sheet_path}: a sprite would overwrite the input sheet")
-    if preview_path and preview_path.resolve() in sprite_paths | {sheet_path.resolve()}:
-        sys.exit(f"{preview_path}: the preview would overwrite a sprite or the input sheet")
-    sheet = Image.open(sheet_path).convert("RGB")
-    if sheet.size != SHEET_SIZE:
-        sys.exit(f"{sheet_path}: expected {SHEET_SIZE[0]}x{SHEET_SIZE[1]}, got {sheet.width}x{sheet.height}")
-    rows = [[keyed(cell) for cell in row] for row in cut_cells(sheet)]
-    # One scale for every frame of every member so all six stand at the same size.
-    boxes = [[cell.getchannel("A").getbbox() for cell in row] for row in rows]
-    empty = [f"{MEMBERS[r]} frame {c}" for r, row in enumerate(boxes) for c, box in enumerate(row) if box is None]
-    if empty:
-        sys.exit(f"{sheet_path}: no character found in " + ", ".join(empty))
-    # The cell outline should be almost all background; otherwise the key colour is not magenta.
-    off_key = [
-        f"{MEMBERS[r]} frame {c}"
-        for r, row in enumerate(rows)
-        for c, cell in enumerate(row)
-        if outline_background_ratio(cell) < MIN_OUTLINE_BACKGROUND
+    if inputs & sprite_paths:
+        sys.exit(f"{out_dir}: a sprite would overwrite an input sheet")
+    if preview_path and preview_path.resolve() in sprite_paths | inputs:
+        sys.exit(f"{preview_path}: the preview would overwrite a sprite or an input sheet")
+    rows, boxes = load_cells(sheet_path, SHEET_SIZE, SHEET_COLS)
+    pose_rows, pose_boxes = load_cells(poses_path, POSES_SIZE, POSES_COLS)
+    # One scale for every frame of the main sheet so all six stand at the same size.
+    scale = min(MAX_H / max(height(b) for row in boxes for b in row), MAX_W / max(width(b) for row in boxes for b in row))
+    # The poses sheet was drawn at its own size. Match each member's standing front pose
+    # (pose 5, carrying) to their idle front pose (frame 0) so frames 0-3 stay exactly as they were.
+    scales = [
+        [scale] * SHEET_COLS + [scale * height(row[0]) / height(pose_row[1])] * POSES_COLS
+        for row, pose_row in zip(boxes, pose_boxes)
     ]
-    if off_key:
-        sys.exit(f"{sheet_path}: background is not magenta in " + ", ".join(off_key))
-    tallest = max(box[3] - box[1] for row in boxes for box in row)
-    widest = max(box[2] - box[0] for row in boxes for box in row)
-    scale = min(MAX_H / tallest, MAX_W / widest)
+    cells = [row + pose_row for row, pose_row in zip(rows, pose_rows)]
+    all_boxes = [row + pose_row for row, pose_row in zip(boxes, pose_boxes)]
+    sizes = [
+        [(max(1, round(width(b) * s)), max(1, round(height(b) * s))) for b, s in zip(row, row_scales)]
+        for row, row_scales in zip(all_boxes, scales)
+    ]
+    too_big = [
+        f"{MEMBERS[r]} frame {c} ({w}x{h})"
+        for r, row in enumerate(sizes)
+        for c, (w, h) in enumerate(row)
+        if w > FRAME or h > FRAME
+    ]
+    if too_big:
+        sys.exit(f"does not fit in {FRAME}x{FRAME} without changing the scale: " + ", ".join(too_big))
 
     out_dir.mkdir(parents=True, exist_ok=True)
     strips = []
-    for member, row, row_boxes in zip(MEMBERS, rows, boxes):
-        strip = Image.new("RGBA", (FRAME * COLS, FRAME), (0, 0, 0, 0))
-        for col, (cell, box) in enumerate(zip(row, row_boxes)):
-            w = max(1, round((box[2] - box[0]) * scale))
-            h = max(1, round((box[3] - box[1]) * scale))
+    for member, row, row_boxes, row_sizes in zip(MEMBERS, cells, all_boxes, sizes):
+        strip = Image.new("RGBA", (FRAME * FRAMES, FRAME), (0, 0, 0, 0))
+        for col, (cell, box, (w, h)) in enumerate(zip(row, row_boxes, row_sizes)):
             sprite = shrink(cell.crop(box), (w, h))
             strip.paste(sprite, (col * FRAME + (FRAME - w) // 2, FRAME - h), sprite)
         strip.save(out_dir / f"{member}.png", optimize=True)
@@ -151,7 +213,7 @@ def build(sheet_path, out_dir, preview_path=None):
 
     if preview_path:
         preview_path.parent.mkdir(parents=True, exist_ok=True)
-        preview = Image.new("RGBA", (FRAME * COLS, FRAME * len(MEMBERS)), (60, 60, 70, 255))
+        preview = Image.new("RGBA", (FRAME * FRAMES, FRAME * len(MEMBERS)), (60, 60, 70, 255))
         for i, strip in enumerate(strips):
             preview.paste(strip, (0, i * FRAME), strip)
         preview.resize(
@@ -162,7 +224,8 @@ def build(sheet_path, out_dir, preview_path=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--sheet", type=Path, default=HERE / "source-sheet.png")
+    parser.add_argument("--poses", type=Path, default=HERE / "source-sheet-poses.png")
     parser.add_argument("--out", type=Path, default=HERE)
     parser.add_argument("--preview", type=Path)
     args = parser.parse_args()
-    build(args.sheet, args.out, args.preview)
+    build(args.sheet, args.poses, args.out, args.preview)

@@ -16,10 +16,11 @@ import {
   type Director,
 } from './director';
 import { PLACES } from './map';
-import { OVERHEAD_OFFSET, TILE_SIZE } from './metrics';
-import { MS_PER_TILE, standingPose } from './motion';
+import { OVERHEAD_OFFSET, SEATING, TILE_SIZE } from './metrics';
+import { MS_PER_TILE, standingPose, type Pose } from './motion';
 import { tileToPoint } from './path';
 import { DEFAULT_SEATS, PICK_UP_MS } from './scenes';
+import { seatedPoint } from './seating';
 
 const context = { seats: DEFAULT_SEATS, random: () => 0.5 };
 
@@ -36,6 +37,10 @@ function event(kind: GuildEventKind, department: DepartmentLabel | null, number 
   return { id: `${kind}#${String(number)}`, kind, number, department };
 }
 
+/** A pose as frameAt draws it: sunk into the seat when on one. */
+const seated = (pose: Pose): Pose => ({ ...pose, point: seatedPoint(pose.point) });
+const atSeat = (id: MemberId): Pose => seated(standingPose(DEFAULT_SEATS[id]));
+
 function play(director: Director, e: GuildEvent, now: number): Director {
   return scheduleEvent(director, e, now, context);
 }
@@ -44,13 +49,21 @@ describe('director: idle stage', () => {
   it('stands everybody at their seat', () => {
     const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS);
     expect(frame.members).toHaveLength(6);
-    for (const { id, pose } of frame.members) expect(pose).toEqual(standingPose(DEFAULT_SEATS[id]));
+    for (const { id, pose } of frame.members) expect(pose).toEqual(atSeat(id));
     expect(frame.confetti).toEqual([]);
   });
 
-  it('orders members back to front', () => {
-    const ys = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS).members.map((m) => m.pose.point.y);
-    expect(ys).toEqual([...ys].sort((a, b) => a - b));
+  it('orders members back to front by the feet on their tile, before sinking', () => {
+    const { members } = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS);
+    const depths = members.map((m) => m.depth);
+    expect(depths).toEqual([...depths].sort((a, b) => a - b));
+    for (const m of members) expect(m.depth).toBe(tileToPoint(DEFAULT_SEATS[m.id]).y);
+  });
+
+  it('sinks every member into their seat', () => {
+    for (const m of frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS).members) {
+      expect(m.pose.point.y).toBeGreaterThan(m.depth);
+    }
   });
 
   it('is not animating', () => {
@@ -140,6 +153,24 @@ describe('director: nobody teleports through a run of events', () => {
     }
   });
 
+  it('sits down and stands up smoothly too (the drawn point never jumps)', () => {
+    const deepest = Math.max(...Object.values(SEATING));
+    const maxDrawnStepPx = ((TILE_SIZE + deepest) * STEP_MS) / MS_PER_TILE + 1e-9;
+    const drawnAt = (t: number) =>
+      new Map(frameAt(director, t, DEFAULT_SEATS).members.map((m) => [m.id, m.pose.point]));
+    let previous = drawnAt(0);
+    for (let t = STEP_MS; t <= end + STEP_MS; t += STEP_MS) {
+      const now = drawnAt(t);
+      for (const id of MEMBER_IDS) {
+        const a = previous.get(id);
+        const b = now.get(id);
+        if (a === undefined || b === undefined) throw new Error('member missing');
+        expect(Math.hypot(b.x - a.x, b.y - a.y)).toBeLessThanOrEqual(maxDrawnStepPx);
+      }
+      previous = now;
+    }
+  });
+
   it('never gives かなめ two scenes at once', () => {
     const parts = director.tracks.filter((t) => t.actor === 'kaname');
     expect(parts).toHaveLength(7);
@@ -189,7 +220,7 @@ describe('director: confetti', () => {
     const director = play(EMPTY_DIRECTOR, event('issue-closed', '企画'), 0);
     const frame = frameAt(director, 100, DEFAULT_SEATS);
     expect(frame.confetti).toHaveLength(1);
-    const seat = tileToPoint(DEFAULT_SEATS.hirame);
+    const seat = seatedPoint(tileToPoint(DEFAULT_SEATS.hirame));
     expect(frame.confetti[0]?.origin).toEqual({ x: seat.x, y: seat.y - OVERHEAD_OFFSET });
   });
 
@@ -201,7 +232,7 @@ describe('director: confetti', () => {
     );
     const director = play(out, event('issue-closed', '企画'), atCounter);
     const frame = frameAt(director, atCounter + 1, DEFAULT_SEATS);
-    const seat = tileToPoint(DEFAULT_SEATS.hirame);
+    const seat = seatedPoint(tileToPoint(DEFAULT_SEATS.hirame));
     expect(frame.confetti[0]?.origin).toEqual({ x: seat.x, y: seat.y - OVERHEAD_OFFSET });
   });
 
@@ -217,7 +248,8 @@ describe('director: animating and pruning', () => {
     event('issue-closed', '広報'),
     0,
   );
-  const end = director.busyUntil.minori ?? 0;
+  // The later of the two: みのり walking back, or かなめ holding the chest up.
+  const end = Math.max(director.busyUntil.minori ?? 0, director.busyUntil.kaname ?? 0);
 
   it('animates until the last track and burst are over', () => {
     expect(isAnimating(director, 0)).toBe(true);
@@ -234,7 +266,7 @@ describe('director: animating and pruning', () => {
     const middle = prune(director, CONFETTI_MS);
     expect(middle.bursts).toEqual([]);
     expect(middle.tracks.map((t) => t.actor)).toEqual(['minori', 'kaname']);
-    expect(middle.busyUntil).toEqual({ minori: end, kaname: director.busyUntil.kaname });
+    expect(middle.busyUntil).toEqual(director.busyUntil);
     expect(prune(director, end)).toEqual(EMPTY_DIRECTOR);
   });
 });
@@ -252,7 +284,7 @@ describe('director: ambient moves', () => {
   it('applies the move to members at their seats', () => {
     const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS, ambient);
     const move = ambientPose('fidget', seeds.yukihiro, 0);
-    const seat = tileToPoint(DEFAULT_SEATS.yukihiro);
+    const seat = seatedPoint(tileToPoint(DEFAULT_SEATS.yukihiro));
     expect(member(frame, 'yukihiro')?.pose.point).toEqual({
       x: seat.x + move.offset.x,
       y: seat.y + move.offset.y,
@@ -263,20 +295,20 @@ describe('director: ambient moves', () => {
   it('places かなめ’s scroll at hand and nobody else holds anything', () => {
     const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS, ambient);
     expect(member(frame, 'kaname')?.hand?.prop).toBe('scroll');
-    expect(member(frame, 'kaname')?.pose.prop).toBeNull();
+    expect(member(frame, 'kaname')?.pose.held).toBeNull();
     expect(frame.members.filter((m) => m.hand !== null)).toHaveLength(1);
   });
 
   it('leaves members without a mood standing still', () => {
     const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS, ambient);
-    expect(member(frame, 'hibiki')?.pose).toEqual(standingPose(DEFAULT_SEATS.hibiki));
+    expect(member(frame, 'hibiki')?.pose).toEqual(atSeat('hibiki'));
     expect(member(frame, 'hibiki')?.hand).toBeNull();
   });
 
   it('matches the plain frame when no ambient is given', () => {
     const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS);
     for (const m of frame.members) {
-      expect(m.pose).toEqual(standingPose(DEFAULT_SEATS[m.id]));
+      expect(m.pose).toEqual(atSeat(m.id));
       expect(m.hand).toBeNull();
     }
   });
@@ -304,7 +336,7 @@ describe('director: no ambient move during scenes', () => {
     const end = director.busyUntil.sasae ?? 0;
     for (const t of [1, 300, end - 1]) {
       const sasae = member(frameAt(director, t, DEFAULT_SEATS, ambient), 'sasae');
-      expect(sasae?.pose).toEqual(poseAt(director, 'sasae', t, DEFAULT_SEATS.sasae));
+      expect(sasae?.pose).toEqual(seated(poseAt(director, 'sasae', t, DEFAULT_SEATS.sasae)));
       expect(sasae?.hand).toBeNull();
     }
     expect(inScene(director, 'sasae', end - 1)).toBe(true);
@@ -315,14 +347,14 @@ describe('director: no ambient move during scenes', () => {
     const director = play(EMPTY_DIRECTOR, event('issue-opened', '経理'), 0);
     const kaname = member(frameAt(director, 10, DEFAULT_SEATS, ambient), 'kaname');
     expect(kaname?.hand).toBeNull();
-    expect(kaname?.pose.prop).toBe('scroll');
+    expect(kaname?.pose.held).toEqual({ prop: 'scroll', hold: 'carry' });
   });
 
   it('gives none while confetti is over the member, and again afterwards', () => {
     const director = play(EMPTY_DIRECTOR, event('issue-closed', '総務'), 0);
     expect(inScene(director, 'sasae', 0)).toBe(true);
     expect(member(frameAt(director, 0, DEFAULT_SEATS, ambient), 'sasae')?.pose).toEqual(
-      standingPose(DEFAULT_SEATS.sasae),
+      atSeat('sasae'),
     );
     expect(inScene(director, 'sasae', CONFETTI_MS)).toBe(false);
     const after = member(frameAt(director, CONFETTI_MS, DEFAULT_SEATS, ambient), 'sasae');
