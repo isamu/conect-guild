@@ -1,13 +1,26 @@
 /**
- * Guild settings: who sits where, which GitHub label maps to which member, and the time windows
- * the domain uses. Names were fixed by the president on 2026-10-12 (docs/DESIGN.md chapter 1).
+ * Guild settings for the web app: the team's values come from the repository root's
+ * guild.settings.ts (validated when it is imported); the seats and the time windows the domain
+ * uses stay here.
  */
+import { z } from 'zod';
+import {
+  DEPARTMENT_LABELS,
+  GUILD_SETTINGS,
+  departmentLabelSchema,
+  memberIdSchema,
+  type DepartmentLabel,
+  type MemberId,
+  type RuleChangePath,
+} from '@conect-guild/snapshot/settings';
 
-/** Department labels on GitHub, in the fixed priority order used when an Issue has several. */
-export const DEPARTMENT_LABELS = ['経理', '広報', '企画', '総務'] as const;
-export type DepartmentLabel = (typeof DEPARTMENT_LABELS)[number];
-
-export type MemberId = 'kaname' | 'minori' | 'hibiki' | 'hirame' | 'sasae' | 'yukihiro';
+export {
+  DEPARTMENT_LABELS,
+  departmentLabelSchema,
+  type DepartmentLabel,
+  type MemberId,
+  type RuleChangePath,
+};
 
 /** A cell on the office tile map (32 px tiles, 32 x 18; src/render/map.ts). */
 export interface TilePos {
@@ -30,59 +43,38 @@ export interface MemberConfig {
   readonly seat: TilePos;
 }
 
-export const MEMBERS: Readonly<Record<MemberId, MemberConfig>> = {
-  kaname: {
-    id: 'kaname',
-    name: 'かなめ',
-    role: '司令塔',
-    color: '#e0b040',
-    seat: { col: 16, row: 7 },
-  },
-  minori: {
-    id: 'minori',
-    name: 'みのり',
-    role: '経理',
-    color: '#4caf50',
-    seat: { col: 12, row: 4 },
-  },
-  hibiki: {
-    id: 'hibiki',
-    name: 'ひびき',
-    role: '広報',
-    color: '#e91e63',
-    seat: { col: 20, row: 4 },
-  },
-  hirame: {
-    id: 'hirame',
-    name: 'ひらめ',
-    role: '企画',
-    color: '#2196f3',
-    seat: { col: 11, row: 10 },
-  },
-  sasae: {
-    id: 'sasae',
-    name: 'ささえ',
-    role: '総務',
-    color: '#9c6b3f',
-    seat: { col: 21, row: 10 },
-  },
-  yukihiro: {
-    id: 'yukihiro',
-    name: 'ゆきひろ',
-    role: '社長',
-    color: '#8e44ad',
-    // The throne is three tiles wide and high (cols 15-17, rows 2-4): the king sits in its middle.
-    seat: { col: 16, row: 3 },
-  },
+/** Seats for the four department desks, the reception and the throne (Issue #18 to vary them). */
+const SEATS: Readonly<Record<MemberId, TilePos>> = {
+  kaname: { col: 16, row: 7 },
+  minori: { col: 12, row: 4 },
+  hibiki: { col: 20, row: 4 },
+  hirame: { col: 11, row: 10 },
+  sasae: { col: 21, row: 10 },
+  // The throne is three tiles wide and high (cols 15-17, rows 2-4): the king sits in its middle.
+  yukihiro: { col: 16, row: 3 },
 };
 
-/** Department label → the member who works it. */
-export const DEPARTMENT_MEMBER: Readonly<Record<DepartmentLabel, MemberId>> = {
-  経理: 'minori',
-  広報: 'hibiki',
-  企画: 'hirame',
-  総務: 'sasae',
+function memberConfig(id: MemberId): MemberConfig {
+  const { name, role, color } = GUILD_SETTINGS.members[id];
+  return { id, name, role, color, seat: SEATS[id] };
+}
+
+export const MEMBERS: Readonly<Record<MemberId, MemberConfig>> = {
+  kaname: memberConfig('kaname'),
+  minori: memberConfig('minori'),
+  hibiki: memberConfig('hibiki'),
+  hirame: memberConfig('hirame'),
+  sasae: memberConfig('sasae'),
+  yukihiro: memberConfig('yukihiro'),
 };
+
+/**
+ * Department label → the member who works it. The record schema needs every label, so a label
+ * the settings do not map fails here instead of yielding undefined later.
+ */
+export const DEPARTMENT_MEMBER: Readonly<Record<DepartmentLabel, MemberId>> = z
+  .record(departmentLabelSchema, memberIdSchema)
+  .parse(Object.fromEntries(GUILD_SETTINGS.departments.map((d) => [d.label, d.member])));
 
 export interface BranchPrefixRule {
   readonly prefix: string;
@@ -92,19 +84,11 @@ export interface BranchPrefixRule {
 /**
  * Branch name prefix → department, used only when a PR links no labelled Issue.
  * Checked top to bottom; the first rule whose prefix the branch starts with wins.
- * 要調整: guessed from the folder names of conect-management (accounting / pr / planning /
- * general-affairs) and the `docs/<topic>-...` habit. Revisit once real PRs show up on screen.
  */
-export const BRANCH_PREFIX_RULES: readonly BranchPrefixRule[] = [
-  { prefix: 'accounting/', department: '経理' },
-  { prefix: 'docs/accounting-', department: '経理' },
-  { prefix: 'pr/', department: '広報' },
-  { prefix: 'docs/pr-', department: '広報' },
-  { prefix: 'planning/', department: '企画' },
-  { prefix: 'docs/planning-', department: '企画' },
-  { prefix: 'general-affairs/', department: '総務' },
-  { prefix: 'docs/general-affairs-', department: '総務' },
-];
+export const BRANCH_PREFIX_RULES: readonly BranchPrefixRule[] = GUILD_SETTINGS.branchPrefixes;
+
+/** Paths whose change needs the president's merge (see domain/party.ts isRuleChangePath). */
+export const RULE_CHANGE_PATHS: readonly RuleChangePath[] = GUILD_SETTINGS.ruleChangePaths;
 
 const MINUTE_MS = 60_000;
 const DAY_MS = 24 * 60 * MINUTE_MS;

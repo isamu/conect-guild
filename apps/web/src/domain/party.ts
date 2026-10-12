@@ -4,8 +4,10 @@ import {
   DEPARTMENT_LABELS,
   DEPARTMENT_MEMBER,
   DONE_WINDOW_MS,
+  RULE_CHANGE_PATHS,
   type DepartmentLabel,
   type MemberId,
+  type RuleChangePath,
 } from '../guild.config';
 import { departmentLabelsOf, pickDepartment } from './quest';
 import { NO_LIVE_STATES, type LiveState, type LiveStates } from './session';
@@ -59,18 +61,33 @@ export function assignPr(pr: SnapshotPr, issues: IssueIndex): PrAssignment {
   return { department: null, source: 'unknown' };
 }
 
+function matchesRule(path: string, rule: RuleChangePath): boolean {
+  switch (rule.match) {
+    case 'exact':
+      return path === rule.path;
+    case 'suffix':
+      return path.endsWith(rule.path);
+    case 'prefix':
+      return path.startsWith(rule.path);
+  }
+}
+
 /**
- * True for files whose change needs the president's merge. Plain string comparisons only, no glob:
- * the root CLAUDE.md, any `<dir>/CLAUDE.md`, or anything under the root `.claude/agents/`.
+ * True for files whose change needs the president's merge. Plain string comparisons only, no glob
+ * (`ruleChangePaths` in guild.settings.ts; by default the root CLAUDE.md, any `<dir>/CLAUDE.md`,
+ * or anything under the root `.claude/agents/`).
  */
-export function isRuleChangePath(path: string): boolean {
-  return path === 'CLAUDE.md' || path.endsWith('/CLAUDE.md') || path.startsWith('.claude/agents/');
+export function isRuleChangePath(
+  path: string,
+  rules: readonly RuleChangePath[] = RULE_CHANGE_PATHS,
+): boolean {
+  return rules.some((rule) => matchesRule(path, rule));
 }
 
 /** Wait kind for an open PR; null for closed PRs, which wait for no one. */
 export function prWaitKind(pr: SnapshotPr): PrWaitKind | null {
   if (pr.state !== 'open') return null;
-  return pr.changedFiles.some(isRuleChangePath) ? 'president' : 'kaname';
+  return pr.changedFiles.some((path) => isRuleChangePath(path)) ? 'president' : 'kaname';
 }
 
 interface Workload {
@@ -94,6 +111,13 @@ function emptyWorkload(): Workload {
     recentlyClosed: 0,
     closedWithoutTime: 0,
   };
+}
+
+function loadOf(
+  loads: ReadonlyMap<DepartmentLabel, Workload>,
+  department: DepartmentLabel | null,
+): Workload | undefined {
+  return department === null ? undefined : loads.get(department);
 }
 
 function addIssue(load: Workload, issue: SnapshotIssue, now: number, doneWindowMs: number): void {
@@ -162,23 +186,20 @@ export function deriveMemberStatuses(
   live: LiveStates = NO_LIVE_STATES,
 ): MemberStatus[] {
   const index = indexIssues(snapshot.issues);
-  const loads: Record<DepartmentLabel, Workload> = {
-    経理: emptyWorkload(),
-    広報: emptyWorkload(),
-    企画: emptyWorkload(),
-    総務: emptyWorkload(),
-  };
+  const loads = new Map<DepartmentLabel, Workload>(
+    DEPARTMENT_LABELS.map((department) => [department, emptyWorkload()]),
+  );
   for (const issue of snapshot.issues) {
-    const { department } = pickDepartment(issue.labels);
-    if (department !== null) addIssue(loads[department], issue, now, doneWindowMs);
+    const load = loadOf(loads, pickDepartment(issue.labels).department);
+    if (load !== undefined) addIssue(load, issue, now, doneWindowMs);
   }
   for (const pr of snapshot.prs) {
-    const { department } = assignPr(pr, index);
-    if (department !== null) addPr(loads[department], pr);
+    const load = loadOf(loads, assignPr(pr, index).department);
+    if (load !== undefined) addPr(load, pr);
   }
   const unassigned = countUnassigned(snapshot, index);
   return DEPARTMENT_LABELS.map((department) => {
-    const load = loads[department];
+    const load = loads.get(department) ?? emptyWorkload();
     const state = stateOf(load, live[DEPARTMENT_MEMBER[department]]);
     return {
       department,

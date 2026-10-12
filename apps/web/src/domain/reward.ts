@@ -1,6 +1,14 @@
 import type { Snapshot } from '@conect-guild/snapshot';
-import { RECENT_REWARD_WINDOW_MS, type DepartmentLabel } from '../guild.config';
+import { z } from 'zod';
+import {
+  DEPARTMENT_LABELS,
+  RECENT_REWARD_WINDOW_MS,
+  departmentLabelSchema,
+  type DepartmentLabel,
+} from '../guild.config';
 import { assignPr, indexIssues } from './party';
+
+const recentRewardsSchema = z.record(departmentLabelSchema, z.number().int().nonnegative());
 
 export type RecentRewards = Readonly<Record<DepartmentLabel, number>>;
 
@@ -14,12 +22,15 @@ export function countRecentRewards(
   now: number,
   windowMs: number = RECENT_REWARD_WINDOW_MS,
 ): RecentRewards {
-  const counts: Record<DepartmentLabel, number> = { 経理: 0, 広報: 0, 企画: 0, 総務: 0 };
+  const counts = new Map<DepartmentLabel, number>();
   const index = indexIssues(snapshot.issues);
   for (const pr of snapshot.prs) {
     if (pr.mergedAt === null || now - Date.parse(pr.mergedAt) > windowMs) continue;
     const { department } = assignPr(pr, index);
-    if (department !== null) counts[department] += 1;
+    if (department !== null) counts.set(department, (counts.get(department) ?? 0) + 1);
   }
-  return counts;
+  // The record schema requires every label, so each department gets a count (0 when none).
+  return recentRewardsSchema.parse(
+    Object.fromEntries(DEPARTMENT_LABELS.map((label) => [label, counts.get(label) ?? 0])),
+  );
 }
