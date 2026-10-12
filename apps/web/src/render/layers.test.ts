@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MEMBERS, type MemberId } from '../guild.config';
-import { ANIMATED_DECOR, STILL_DECOR } from './decor';
+import { ANIMATED_DECOR, STILL_DECOR } from './animatedDecor';
 import { EMPTY_DIRECTOR, frameAt } from './director';
 import {
   BACK_ANIMATED_DECOR,

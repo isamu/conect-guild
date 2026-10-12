@@ -1,6 +1,6 @@
 import type { DecorName } from '../../../../assets/decor/decor';
 import { decorPose } from './ambient';
-import { ANIMATED_DECOR } from './decor';
+import { ANIMATED_DECOR } from './animatedDecor';
 import { AMBIENT, DAYLIGHT, TILE_SIZE } from './metrics';
 import type { Point } from './path';
 
