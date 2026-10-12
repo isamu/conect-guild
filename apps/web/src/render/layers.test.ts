@@ -59,11 +59,18 @@ describe('layers: what is in front of the members', () => {
       }
     }
     // The candle, the abacus and the coins on みのり's desk, the megaphone on ひびき's, the globe
-    // and the lamp on ひらめ's and the hourglass on ささえ's move in front of them.
+    // and the lamp on ひらめ's and the papers and the hourglass on ささえ's move in front of them.
     expect(frontAnimated.map((a) => a.placement.name).sort(byName)).toEqual(
-      ['abacus', 'candlestick', 'coin-pile', 'globe', 'hourglass', 'lantern', 'megaphone'].sort(
-        byName,
-      ),
+      [
+        'abacus',
+        'candlestick',
+        'coin-pile',
+        'file-stack',
+        'globe',
+        'hourglass',
+        'lantern',
+        'megaphone',
+      ].sort(byName),
     );
     expect(frontStill.map((i) => i.name)).toEqual(expect.arrayContaining(['jar', 'flower-vase']));
   });

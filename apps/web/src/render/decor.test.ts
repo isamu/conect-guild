@@ -138,7 +138,8 @@ describe('decor drawing lists', () => {
     expect(working('coin-pile')).toEqual([{ kind: 'working', member: 'minori' }]);
     expect(working('megaphone')).toEqual([{ kind: 'working', member: 'hibiki' }]);
     expect(working('globe')).toEqual([{ kind: 'working', member: 'hirame' }]);
-    expect(working('key-board')).toEqual([{ kind: 'working', member: 'sasae' }]);
+    expect(working('file-stack')).toEqual([{ kind: 'working', member: 'sasae' }]);
+    expect(working('key-board')).toEqual([]);
     expect(working('hourglass')).toEqual([{ kind: 'awaiting-president' }]);
     expect(working('banner')).toEqual([
       { kind: 'cleared', members: ['kaname', 'minori', 'hibiki'] },

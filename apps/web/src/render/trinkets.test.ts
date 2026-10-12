@@ -20,7 +20,8 @@ import {
   SAND_STREAM,
   sandGrainAt,
   spinBandAt,
-  swingAt,
+  papersAt,
+  FILE_TOP,
   triggerOf,
   waveAt,
   type DecorCues,
@@ -93,7 +94,14 @@ describe('triggerOf', () => {
     expect(triggerOf({ name: 'coin-pile', row: 5 })).toEqual({ kind: 'working', member: 'minori' });
     expect(triggerOf({ name: 'megaphone', row: 5 })).toEqual({ kind: 'working', member: 'hibiki' });
     expect(triggerOf({ name: 'globe', row: 11 })).toEqual({ kind: 'working', member: 'hirame' });
-    expect(triggerOf({ name: 'key-board', row: 12 })).toEqual({ kind: 'working', member: 'sasae' });
+    expect(triggerOf({ name: 'file-stack', row: 11 })).toEqual({
+      kind: 'working',
+      member: 'sasae',
+    });
+  });
+
+  it('leaves the key board by the door still: it is too far from ささえ to read as hers', () => {
+    expect(triggerOf({ name: 'key-board', row: 12 })).toBeNull();
   });
 
   it('runs the hourglass for the king and flutters each banner for its side of the room', () => {
@@ -267,16 +275,67 @@ describe('spinBandAt', () => {
   });
 });
 
-describe('swingAt', () => {
-  it('swings 0, right, 0, left within the keys’ reach', () => {
-    const quarter = TRINKETS.swingMs / 4;
-    expect([0, 1, 2, 3].map((q) => swingAt(0, q * quarter + 1))).toEqual([
-      0,
-      TRINKETS.swingPx,
-      0,
-      -TRINKETS.swingPx,
-    ]);
-    expect(swingAt(0, TRINKETS.swingMs)).toBe(0);
+describe('papersAt', () => {
+  const quarter = TRINKETS.shuffleMs / 4;
+  const turns = Array.from({ length: 200 }, (_, turn) => turn);
+  const floating = turns.filter((turn) => hashStep(turn) < TRINKETS.floatShare);
+  const resting = turns.filter((turn) => hashStep(turn) >= TRINKETS.floatShare);
+
+  it('lays the top sheet flat, slides it, lifts its corner, then lays it back each turn', () => {
+    const look = (t: number) => {
+      const { slide, curl } = papersAt(0, t);
+      return { slide, curl };
+    };
+    expect(look(0)).toEqual({ slide: 0, curl: false });
+    expect(look(quarter - 1)).toEqual({ slide: 0, curl: false });
+    expect(look(quarter)).toEqual({ slide: TRINKETS.shuffleSlidePx, curl: false });
+    expect(look(2 * quarter - 1)).toEqual({ slide: TRINKETS.shuffleSlidePx, curl: false });
+    expect(look(2 * quarter)).toEqual({ slide: TRINKETS.shuffleSlidePx, curl: true });
+    expect(look(3 * quarter - 1)).toEqual({ slide: TRINKETS.shuffleSlidePx, curl: true });
+    expect(look(3 * quarter)).toEqual({ slide: 0, curl: false });
+    expect(look(TRINKETS.shuffleMs)).toEqual({ slide: 0, curl: false });
+    expect(papersAt(quarter, 0)).toEqual(papersAt(0, quarter));
+  });
+
+  it('floats a sheet up off the stack on some turns only, for floatMs from the turn’s start', () => {
+    expect(floating.length / turns.length).toBeGreaterThan(TRINKETS.floatShare - 0.15);
+    expect(floating.length / turns.length).toBeLessThan(TRINKETS.floatShare + 0.15);
+    for (const turn of floating) {
+      const start = turn * TRINKETS.shuffleMs;
+      expect(papersAt(0, start).float).toEqual({ x: 0, y: 0 });
+      const late = papersAt(0, start + TRINKETS.floatMs - 1).float;
+      expect(late?.y).toBeLessThan(-TRINKETS.floatRisePx + 2);
+      expect(late?.x).toBeGreaterThan(TRINKETS.floatDriftPx - 2);
+      expect(papersAt(0, start + TRINKETS.floatMs).float).toBeNull();
+    }
+    for (const turn of resting) {
+      const start = turn * TRINKETS.shuffleMs;
+      for (let t = start; t < start + TRINKETS.shuffleMs; t += 70) {
+        expect(papersAt(0, t).float).toBeNull();
+      }
+    }
+  });
+
+  it('rises the floating sheet steadily within its reach', () => {
+    const turn = floating[0] ?? 0;
+    let previous = 1;
+    for (let t = 0; t < TRINKETS.floatMs; t += 20) {
+      const float = papersAt(0, turn * TRINKETS.shuffleMs + t).float;
+      expect(float).not.toBeNull();
+      const y = float?.y ?? 0;
+      expect(y).toBeLessThanOrEqual(previous);
+      expect(y).toBeGreaterThanOrEqual(-TRINKETS.floatRisePx);
+      expect(float?.x).toBeGreaterThanOrEqual(0);
+      expect(float?.x).toBeLessThanOrEqual(TRINKETS.floatDriftPx);
+      previous = y;
+    }
+  });
+
+  it('keeps the top sheet on the stack’s picture as it slides', () => {
+    expect(FILE_TOP.x).toBeGreaterThanOrEqual(0);
+    expect(FILE_TOP.y).toBeGreaterThanOrEqual(0);
+    expect(FILE_TOP.x + FILE_TOP.w + TRINKETS.shuffleSlidePx).toBeLessThanOrEqual(PICTURE);
+    expect(FILE_TOP.y + FILE_TOP.h).toBeLessThanOrEqual(PICTURE);
   });
 });
 
