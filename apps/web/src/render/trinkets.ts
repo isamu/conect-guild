@@ -9,8 +9,8 @@ import type { Point } from './path';
  * abacus and coins, notes and "!" from 広報's megaphone, a band of light turning 企画's globe and
  * the papers sorted on ささえ's file stack (総務) while that department works; the hourglass
  * running while the king has PRs to approve (it stands on ささえ's desk, but it is the king's
- * sign); a banner fluttering when a quest of its side of the room is cleared; the cat waking
- * to stretch now and then, and the light patches drifting with the sun. Pure: the time, each
+ * sign); a banner fluttering when a quest of its side of the room is cleared; the pet waking
+ * to sit up now and then, and the light patches drifting with the sun. Pure: the time, each
  * thing's phase and what the members do are passed in. Distances are px of the decor pictures
  * (logical px), from the picture's top-left.
  */

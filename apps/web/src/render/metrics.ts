@@ -144,7 +144,7 @@ export const CONFETTI = {
 /**
  * The small things that move (trinkets.ts): times are ms, distances logical px (one px of the
  * decor pictures). Each thing is still unless its trigger holds (who works, the king waiting, a
- * quest just cleared); the cat and the light patches always move.
+ * quest just cleared); the pet and the light patches always move.
  */
 export const TRINKETS = {
   /** 経理: a glint on the abacus or the coins now and then, `showMs` out of every `stepMs`. */
