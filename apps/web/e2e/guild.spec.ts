@@ -91,7 +91,7 @@ test('「基準を消す」 removes the baseline and the next fetch stores a new
   const holding = new Promise<void>((resolve) => {
     held = resolve;
   });
-  await page.route('/snapshot.json', async (route) => {
+  await page.route('**/snapshot.json', async (route) => {
     held();
     await gate;
     await route.continue();
