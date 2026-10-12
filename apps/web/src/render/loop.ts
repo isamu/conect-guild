@@ -9,6 +9,7 @@ import type { Random } from './confetti';
 import {
   EMPTY_DIRECTOR,
   frameAt,
+  hushed,
   isAnimating,
   prune,
   type Director,
@@ -33,7 +34,8 @@ import { AMBIENT } from './metrics';
 import type { IdleSeeds, IdleSince } from './idle';
 import { createIdleCrew, playEvent, recallHome, type HomeIn, type IdleCrew } from './idleCrew';
 import { levelTags, type Levels } from './levelTags';
-import { DEFAULT_SEATS } from './scenes';
+import { createLinePicker, seenLines, type LinePicker } from './lines';
+import { DEFAULT_SEATS, type SceneContext } from './scenes';
 import { createCalls, type CallView, type Calls } from './calls';
 import type { Speeches } from './summons';
 import { decorCuesOf, type DecorCues } from './trinkets';
@@ -70,6 +72,8 @@ export interface RenderLoopOptions {
   readonly random?: Random;
   /** Whether かなめ tosses a scroll (scenes.SceneContext.tossRandom); apart from `random`. */
   readonly tossRandom?: Random;
+  /** Which line a member says in a scene (lines.ts, Issue #47); apart from the other two. */
+  readonly lineRandom?: Random;
   readonly visibility?: PageVisibility;
   /** Epoch ms, for the long idle spells (idle.ts); they go on while the page is hidden. */
   readonly wallNow?: () => number;
@@ -85,7 +89,10 @@ export interface StageParty {
   readonly bubbles: Bubbles;
   readonly moods: AmbientMoods;
   readonly idleSince: IdleSince;
-  /** The screen is halted (not live): the king's calls are dropped, to come or playing. */
+  /**
+   * The screen is halted (not live): the king's calls are dropped, to come or playing, and so are
+   * the lines of the scenes (lines.ts).
+   */
   readonly halted: boolean;
   /** The members' levels, shown small under their seats (levelTags.ts). */
   readonly levels: Levels;
@@ -273,9 +280,10 @@ function paint(painter: Painter, scale: number, moment: Moment): void {
   drawAnimatedDecor(ctx, art, moment, BACK_ANIMATED_DECOR);
   drawActors(ctx, moment, art, painter.front);
   drawShade(ctx, painter.scratch, light, lampLights(moment.now));
-  drawLevelTags(ctx, levelTags(moment.levels, DEFAULT_SEATS));
-  drawOverhead(ctx, moment);
-  drawLevelUpBanners(ctx, moment);
+  const tags = levelTags(moment.levels, DEFAULT_SEATS);
+  drawLevelTags(ctx, tags);
+  drawOverhead(ctx, { ...moment, tags });
+  drawLevelUpBanners(ctx, { ...moment, tags });
 }
 
 /** The canvas, the scenery drawn once and an empty canvas for the shade. */
@@ -313,7 +321,7 @@ function createCast(
     calls,
     receive: (director, party, t) => {
       calls.setHalted(party.halted);
-      return crew.setSince(director, party.idleSince, t);
+      return crew.setSince(party.halted ? hushed(director) : director, party.idleSince, t);
     },
     frame: (director, t, moods) =>
       frameAt(director, t, DEFAULT_SEATS, {
@@ -337,30 +345,74 @@ function stageAt(
   return { ...view, cues: decorCuesOf(moods, director.bursts, t, view.frame.members) };
 }
 
+/**
+ * How the scenes are planned. The toss and the lines draw from sources of their own, never the
+ * injected `random`: an injected (reproducible) sequence keeps its confetti. All default to
+ * Math.random, which has no sequence anyone could reproduce, so sharing it is harmless.
+ */
+export function sceneContext(
+  options: Pick<RenderLoopOptions, 'random' | 'tossRandom' | 'lineRandom'>,
+): SceneContext & { readonly sawLines: LinePicker['saw'] } {
+  const picker = createLinePicker(options.lineRandom ?? Math.random);
+  return {
+    seats: DEFAULT_SEATS,
+    random: options.random ?? Math.random,
+    tossRandom: options.tossRandom ?? Math.random,
+    pickLine: picker.pick,
+    sawLines: (lines, now) => {
+      picker.saw(lines, now);
+    },
+  };
+}
+
+/**
+ * True when a scene played now says nothing: halted (its lines are dropped then: StageParty.halted)
+ * or the canvas is out of sight (the scene itself is dropped: scenesShown). No line is picked for
+ * it, so the lines said last stay those that were seen.
+ */
+export function isQuiet(halted: boolean, cssWidth: number): boolean {
+  return halted || !isShown(cssWidth);
+}
+
+/** The context without the picker while quiet (isQuiet). */
+export function sceneContextWhile(context: SceneContext, quiet: boolean): SceneContext {
+  return quiet ? { ...context, pickLine: undefined } : context;
+}
+
 /** Asks for the next draw as `next` says. */
 function follow(schedule: Scheduler, next: NextDraw): void {
   if (next === 'frame') schedule.now();
   if (next === 'ambient') schedule.later();
 }
 
-/** The clocks and the random sources of the loop: the injected ones, else the browser's. */
+/** The clocks and the random sources of the loop (sceneContext): the injected ones, else the browser's. */
 function loopSources(options: RenderLoopOptions) {
-  const random = options.random ?? Math.random;
+  const context = sceneContext(options);
   return {
     now: options.now ?? (() => performance.now()),
     localHour: options.localHour ?? (() => hourOf(new Date())),
-    random,
-    // Never the injected `random`: an injected (reproducible) sequence keeps its confetti. Both
-    // default to Math.random, which has no sequence anyone could reproduce, so sharing it is harmless.
-    context: { seats: DEFAULT_SEATS, random, tossRandom: options.tossRandom ?? Math.random },
+    context,
   };
+}
+
+/**
+ * After a frame is painted: the lines it showed are seen (lines.createLinePicker remembers them),
+ * then what is over is pruned.
+ */
+function seenAndPruned(
+  context: { readonly sawLines: LinePicker['saw'] },
+  director: Director,
+  frame: { readonly t: number; readonly speeches: Speeches },
+): Director {
+  context.sawLines(seenLines(director.lines, frame.t, frame.speeches), frame.t);
+  return prune(director, frame.t);
 }
 
 export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   const { canvas, art } = options;
-  const { now, localHour, random, context } = loopSources(options);
+  const { now, localHour, context } = loopSources(options);
   const painter = createPainter(context2d(canvas), art);
-  const cast = createCast(art, random, options);
+  const cast = createCast(art, context.random, options);
   const visibility = options.visibility ?? documentVisibility;
   // Narrow screens hide the canvas (display: none): its width is 0 and nothing is drawn.
   let cssWidth = 1;
@@ -369,15 +421,15 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   let scale = 1;
   let clock: StageClock = RUNNING_CLOCK;
   const stageNow = () => stageTime(clock, now());
+  const quiet = () => sceneContextWhile(context, isQuiet(party.halted, cssWidth));
 
   function draw(): void {
     const t = stageNow();
-    const { bubbles, moods, levels } = party;
-    const { frame, speeches, calling, cues } = stageAt(cast, director, t, moods);
-    paint(painter, scale, { now: t, hour: localHour(), frame, bubbles, speeches, cues, levels });
-    director = prune(director, t);
+    const { frame, speeches, calling, cues } = stageAt(cast, director, t, party.moods);
+    paint(painter, scale, { ...party, now: t, hour: localHour(), frame, speeches, cues });
+    director = seenAndPruned(context, director, { t, speeches });
     // A call needs no more than the ambient pace: its words and turns change every few hundred ms.
-    const ambient = Object.keys(moods).length > 0 || ANIMATED_DECOR.length > 0 || calling;
+    const ambient = Object.keys(party.moods).length > 0 || ANIMATED_DECOR.length > 0 || calling;
     follow(schedule, nextDraw({ hidden: paused(), animating: isAnimating(director, t), ambient }));
   }
 
@@ -397,7 +449,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   return {
     play(event) {
       // Members out playing come back first; the scene waits for them (idleCrew.playEvent).
-      director = playEvent(cast.crew, director, event, { t: stageNow(), context });
+      director = playEvent(cast.crew, director, event, { t: stageNow(), context: quiet() });
       refresh();
     },
     recall(members) {

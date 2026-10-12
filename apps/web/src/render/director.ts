@@ -4,6 +4,7 @@ import { ambientPose, type AmbientMoods, type AmbientSeeds, type HandProp } from
 import { burstOrigin, confettiAt, CONFETTI_MS, type PlacedParticle } from './confetti';
 import type { IdleMark, IdlePose, IdlePoses } from './idle';
 import { bannerAt, type BannerView } from './levelUp';
+import { linesAt, speakInTurn, type SpokenLines, type Utterance } from './lines';
 import {
   hopLift,
   poseOnSegment,
@@ -28,6 +29,8 @@ export interface Director {
   readonly bursts: readonly Burst[];
   /** Items in the air (toss.ts). */
   readonly flights: readonly Flight[];
+  /** The members' lines in the scenes (lines.ts). */
+  readonly lines: readonly Utterance[];
   /** When each member's last scheduled track ends. */
   readonly busyUntil: Readonly<Partial<Record<MemberId, number>>>;
 }
@@ -41,7 +44,13 @@ const MEMBER_IDS: readonly MemberId[] = [
   'yukihiro',
 ];
 
-export const EMPTY_DIRECTOR: Director = { tracks: [], bursts: [], flights: [], busyUntil: {} };
+export const EMPTY_DIRECTOR: Director = {
+  tracks: [],
+  bursts: [],
+  flights: [],
+  lines: [],
+  busyUntil: {},
+};
 
 /** A member at their seat with an ambient move: may type with a holding frame, holds nothing. */
 export interface SeatPose {
@@ -97,6 +106,8 @@ export interface StageFrame {
   readonly confetti: readonly ConfettiView[];
   /** Items in the air now (drawn between the raised hands of the two members: toss.ts). */
   readonly flights: readonly FlightView[];
+  /** Who says which line of a scene now (lines.ts). */
+  readonly lines: SpokenLines;
 }
 
 export function trackEnd(track: Track): number {
@@ -128,6 +139,7 @@ export function scheduleEvent(
     tracks: [...director.tracks, ...scene.tracks],
     bursts: [...director.bursts, ...scene.bursts],
     flights: [...director.flights, ...scene.flights],
+    lines: [...director.lines, ...speakInTurn(scene.turns, director.lines, context.pickLine)],
     busyUntil,
   };
 }
@@ -287,7 +299,7 @@ export function frameAt(
   const flights = director.flights
     .map((flight) => flightAt(flight, now))
     .filter((view) => view !== null);
-  return { members, confetti, flights };
+  return { members, confetti, flights, lines: linesAt(director.lines, now) };
 }
 
 /** True while anything is moving or still to come (the loop may sleep otherwise). */
@@ -295,8 +307,14 @@ export function isAnimating(director: Director, now: number): boolean {
   return (
     director.tracks.some((track) => trackEnd(track) > now) ||
     director.bursts.some((burst) => burst.start + CONFETTI_MS > now) ||
-    director.flights.some((flight) => flight.end > now)
+    director.flights.some((flight) => flight.end > now) ||
+    director.lines.some((said) => said.end > now)
   );
+}
+
+/** The director without its lines (halted: what is said and still to be said is dropped). */
+export function hushed(director: Director): Director {
+  return { ...director, lines: [] };
 }
 
 /** Drops finished tracks and bursts so the director does not grow forever. */
@@ -310,6 +328,7 @@ export function prune(director: Director, now: number): Director {
     tracks: director.tracks.filter((track) => trackEnd(track) > now),
     bursts: director.bursts.filter((burst) => burst.start + CONFETTI_MS > now),
     flights: director.flights.filter((flight) => flight.end > now),
+    lines: director.lines.filter((said) => said.end > now),
     busyUntil,
   };
 }

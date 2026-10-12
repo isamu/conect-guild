@@ -3,9 +3,12 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { drawnTexts, installCanvasTextRecorder } from './canvasText.ts';
 import { installFakeAudio } from './fakeAudio.ts';
+import { LINE_BOOK } from '../src/render/lineBook.ts';
 
 /** The first scroll is handed out about 5 s after はじめる (domain/demoScript.ts). */
 const FIRST_EVENT_TIMEOUT = 15_000;
+/** The first scroll's lines: handed out about 5 s in, walked over in about 8 s more. */
+const LINES_TIMEOUT = 25_000;
 /** The king's call (summon, audio/scores.ts): D4 then G4, in Hz rounded. */
 const SUMMON_TONES = [294, 392];
 
@@ -76,6 +79,31 @@ test('?demo=1 plays the fictional script with sound, never reading /snapshot.jso
   const keys = await page.evaluate(() => Object.keys(localStorage));
   expect(keys.filter((key) => key.startsWith('conect-guild:'))).toEqual([]);
   await expect(fetchStatus).not.toContainText('情報が古い');
+  expect(snapshotRequests).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test('in the demo the members say their lines with the scenes (Issue #47)', async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(60_000);
+  const { errors, snapshotRequests } = await openDemo(page, context);
+  await page.getByRole('button', { name: '▶ はじめる' }).click();
+  // The first scroll goes to 経理 (quest1 of the even loops): かなめ hands it over or tosses it,
+  // then みのり says hers as she holds it up.
+  const kaname: readonly string[] = [...LINE_BOOK.kaname.handOver, ...LINE_BOOK.kaname.toss];
+  const minori: readonly string[] = LINE_BOOK.minori.takeScroll;
+  await expect
+    .poll(async () => (await drawnTexts(page)).some((text) => kaname.includes(text)), {
+      timeout: LINES_TIMEOUT,
+    })
+    .toBe(true);
+  await expect
+    .poll(async () => (await drawnTexts(page)).some((text) => minori.includes(text)), {
+      timeout: LINES_TIMEOUT,
+    })
+    .toBe(true);
   expect(snapshotRequests).toEqual([]);
   expect(errors).toEqual([]);
 });

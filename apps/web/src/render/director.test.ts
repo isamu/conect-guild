@@ -118,7 +118,7 @@ describe('director: scheduling', () => {
   it('does not change the director it was given', () => {
     const before = EMPTY_DIRECTOR;
     play(before, event('pr-merged', '経理'), 0);
-    expect(before).toEqual({ tracks: [], bursts: [], flights: [], busyUntil: {} });
+    expect(before).toEqual({ tracks: [], bursts: [], flights: [], lines: [], busyUntil: {} });
   });
 });
 

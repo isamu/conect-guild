@@ -237,3 +237,28 @@ export const TOSS = {
   watchMs: 500,
   arcPx: 24,
 } as const;
+
+/**
+ * The members' lines at the moments of a scene (lines.ts, Issue #47). How long each shows: the one
+ * who brings an item until it changes hands (`giveMs`, at most half of scenes.HANDOVER_MS), the
+ * toss as the scroll flies off (`tossMs`), the one who takes it as they hold it up (`takeMs`), the
+ * cleared member under the confetti (`clearMs`), then the king `kingGapMs` later (`kingMs`). A
+ * member does not say again any of the last `recentLines` lines they said at the same moment (fewer
+ * when the moment has fewer lines). While the member holds an item up over the head, what is over
+ * the head goes `raisedLiftPx` higher, so the whole bubble sits over the item: the item is centred
+ * over the head and wider than the gap to the bubble's left edge, so only lifting it past the
+ * item's top clears it (the chest showed under the bubble's left end on screenshots; overhead.test.ts
+ * checks every member). Words that would meet a 「Lv N」 tag on a desk go up until they are
+ * `tagGapPx` over it (overhead.overheadLift). Times are ms, distances logical px.
+ */
+export const LINES = {
+  giveMs: 1_500,
+  tossMs: 1_200,
+  takeMs: 1_800,
+  clearMs: 2_000,
+  kingGapMs: 400,
+  kingMs: 1_600,
+  recentLines: 2,
+  raisedLiftPx: 36,
+  tagGapPx: 2,
+} as const;

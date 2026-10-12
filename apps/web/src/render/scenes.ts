@@ -1,7 +1,10 @@
 import type { GuildEvent } from '../domain/events';
 import { DEPARTMENT_MEMBER, MEMBERS, type MemberId, type TilePos } from '../guild.config';
 import { createConfetti, type Particle, type Random } from './confetti';
+import type { LineScene } from './lineBook';
+import type { PickLine, Turn } from './lines';
 import { isWalkable, PLACES } from './map';
+import { LINES } from './metrics';
 import {
   carry,
   raise,
@@ -34,6 +37,10 @@ import { planToss, shouldToss, type Flight } from './toss';
  *   member catches it at the seat (toss.ts, Issue #12)
  *
  * A handover takes about 10–14 s in all (scenes.test.ts checks every department).
+ *
+ * Each scene also says who speaks at which moment (`turns`, lines.ts, Issue #47): the one who brings
+ * the item as they reach the other (or lets the tossed scroll go), then the one who takes it as they
+ * hold it up; on a clear the member under the confetti, then the king.
  */
 
 /** The giver takes up the item in their arms at the start before setting off. */
@@ -66,6 +73,8 @@ export interface Scene {
   readonly bursts: readonly Burst[];
   /** Items in the air (toss.ts). */
   readonly flights: readonly Flight[];
+  /** Who speaks when (lines.ts), in the order they speak. */
+  readonly turns: readonly Turn[];
 }
 
 export interface SceneContext {
@@ -76,6 +85,8 @@ export interface SceneContext {
    * draws the same numbers as without tosses. Without one she always walks the scroll over.
    */
   readonly tossRandom?: Random;
+  /** What the members say at the turns (lines.createLinePicker); without one nobody speaks. */
+  readonly pickLine?: PickLine;
 }
 
 /** The member who acts for an event; かなめ for the reception. */
@@ -157,6 +168,19 @@ function besideSeat(from: TilePos, seat: TilePos): TilePos {
   return from;
 }
 
+/** The tracks of a handover and who speaks when in it. */
+interface Staging {
+  readonly tracks: readonly Track[];
+  readonly turns: readonly Turn[];
+}
+
+/** What the one who brings `prop` says, and what the one who takes it says. */
+function linesFor(prop: Prop): { give: LineScene; take: LineScene } {
+  return prop === 'scroll'
+    ? { give: 'handOver', take: 'takeScroll' }
+    : { give: 'deliverChest', take: 'takeChest' };
+}
+
 /** Who brings what to where in a handover. */
 interface Delivery {
   readonly giver: MemberId;
@@ -171,25 +195,39 @@ interface Delivery {
  * halfway through the stop and walks back; the receiver waits at their seat, takes the item in
  * their arms, then raises it over their head a while.
  */
-function deliver(item: Delivery, start: number, seats: SceneContext['seats']): Track[] {
+function deliver(item: Delivery, start: number, seats: SceneContext['seats']): Staging {
   const { giver, receiver, to, prop } = item;
   const giving = new TrackBuilder(giver, start, seats[giver])
     .stay(PICK_UP_MS, carry(prop))
     .walk(to, carry(prop));
-  const handover = giving.time + HANDOVER_MS / 2;
+  const arrived = giving.time;
+  const handover = arrived + HANDOVER_MS / 2;
   giving
     .stay(HANDOVER_MS / 2, carry(prop))
     .stay(HANDOVER_MS / 2)
     .walk(seats[giver]);
   const receiving = new TrackBuilder(receiver, start, seats[receiver])
     .stay(handover - start)
-    .stay(RECEIVE_MS, carry(prop))
-    .stay(HOLD_UP_MS, raise(prop));
-  return [giving.build(), receiving.build()];
+    .stay(RECEIVE_MS, carry(prop));
+  const raised = receiving.time;
+  receiving.stay(HOLD_UP_MS, raise(prop));
+  const { give, take } = linesFor(prop);
+  return {
+    tracks: [giving.build(), receiving.build()],
+    turns: [
+      { actor: giver, scene: give, at: arrived },
+      { actor: receiver, scene: take, at: raised },
+    ],
+  };
 }
 
-function reception(start: number, seats: SceneContext['seats'], prop: Prop): Track {
-  return new TrackBuilder('kaname', start, seats.kaname).stay(RECEPTION_MS, raise(prop)).build();
+function reception(start: number, seats: SceneContext['seats'], prop: Prop): Staging {
+  return {
+    tracks: [
+      new TrackBuilder('kaname', start, seats.kaname).stay(RECEPTION_MS, raise(prop)).build(),
+    ],
+    turns: [{ actor: 'kaname', scene: linesFor(prop).take, at: start }],
+  };
 }
 
 /** かなめ brings the scroll to the member's seat; the member brings the chest to the counter. */
@@ -214,14 +252,14 @@ function handoverTracks(
   actor: MemberId,
   start: number,
   seats: SceneContext['seats'],
-): Track[] {
+): Staging {
   const prop = kind === 'issue-opened' ? 'scroll' : 'chest';
-  if (actor === 'kaname') return [reception(start, seats, prop)];
+  if (actor === 'kaname') return reception(start, seats, prop);
   const item = deliveryOf(kind, actor, seats);
   const way = findPath(seats[item.giver], item.to);
   // An item never changes hands between members who cannot meet.
   return way === null || way.length < 2
-    ? [reception(start, seats, prop)]
+    ? reception(start, seats, prop)
     : deliver(item, start, seats);
 }
 
@@ -238,7 +276,19 @@ function tossScene(actor: MemberId, start: number, seats: SceneContext['seats'])
     ],
     bursts: [],
     flights: [toss.flight],
+    turns: [
+      { actor: 'kaname', scene: 'toss', at: toss.flight.start },
+      { actor, scene: 'takeScroll', at: toss.flight.end },
+    ],
   };
+}
+
+/** The cleared member speaks under the confetti, then the king a moment after. */
+function clearTurns(actor: MemberId, start: number): Turn[] {
+  return [
+    { actor, scene: 'clear', at: start },
+    { actor: 'yukihiro', scene: 'seeClear', at: start + LINES.clearMs + LINES.kingGapMs },
+  ];
 }
 
 export function planScene(event: GuildEvent, start: number, context: SceneContext): Scene {
@@ -248,6 +298,7 @@ export function planScene(event: GuildEvent, start: number, context: SceneContex
       tracks: [],
       bursts: [{ actor, start, particles: createConfetti(context.random) }],
       flights: [],
+      turns: clearTurns(actor, start),
     };
   }
   if (event.kind === 'level-up') {
@@ -255,6 +306,8 @@ export function planScene(event: GuildEvent, start: number, context: SceneContex
       tracks: [{ actor, segments: hopSegments(context.seats[actor], start) }],
       bursts: [{ actor, start, particles: createConfetti(context.random), levelUp: true }],
       flights: [],
+      // The level-up has no line of its own (Issue #47 part 1 covers the scroll, chest and clear).
+      turns: [],
     };
   }
   const { seats, tossRandom } = context;
@@ -266,7 +319,7 @@ export function planScene(event: GuildEvent, start: number, context: SceneContex
   ) {
     return tossScene(actor, start, seats);
   }
-  return { tracks: handoverTracks(event.kind, actor, start, seats), bursts: [], flights: [] };
+  return { ...handoverTracks(event.kind, actor, start, seats), bursts: [], flights: [] };
 }
 
 /** Seats from the guild config. */
