@@ -6,3 +6,5 @@ package-lock.json
 assets/
 *.md
 .mulmoterminal.json
+.scoria/
+scoria.config.json
