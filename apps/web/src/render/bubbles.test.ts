@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { issue, pr } from '../domain/fixtures.test-util';
 import { deriveMemberStatuses, type MemberState } from '../domain/party';
 import type { LiveStates } from '../domain/session';
-import { bubbleFor, bubblesOf } from './bubbles';
+import { bubbleFor, bubbleShown, bubblesOf, type Bubbles } from './bubbles';
+import { EMPTY_DIRECTOR, frameAt, scheduleEvent } from './director';
+import { DEFAULT_SEATS } from './scenes';
 
 const STATES: readonly MemberState[] = [
   'awaiting-permission',
@@ -71,5 +73,41 @@ describe('bubblesOf', () => {
 
   it('is empty without rows', () => {
     expect(bubblesOf([])).toEqual({});
+  });
+});
+
+describe('bubbleShown', () => {
+  const bubbles: Bubbles = { sasae: 'awaiting-permission', kaname: 'awaiting-kaname' };
+
+  it('shows the bubble of a member at their seat, and none for members without one', () => {
+    expect(bubbleShown(bubbles, { id: 'sasae', inScene: false })).toBe('awaiting-permission');
+    expect(bubbleShown(bubbles, { id: 'kaname', inScene: false })).toBe('awaiting-kaname');
+    expect(bubbleShown(bubbles, { id: 'minori', inScene: false })).toBeNull();
+  });
+
+  it('hides every kind of bubble while the member is in a scene', () => {
+    expect(bubbleShown(bubbles, { id: 'sasae', inScene: true })).toBeNull();
+    expect(bubbleShown(bubbles, { id: 'kaname', inScene: true })).toBeNull();
+  });
+
+  it('hides it for the whole scene, walking empty-handed included, and shows it back after', () => {
+    const director = scheduleEvent(
+      EMPTY_DIRECTOR,
+      { id: 'pr-merged#1', kind: 'pr-merged', number: 1, department: '総務' },
+      0,
+      { seats: DEFAULT_SEATS, random: () => 0.5 },
+    );
+    const end = director.busyUntil.sasae ?? 0;
+    const poses = [];
+    for (let t = 0; t < end; t += 100) {
+      const sasae = frameAt(director, t, DEFAULT_SEATS).members.find((m) => m.id === 'sasae');
+      if (sasae === undefined) throw new Error('sasae is always on the stage');
+      poses.push(sasae);
+      expect(bubbleShown(bubbles, sasae)).toBeNull();
+    }
+    // The scene has stretches where she holds nothing (the bubble used to follow her then).
+    expect(poses.some((m) => m.pose.held === null)).toBe(true);
+    const back = frameAt(director, end, DEFAULT_SEATS).members.find((m) => m.id === 'sasae');
+    expect(back === undefined ? null : bubbleShown(bubbles, back)).toBe('awaiting-permission');
   });
 });

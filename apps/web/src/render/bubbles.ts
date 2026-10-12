@@ -27,6 +27,18 @@ export function bubbleFor(id: MemberId, state: MemberState): BubbleKind | null {
   return isBubbleKind(state) ? state : null;
 }
 
+/**
+ * The bubble drawn over a member in this frame. A member in a scene (carrying a scroll or a chest,
+ * walking to the counter and back, or under confetti) shows none: the bubble belongs to the seat
+ * where they wait, and comes back when they are seated again.
+ */
+export function bubbleShown(
+  bubbles: Bubbles,
+  member: { readonly id: MemberId; readonly inScene: boolean },
+): BubbleKind | null {
+  return member.inScene ? null : (bubbles[member.id] ?? null);
+}
+
 export function bubblesOf(rows: readonly { id: MemberId; state: MemberState }[]): Bubbles {
   const bubbles: Partial<Record<MemberId, BubbleKind>> = {};
   for (const row of rows) {
