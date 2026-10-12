@@ -9,14 +9,14 @@ import { pickDepartment } from './quest';
  */
 
 /** Experience per thing done (the president's decision, 2026-10-12). */
-export const XP_PER = {
+export const XP_PER: Readonly<{ clear: number; merge: number; scroll: number }> = {
   /** An Issue of one's own closed as completed (not planned / duplicate are not in the history). */
   clear: 10,
   /** A PR of one's own merged. */
   merge: 5,
   /** かなめ: a scroll handed out at the reception (any Issue ever opened). */
   scroll: 3,
-} as const;
+};
 
 export const MAX_LEVEL = 99;
 

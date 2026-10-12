@@ -1,19 +1,20 @@
+import type { SnapshotHistory } from '@conect-guild/snapshot';
 import { describe, expect, it } from 'vitest';
 import { at, issue, snapshot, T0 } from '../domain/fixtures.test-util';
 import { xpForLevel } from '../domain/xp';
 import { buildParty } from './guildView';
 import { buildPartyLevels, KING_LEVEL } from './partyLevel';
 
-const history = {
+const history: SnapshotHistory = {
   openedIssueCount: 6,
   completedIssues: [
-    { number: 1, departments: ['経理' as const] },
-    { number: 2, departments: ['経理' as const, '総務' as const] },
+    { number: 1, departments: ['経理'] },
+    { number: 2, departments: ['経理', '総務'] },
     { number: 3, departments: [] },
   ],
   mergedPrs: [
     { number: 10, linkedIssues: [1], branchDepartment: null },
-    { number: 11, linkedIssues: [], branchDepartment: '企画' as const },
+    { number: 11, linkedIssues: [], branchDepartment: '企画' },
   ],
 };
 

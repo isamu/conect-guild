@@ -42,10 +42,10 @@ function inside(tag: LevelTag, area: { col: number; row: number; w: number; h: n
 
 describe('levelsOf', () => {
   it('takes each member with a level and leaves the king out', () => {
-    const rows = [
-      { id: 'kaname' as const, level: level(4) },
-      { id: 'minori' as const, level: level(1) },
-      { id: 'yukihiro' as const, level: KING_LEVEL },
+    const rows: { id: MemberId; level: PartyLevel }[] = [
+      { id: 'kaname', level: level(4) },
+      { id: 'minori', level: level(1) },
+      { id: 'yukihiro', level: KING_LEVEL },
     ];
     expect(levelsOf(rows)).toEqual({ kaname: 4, minori: 1 });
   });
