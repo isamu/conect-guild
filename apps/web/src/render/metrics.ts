@@ -251,7 +251,11 @@ export const TOSS = {
  * checks every member). Words that would meet a 「Lv N」 tag on a desk go up until they are
  * `tagGapPx` over it (overhead.overheadLift). A member who starts waiting on someone (the waiting
  * bubble is new) says a line `remarkMs` long only when the injected random number is under
- * `remarkChance` (remarks.ts: now and then, not every time). Times are ms, distances logical px.
+ * `remarkChance` (remarks.ts: now and then, not every time). One member at a time murmurs
+ * (murmurs.ts) for `murmurMs`; the next comes `murmurGapMinMs` to `murmurGapMaxMs` after it (drawn
+ * evenly), but never while a scene, a call or a remark plays nor sooner than `murmurRestMs` after
+ * one. A sleeper is chosen with the weight `sleepTalkWeight` against 1 for anyone awake. Times are
+ * ms, distances logical px.
  */
 export const LINES = {
   giveMs: 1_500,
@@ -262,6 +266,11 @@ export const LINES = {
   kingMs: 1_600,
   remarkMs: 2_000,
   remarkChance: 0.3,
+  murmurMs: 2_400,
+  murmurGapMinMs: 40_000,
+  murmurGapMaxMs: 90_000,
+  murmurRestMs: 2_000,
+  sleepTalkWeight: 0.3,
   recentLines: 2,
   raisedLiftPx: 36,
   tagGapPx: 2,

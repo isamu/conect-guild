@@ -1,6 +1,6 @@
 import type { MemberId } from '../guild.config';
 import type { Random } from './confetti';
-import { linesOf, type LineScene, type SpokenLine } from './lineBook';
+import { hasOwnLines, linesOf, type LineScene, type SpokenLine } from './lineBook';
 import { LINES } from './metrics';
 
 /**
@@ -46,6 +46,17 @@ const SHOW_MS: Readonly<Record<LineScene, number>> = {
   awaitPresident: LINES.remarkMs,
   awaitKaname: LINES.remarkMs,
   awaitPermission: LINES.remarkMs,
+  work: LINES.murmurMs,
+  idle: LINES.murmurMs,
+  doze: LINES.murmurMs,
+  sleepTalk: LINES.murmurMs,
+  tea: LINES.murmurMs,
+  pet: LINES.murmurMs,
+  chat: LINES.murmurMs,
+  windowMorning: LINES.murmurMs,
+  windowDay: LINES.murmurMs,
+  windowEvening: LINES.murmurMs,
+  windowNight: LINES.murmurMs,
 };
 
 /** How long a line of `scene` shows. */
@@ -77,11 +88,15 @@ export function remember<L>(recent: readonly L[], line: L): L[] {
   return [...recent, line].slice(-LINES.recentLines);
 }
 
-/** Picks from the line book, remembering the last lines of each member at each moment. */
+/**
+ * Picks from the line book, remembering the last lines of each member at each moment; the shared
+ * lines (lineBook.SHARED_LINES) are remembered for everyone at once, so one member does not say
+ * again what another has just said there.
+ */
 export function createLinePicker(random: Random): PickLine {
   const memory = new Map<string, readonly SpokenLine[]>();
   return (actor, scene) => {
-    const key = `${actor}:${scene}`;
+    const key = hasOwnLines(actor, scene) ? `${actor}:${scene}` : `shared:${scene}`;
     const recent = memory.get(key) ?? [];
     const line = pickLine(linesOf(actor, scene), recent, random);
     if (line !== null) memory.set(key, remember(recent, line));
