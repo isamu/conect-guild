@@ -292,7 +292,7 @@ describe('createGuildStore: localStorage unavailable', () => {
     await settle();
     expect(store.state.messages).toEqual([]);
     expect(store.state.effectsAvailable).toBe(true);
-    expect(storage.items.get(BASELINE_STORAGE_KEY)).toContain('"schemaVersion":1');
+    expect(storage.items.get(BASELINE_STORAGE_KEY)).toContain('"schemaVersion":2');
     store.stop();
   });
 });

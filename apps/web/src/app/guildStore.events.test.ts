@@ -210,6 +210,48 @@ describe('createGuildStore: halted screen', () => {
   });
 });
 
+describe('createGuildStore: another repository', () => {
+  const BASELINE_KEY = 'conect-guild:baseline';
+
+  it('shows no clear or merge from a baseline of the previous repository', async () => {
+    const storage = memoryStorage();
+    const store = setup([ok(first), ok({ ...busy, repo: 'new-team/company' })], storage);
+    store.start();
+    await settle();
+    await store.refresh();
+    expect(store.state.messages).toEqual([]);
+    expect(storage.getItem(BASELINE_KEY)).not.toBeNull();
+    expect(storage.getItem(BASELINE_KEY)).not.toContain('new-team');
+    store.stop();
+  });
+
+  it('halts on a snapshot of another repository and keeps its data off the screen', async () => {
+    const storage = memoryStorage();
+    const mismatch = { ok: false, reason: 'repo-mismatch' } as const;
+    const store = setup([mismatch, { ok: false, reason: 'network' }, ok(first)], storage);
+    store.start();
+    await settle();
+    expect(store.state.halted).toBe(true);
+    expect(store.state.haltReason).toBe('repo-mismatch');
+    expect(store.state.snapshot).toBeNull();
+    expect(storage.getItem(BASELINE_KEY)).toBeNull();
+    await store.refresh();
+    expect(store.state.haltReason).toBe('repo-mismatch');
+    await store.refresh();
+    expect(store.state.halted).toBe(false);
+    expect(store.state.haltReason).toBeNull();
+    store.stop();
+  });
+
+  it('names schema-version as the halt reason', async () => {
+    const store = setup([{ ok: false, reason: 'schema-version' }]);
+    store.start();
+    await settle();
+    expect(store.state.haltReason).toBe('schema-version');
+    store.stop();
+  });
+});
+
 describe('createGuildStore: no repeated or missing events', () => {
   it('does not send the same events again on the next fetches', async () => {
     const again = { ...busy, fetchedAt: minutesAfter(T0, 2) };

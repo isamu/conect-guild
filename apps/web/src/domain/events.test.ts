@@ -77,6 +77,22 @@ describe('diffSnapshot: when to stay quiet', () => {
   });
 });
 
+describe('diffSnapshot: another repository', () => {
+  it('treats a baseline of another repository as the first load', () => {
+    const base = baselineOf({ repo: 'old-team/company', issues: [issue(1)], prs: [pr(3)] });
+    const next = snapshot({
+      fetchedAt: T1,
+      repo: 'new-team/company',
+      issues: [closedIssue(1, T1), issue(2)],
+      prs: [mergedPr(3, T1)],
+    });
+    const result = diffSnapshot(base, next);
+    expect(result.events).toEqual([]);
+    expect(result.notice).toBeNull();
+    expect(result.baselineUpdate).toEqual({ action: 'replace', baseline: toBaseline(next) });
+  });
+});
+
 describe('diffSnapshot: Issue events', () => {
   it('opens a quest for a new open Issue with its department', () => {
     const result = diffSnapshot(

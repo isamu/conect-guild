@@ -2,6 +2,7 @@ import type { Snapshot } from '@conect-guild/snapshot';
 import { shallowReactive } from 'vue';
 import { z } from 'zod';
 import {
+  defaultExpectedRepo,
   loadSnapshot,
   type SnapshotLoadFailure,
   type SnapshotLoadResult,
@@ -33,8 +34,13 @@ export interface GuildState {
   snapshot: Snapshot | null;
   /** Failure of the latest fetch; null after a success. */
   failure: SnapshotLoadFailure | null;
-  /** True after a schema-version failure: the screen stops and asks to update the collector. */
+  /**
+   * True after a schema-version or repo-mismatch failure: the screen stops and asks to update the
+   * collector, or to wait for it to collect the repository in guild.settings.ts.
+   */
   halted: boolean;
+  /** Why the screen is halted; null while it is not. */
+  haltReason: HaltReason | null;
   /** False when localStorage cannot be read or written: the screen goes on without events. */
   effectsAvailable: boolean;
   /** Epoch ms of the latest finished fetch (success or failure). */
@@ -46,6 +52,12 @@ export interface GuildState {
   messages: readonly GuildMessage[];
   /** Result of the last "基準を消す". */
   baselineNotice: string | null;
+}
+
+export type HaltReason = Extract<SnapshotLoadFailure, 'schema-version' | 'repo-mismatch'>;
+
+function haltReasonOf(reason: SnapshotLoadFailure): HaltReason | null {
+  return reason === 'schema-version' || reason === 'repo-mismatch' ? reason : null;
 }
 
 export interface GuildStoreOptions {
@@ -101,6 +113,7 @@ function initialState(): GuildState {
     snapshot: null,
     failure: null,
     halted: false,
+    haltReason: null,
     effectsAvailable: true,
     checkedAt: null,
     messages: [],
@@ -116,13 +129,15 @@ function applyResult(
 ): readonly MessageEntry[] {
   if (!result.ok) {
     state.failure = result.reason;
-    // Once halted, only a snapshot of the expected version resumes the screen.
-    state.halted = state.halted || result.reason === 'schema-version';
+    // Once halted, only a snapshot of the expected version and repository resumes the screen.
+    state.haltReason = haltReasonOf(result.reason) ?? state.haltReason;
+    state.halted = state.haltReason !== null;
     return [];
   }
   state.snapshot = result.snapshot;
   state.failure = null;
   state.halted = false;
+  state.haltReason = null;
   const outcome = syncBaseline(storage, result.snapshot);
   state.effectsAvailable = outcome.effectsAvailable;
   return outcome.entries;
@@ -144,7 +159,8 @@ function queueInto(
 }
 
 export function createGuildStore(options: GuildStoreOptions = {}): GuildStore {
-  const load = options.loadSnapshot ?? (() => loadSnapshot());
+  const load =
+    options.loadSnapshot ?? (() => loadSnapshot({ expectedRepo: defaultExpectedRepo() }));
   const storage = options.storage ?? createKeyValueStore();
   const now = options.now ?? Date.now;
   const scheduler = options.scheduler ?? globalScheduler;

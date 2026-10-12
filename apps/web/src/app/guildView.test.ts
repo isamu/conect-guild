@@ -36,14 +36,19 @@ describe('buildBoard', () => {
       ],
     });
     const board = buildBoard(snap);
-    expect(board.map((g) => g.key)).toEqual(['reception', '経理', '広報', '総務']);
+    expect(board.map((g) => g.key)).toEqual([
+      'reception',
+      'department:経理',
+      'department:広報',
+      'department:総務',
+    ]);
     expect(board.map((g) => g.label)).toEqual([
       'かなめの受付',
       'みのり（経理）',
       'ひびき（広報）',
       'ささえ（総務）',
     ]);
-    const multi = board.find((g) => g.key === '広報')?.quests[0];
+    const multi = board.find((g) => g.key === 'department:広報')?.quests[0];
     expect(multi).toMatchObject({ number: 4, multiDepartment: true });
   });
 
@@ -263,7 +268,15 @@ describe('buildFetchStatus', () => {
   });
 
   it('labels every failure reason', () => {
-    const reasons = ['network', 'timeout', 'http', 'parse', 'invalid', 'schema-version'] as const;
+    const reasons = [
+      'network',
+      'timeout',
+      'http',
+      'parse',
+      'invalid',
+      'schema-version',
+      'repo-mismatch',
+    ] as const;
     for (const reason of reasons) {
       expect(buildFetchStatus(null, reason, 0).failure).toMatch(/^取得失敗（.+）$/);
     }

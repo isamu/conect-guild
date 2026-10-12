@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   BRANCH_PREFIX_RULES,
   DEPARTMENT_LABELS,
@@ -7,7 +7,10 @@ import {
   EVENT_GAP_LIMIT_MS,
   MEMBERS,
   RECENT_REWARD_WINDOW_MS,
+  RULE_CHANGE_PATHS,
   STALE_AFTER_MS,
+  type DepartmentLabel,
+  type MemberId,
 } from './guild.config';
 
 describe('guild.config', () => {
@@ -49,5 +52,53 @@ describe('guild.config', () => {
     expect(RECENT_REWARD_WINDOW_MS).toBe(7 * 24 * 3_600_000);
     expect(STALE_AFTER_MS).toBe(5 * 60_000);
     expect(EVENT_GAP_LIMIT_MS).toBe(7 * 24 * 3_600_000);
+  });
+});
+
+describe('guild.config from guild.settings.ts', () => {
+  it('keeps the literal types of the labels and ids', () => {
+    expectTypeOf<DepartmentLabel>().toEqualTypeOf<'経理' | '広報' | '企画' | '総務'>();
+    expectTypeOf<MemberId>().toEqualTypeOf<
+      'kaname' | 'minori' | 'hibiki' | 'hirame' | 'sasae' | 'yukihiro'
+    >();
+  });
+
+  it('keeps the colours and seats of the members', () => {
+    expect(
+      Object.fromEntries(Object.values(MEMBERS).map((m) => [m.id, [m.color, m.seat]])),
+    ).toEqual({
+      kaname: ['#e0b040', { col: 16, row: 7 }],
+      minori: ['#4caf50', { col: 12, row: 4 }],
+      hibiki: ['#e91e63', { col: 20, row: 4 }],
+      hirame: ['#2196f3', { col: 11, row: 10 }],
+      sasae: ['#9c6b3f', { col: 21, row: 10 }],
+      yukihiro: ['#8e44ad', { col: 16, row: 3 }],
+    });
+  });
+
+  it('maps the departments to the same members as before', () => {
+    expect(DEPARTMENT_MEMBER).toEqual({
+      経理: 'minori',
+      広報: 'hibiki',
+      企画: 'hirame',
+      総務: 'sasae',
+    });
+  });
+
+  it('keeps the branch prefix rules in their order', () => {
+    expect(BRANCH_PREFIX_RULES.map((r) => `${r.prefix}→${r.department}`)).toEqual([
+      'accounting/→経理',
+      'docs/accounting-→経理',
+      'pr/→広報',
+      'docs/pr-→広報',
+      'planning/→企画',
+      'docs/planning-→企画',
+      'general-affairs/→総務',
+      'docs/general-affairs-→総務',
+    ]);
+  });
+
+  it('reads the rule change paths from the settings', () => {
+    expect(RULE_CHANGE_PATHS.map((r) => r.match)).toEqual(['exact', 'suffix', 'prefix']);
   });
 });

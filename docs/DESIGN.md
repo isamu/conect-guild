@@ -23,7 +23,7 @@ conect.llc の「AI だけで動く会社」（司令塔かなめ 1 + 部門セ�
 
 ### メンバーの名前
 
-部門にはかなめと同じように名前を付ける（社長のリクエスト、2026-10-12）。名前は `guild.config.ts` の「部門 → 表示名」の対応表に置き、後から変えられるようにする。社長が確定した名前（2026-10-12）:
+部門にはかなめと同じように名前を付ける（社長のリクエスト、2026-10-12）。名前はリポジトリ直下の `guild.settings.ts`（3 章、10 章 9）に置き、後から変えられるようにする。社長が確定した名前（2026-10-12）:
 
 | 部門 | 名前 | 由来 |
 |---|---|---|
@@ -51,6 +51,7 @@ GitHub 上の部門ラベル（`経理` など）とは対応表で結び、Issu
 
 ```
 conect-guild/
+├── guild.settings.ts         チームごとの値をここだけに置く（10 章 9）。対象リポジトリ、メンバーの名前・役・色、部門（ラベル・担当・固定の順・セッションの起動ディレクトリ）、司令塔のセッションの起動ディレクトリ、ブランチ接頭辞 → 部門、ルール変更のパスの規則
 ├── apps/web/                 Vue 3 + Vite + TS（画面）
 │   ├── vite.config.ts        server.host を 127.0.0.1 に固定。snapshot 配信プラグインを登録
 │   ├── vite-plugin-snapshot.ts  開発時だけの自作プラグイン。/snapshot.json を .data/ から返す
@@ -59,7 +60,7 @@ conect-guild/
 │   ├── public/
 │   │   └── snapshot.sample.json  ダミー（架空の題名）。build と CI はこれだけを使う
 │   └── src/
-│       ├── guild.config.ts   部門 → 名前・色・席の位置、ブランチ接頭辞 → 部門
+│       ├── guild.config.ts   guild.settings.ts の値を画面の形に並べ直す（部門 → 担当、メンバー → 名前・色）。席の位置と時間の窓はここに置く（席を部門の数に合わせるのは Issue #18）
 │       ├── domain/           純粋関数。型とロジック。テストの主戦場
 │       │   ├── quest.ts      Issue → Quest（部門ラベル → 担当メンバー）
 │       │   ├── party.ts      メンバーの状態の導出（4 章の表）
@@ -85,8 +86,12 @@ conect-guild/
 │       ├── audio/            効果音（M4、4.8）。楽譜・鳴らす判定・設定は純粋、Web Audio は差し替えられる境界
 │       ├── ui/               Vue 部品: QuestBoard / PartyStatus / MessageWindow（Canvas の上に重ねる HTML）
 │       └── app/              Vue の reactive による小さなストア。Pinia は入れない
+├── packages/snapshot/        collector と画面が共有する型と zod の schema
+│   └── src/
+│       ├── index.ts          snapshot.json の schema（4.2）
+│       └── settings.ts       guild.settings.ts の schema。読み込んだ時点で検証し、合わなければ項目を挙げて止める
 ├── packages/collector/       収集スクリプト（TS。Node の型除去で直接実行）
-│   ├── collector.config.ts   対象リポジトリ（既定 yukihiroyamaguchi569/conect-management）、間隔、会社の 5 セッションの起動ディレクトリ、MulmoTerminal のファイルのパス
+│   ├── collector.config.ts   guild.settings.ts から対象リポジトリと会社のセッションの起動ディレクトリ（`~` をホームに展開）を受け取り、間隔、MulmoTerminal のファイルのパス、出力先を足す
 │   └── src/main.ts           `gh api` で Issue・PR を取り、MulmoTerminal のファイルからセッションの状態を読み、検証して .data/snapshot.json を原子的に書く
 ├── assets/                   コンセプト画、スプライト、タイル（出所とライセンスを README に書く）
 ├── docs/DESIGN.md            この文書
@@ -99,7 +104,7 @@ conect-guild/
 ## 4. データの流れ
 
 ```
-GitHub（collector.config.ts に固定したリポジトリの Issue / PR）    MulmoTerminal のファイル（~/.mulmoterminal/、読むだけ）
+GitHub（guild.settings.ts に固定したリポジトリの Issue / PR）    MulmoTerminal のファイル（~/.mulmoterminal/、読むだけ）
    │  gh api（execFile で引数配列。gh の認証を使う。60 秒ごと）          │  会社の 5 セッションの行だけ（5 秒ごと、4.7）
    ▼                                                                      ▼
 packages/collector ──検証して一時ファイルに書き rename──▶ apps/web/.data/snapshot.json（0600、gitignore）
@@ -115,7 +120,7 @@ packages/collector ──検証して一時ファイルに書き rename──▶
 
 ### 4.1 収集（packages/collector）
 
-- **対象リポジトリ**: `collector.config.ts` に固定する（既定 `yukihiroyamaguchi569/conect-management`）。コマンドライン引数や環境変数では変えられない
+- **対象リポジトリ**: `guild.settings.ts` の `repo` に固定する（既定 `yukihiroyamaguchi569/conect-management`）。コマンドライン引数や環境変数では変えられず、設定ファイルを書き換えて変える
 - **`gh` の呼び方**: `child_process.execFile('gh', [引数の配列])`。シェル文字列は組まない。認証はユーザーの `gh` のものをそのまま使う
 - **ページ送り**: `gh api --paginate --jq '<射影> | @json'` で、要るフィールドだけに絞った要素を 1 行 1 JSON で受け、行ごとに zod で検証する（`--slurp` は `--jq` と併用できない）。差分の中身や Issue の本文は gh の段階で落とす。ページが配列でなければ jq でエラーにし、空の一覧と取り違えない。`execFile` の `maxBuffer` は 64 MB にし、超えたら失敗として扱う。テストは複数ページの出力で行う
 - **Issue**: 全ページ取る。open は全部、closed は直近 7 日（`since` で絞り、`closed_at` で確かめる）。GitHub の Issue 一覧には PR が混ざるので、`pull_request` キーを持つものは除く
@@ -152,13 +157,14 @@ packages/collector ──検証して一時ファイルに書き rename──▶
 
 - 画面は 5 秒ごとに `/snapshot.json` を `cache: 'no-store'` で fetch する（M3 で 30 秒から短くした。手元の no-store の読み込みなので軽い）。ネットワークエラーと HTTP エラーの両方を扱い、失敗したら前回の表示を残して小さく「取得失敗」と出す
 - `schemaVersion` が画面の想定と違えば、表示を止めて「収集スクリプトを更新してください」と出す
+- 開発時（実データ）は snapshot の `repo` が `guild.settings.ts` の `repo` と違えば、表示を止めて「収集の対象と設定が違います」と出す（設定を変えた直後、新しいリポジトリの収集が成功するまで前のチームのデータを新しい名前・部門で出さないため）。build のダミーは照合しない
 - `fetchedAt`（GitHub の取得時刻）が 5 分より古ければ「情報が古い」の印を出す（collector が止まっている合図）。セッションの状態の古さは別に `sessions.checkedAt` で見る（4.7）
 - 開発時だけ、Vite の自作プラグイン（`configureServer` のミドルウェア。依存なし）が `/snapshot.json` を `apps/web/.data/snapshot.json` から返す。ファイルが無ければ 404。`.data/` は `public/` の外なので、Vite の public 監視による再読み込みは起きない
 
 ### 4.4 差分 → イベント（domain/events.ts, domain/baseline.ts）
 
-- 差分の基準はブラウザの `localStorage` に置く。保存するのは `{ schemaVersion, fetchedAt, issues: [{ number, state, closedAt }], prs: [{ number, state, mergedAt }] }` だけ。題名・ラベル・ブランチ名は保存しない
-- **初回**（基準が無い、または `schemaVersion` が違う）は演出を出さず、基準だけ保存する
+- 差分の基準はブラウザの `localStorage` に置く。保存するのは `{ schemaVersion, fetchedAt, repo, issues: [{ number, state, closedAt }], prs: [{ number, state, mergedAt }] }` だけ。`repo` はリポジトリ名の FNV-1a（32 bit）の値で、名前そのものは保存しない。題名・ラベル・ブランチ名も保存しない
+- **初回**（基準が無い、`schemaVersion` が違う、または基準の `repo` が今回のリポジトリと違う。`guild.settings.ts` の `repo` を変えた直後など）は演出を出さず、基準だけ保存する。`repo` を足したので基準の `schemaVersion` を 2 にした（1 の基準は初回扱い）
 - **巻き戻さない**: 今回の `fetchedAt` が基準の `fetchedAt` 以前なら、イベントも基準の更新もしない
 - **空白が長いとき**: 基準の `fetchedAt` が 7 日（収集の取得範囲）より古ければ、取りこぼしがありうるので演出を出さず、基準だけ置き換えてメッセージ窓に「この期間の出来事は復元できません」と出す
 - **基準の更新**は、取得と検証に成功したときだけ行う。失敗した取得では基準を変えない
@@ -169,15 +175,15 @@ packages/collector ──検証して一時ファイルに書き rename──▶
 
 ### 4.5 担当の決め方（domain/quest.ts, domain/party.ts）
 
-- **Issue の担当**: 部門ラベル（`経理`・`広報`・`企画`・`総務`）で決める
+- **Issue の担当**: 部門ラベル（`経理`・`広報`・`企画`・`総務`。`guild.settings.ts` の `departments`）で決める
   - 部門ラベルが 0 個 → 「かなめの受付（担当なし）」の巻物として受付に置く
-  - 2 個以上 → 固定の順（経理 → 広報 → 企画 → 総務）で最初のものを担当にし、巻物に「複数部門」の印を付ける
+  - 2 個以上 → 固定の順（`guild.settings.ts` の `departments` の並び順。既定は経理 → 広報 → 企画 → 総務）で最初のものを担当にし、巻物に「複数部門」の印を付ける
 - **PR の担当**: 次の順で決める
   1. `linkedIssues` のうち snapshot にある Issue の部門ラベル（複数あれば上と同じ固定の順）
-  2. 結べなければ、ブランチ名の接頭辞の対応表（`guild.config.ts`）で推定
+  2. 結べなければ、ブランチ名の接頭辞の対応表（`guild.settings.ts` の `branchPrefixes`。上から順に見て最初に当たったもの）で推定
   3. それも無ければ「担当不明」として、かなめの受付に置く
 - **PR の待ちの種類**（open PR だけ）
-  - `changedFiles` のどれかがルール変更に当たる → 社長の承認まち（conect-management のルール変更は社長がマージするため）。照合は glob を使わず、次の 3 つの文字列比較で行う
+  - `changedFiles` のどれかがルール変更に当たる → 社長の承認まち（conect-management のルール変更は社長がマージするため）。照合は glob を使わず、文字列比較で行う。規則は `guild.settings.ts` の `ruleChangePaths` に、`exact`（等しい）・`suffix`（で終わる）・`prefix`（で始まる）のどれかとパスの組で書く。既定は次の 3 つ
     - パスが `CLAUDE.md` に等しい（ルートの CLAUDE.md）
     - パスが `/CLAUDE.md` で終わる（`accounting/CLAUDE.md`、`projects/CLAUDE.md` など）
     - パスが `.claude/agents/` で始まる
@@ -213,7 +219,7 @@ M3 からは、セッションの状態（4.7）を混ぜる。優先順位は �
 
 **会社以外を捨てる**
 
-- 会社の 5 セッションの起動ディレクトリを `collector.config.ts` に固定する: `~/conect-management`（かなめ）、その下の `accounting`（経理）・`pr`（広報）・`planning`（企画）・`general-affairs`（総務）。ホームは `os.homedir()` で決め、引数・環境変数では変えない
+- 会社の 5 セッションの起動ディレクトリを `guild.settings.ts`（`commanderSessionDir` と `departments[].sessionDir`）に固定する: `~/conect-management`（かなめ）、その下の `accounting`（経理）・`pr`（広報）・`planning`（企画）・`general-affairs`（総務）。`~/` はホームの下を表し、ホームは `os.homedir()` で決める。引数・環境変数では変えない。設定の検証（collector と画面に共通）で、`~`・`~/...`・絶対パスのどれかで、前後の空白・制御文字・末尾の `/`・空や `.`・`..` の区切りが無く、5 つの文字列が互いに違うことを確かめる。`~` とホームの絶対パスのように展開すると同じになる重複は、collector だけが起動時にホームを展開してから調べて止まる（画面はセッションの起動ディレクトリを使わない）
 - 行ログは 1 行ずつストリームで読み、パスが 5 つに**完全一致する行だけ**を残す（末尾の `/`、子ディレクトリ、worktree は当たらない）。それ以外の行はその場で比べて捨て、変数にためず、保存も、件数を含めてログもしない。会社の ID が後で別のパスの行に出たら、その ID は会社の候補から外す（ID の最後の行が正）
 - パスごとに、残った候補のうち最後の行の ID を今のセッションとする。行は MulmoTerminal と同じく前後の空白を落とし、最初の空白で ID とパスに分ける（パスの中の空白はそのまま）。ID が UUID の形でない行、空行、壊れた行は飛ばす
 - 末尾の行（直後に改行が無い行）は書きかけかもしれない（MulmoTerminal は `\n<ID> <パス>` と行頭に改行を付けて追記するので、部門の行が会社のルートまでで途切れるとかなめの行に見える）。前回の周期でも同じ内容が同じ位置で末尾にあったときだけ使い、それ以外はその行を除いて決める。collector が覚えるのは末尾の行のハッシュと終わりの位置だけで、内容は持たない。新しいセッションの反映は最大 1 周期（5 秒）遅れる。`--once` では末尾の行を使わない
@@ -334,6 +340,16 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 6. 実データは `apps/web/.data/` に置き、開発時だけの自作プラグインで配信する。build と CI はダミーだけ（5 章）
 7. M3 のセッションの状態は、Claude Code の hooks を足さず、MulmoTerminal が書くファイルを collector が読んで取る（社長の判断）。5 セッションの設定を触らずに済む。会社の 5 つの起動ディレクトリに完全一致する行だけを使い、ほかは捨てる。MulmoTerminal の内部ファイルなので、形が合わなければリアルタイムだけを止める（4.7）
 8. リアルタイムの文言は「いま作業中」「許可待ち」のままにする。`sessions.checkedAt` が 30 秒より古いときにリアルタイムの状態を使わず GitHub だけで決める扱いも、このままにする（社長の判断。4.7）
+9. ほかのチームが使えるように、チームごとの値をリポジトリ直下の `guild.settings.ts` 1 つに集める（Issue #10。社長の判断で、部門の数に応じた席の並べ方は Issue #18 に分けた）
+   - 置く値: 対象リポジトリ（`repo`）、6 人の名前・役・色（`members`）、部門のラベル・担当・固定の順・セッションの起動ディレクトリ（`departments`）、司令塔のセッションの起動ディレクトリ（`commanderSessionDir`）、ブランチ接頭辞 → 部門（`branchPrefixes`）、ルール変更のパスの規則（`ruleChangePaths`。`exact`・`suffix`・`prefix` の 3 種類で、glob は使わない）
+   - 置かない値: 席の位置（Issue #18）、間隔・時間の窓、出力先、MulmoTerminal のファイルのパス（チームで変わらない）
+   - TS の値として書き（`as const satisfies`）、collector は Node の型除去で、画面は Vite で読む。JSON にしないのは、書き間違いを型検査でも拾え、ラベルのリテラル型を画面の型に使えるため。schema は `packages/snapshot/src/settings.ts` に置き、型は schema から推論する。読み込んだ時点で zod で検証し、合わなければ collector も画面も項目を挙げて止まる
+   - 検証すること: 余分な項目が無い、6 人がそろう、色が `#rrggbb`、部門が 4 つ（Issue #18 まで）、ラベル・担当・起動ディレクトリ（書いた文字列のまま）が重ならない、起動ディレクトリに前後の空白・制御文字が無い、ブランチ接頭辞の部門が部門のラベルにある、`repo` が `owner/name` の形
+   - 起動ディレクトリの `~` をホームに展開した後の重複は、共通の検証ではなく collector の起動時に調べて止める。画面は起動ディレクトリを使わないので、画面はそのまま動く
+   - メンバーの id（`kaname` など）は変えられない。絵（`assets/sprites/<id>.png`）、手の位置、席がこの id で引かれるため。司令塔は `kaname`、王は `yukihiro`
+   - 引数・環境変数では変えられない方針（4.1）は保つ。変えるときは設定ファイルを書き換える
+   - 画面のバンドルにも設定ファイル全体（対象リポジトリの名前と起動ディレクトリを含む）が入る。`dist/` は配布しない（5 章）ので扱いは変えない
+   - テスト（`npm run verify`）は conect.llc の設定を前提にする。部門ラベルの型を設定の値から作っているので、ほかのチーム向けに設定を変えると型検査とテストが通らない。その場合は `npm run collect` と `npm run dev` だけを使う（README。司令塔の判断。設定に依存しないテストは Issue #18 とあわせて考える）
 
 ## 11. 作り方の体制
 
@@ -343,6 +359,10 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 
 ## 変更履歴
 
+- **Issue #10（2026-10-12）** チームごとの値を 1 か所に集めた
+  - 対象リポジトリ、メンバーの名前・役・色、部門（ラベル・担当・固定の順）、ブランチ接頭辞 → 部門、ルール変更のパスの規則、会社のセッションの起動ディレクトリを、`collector.config.ts`・`guild.config.ts`・`domain/party.ts` から、リポジトリ直下の `guild.settings.ts` に移した。読み込んだ時点で zod で検証する（1 章、3 章、4.1、4.5、4.7、10 章 9）
+  - ルール変更のパスの規則を、glob を使わない 3 種類の文字列比較（`exact`・`suffix`・`prefix`）で設定に書く形にした。既定の 3 つの規則と照合の結果は変えていない（4.5）
+  - README に「自分のチームで使う」節を足した。部門の数に応じて席を並べるのは Issue #18
 - **M4 の一部（2026-10-12）** 昼夜と小物の動きを足した
   - 実際の時刻で部屋の明るさを変える（8 章。Issue #19）。効果音・累積の経験値とレベルは別に進める
   - 小物の動きを足した: いつも動くもの、部門の作業中に動くもの、出来事で動くもの（8 章。Issue #11）。PR マージで金貨の山が増える案は見送った

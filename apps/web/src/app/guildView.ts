@@ -4,7 +4,6 @@ import {
   DEPARTMENT_LABELS,
   DEPARTMENT_MEMBER,
   MEMBERS,
-  type DepartmentLabel,
   type MemberConfig,
   type MemberId,
 } from '../guild.config';
@@ -30,8 +29,10 @@ import type { GuildMessage } from './messageQueue';
 type SnapshotLists = Pick<Snapshot, 'issues' | 'prs'>;
 
 export interface BoardGroup {
-  /** 'reception' or the department label. */
-  readonly key: 'reception' | DepartmentLabel;
+  /**
+   * Unique key: 'reception', or `department:` + the label (a label may itself be "reception").
+   */
+  readonly key: 'reception' | `department:${string}`;
   readonly label: string;
   readonly color: string;
   readonly quests: readonly Quest[];
@@ -39,8 +40,8 @@ export interface BoardGroup {
 
 export const STATE_LABELS: Readonly<Record<MemberState, string>> = {
   'awaiting-permission': '許可待ち',
-  'awaiting-president': '社長の承認まち',
-  'awaiting-kaname': 'かなめの確認まち',
+  'awaiting-president': `${MEMBERS.yukihiro.role}の承認まち`,
+  'awaiting-kaname': `${MEMBERS.kaname.name}の確認まち`,
   busy: 'いま作業中',
   working: '作業中',
   done: '完了',
@@ -59,7 +60,7 @@ export function buildBoard(snapshot: SnapshotLists): BoardGroup[] {
   const departments = DEPARTMENT_LABELS.map((department): BoardGroup => {
     const member = MEMBERS[DEPARTMENT_MEMBER[department]];
     return {
-      key: department,
+      key: `department:${department}`,
       label: `${member.name}（${department}）`,
       color: member.color,
       quests: open.filter((quest) => quest.department === department),
@@ -161,7 +162,7 @@ function kingRow(waits: WaitCounts): PartyRow {
     return row(MEMBERS.yukihiro, {
       state: 'awaiting-president',
       stateLabel: `承認まち ${String(waits.president)} 件`,
-      tooltip: 'ルール（CLAUDE.md・.claude/agents/）を変える PR は社長がマージします',
+      tooltip: `ルールを変える PR は${MEMBERS.yukihiro.role}がマージします`,
       rewards: null,
     });
   }
@@ -260,6 +261,7 @@ const FAILURE_LABELS: Readonly<Record<SnapshotLoadFailure, string>> = {
   parse: 'データが壊れています',
   invalid: 'データの形が違います',
   'schema-version': '収集スクリプトを更新してください',
+  'repo-mismatch': '収集の対象と設定が違います',
 };
 
 export interface FetchStatusView {

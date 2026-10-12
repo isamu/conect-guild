@@ -36,6 +36,25 @@ describe('isRuleChangePath', () => {
     expect(isRuleChangePath(path)).toBe(false);
   });
 
+  it('takes the rules from the settings: exact, suffix and prefix', () => {
+    const rules = [
+      { match: 'exact', path: 'AGENTS.md' },
+      { match: 'suffix', path: '/RULES.md' },
+      { match: 'prefix', path: 'policy/' },
+    ] as const;
+    expect(isRuleChangePath('AGENTS.md', rules)).toBe(true);
+    expect(isRuleChangePath('x/AGENTS.md', rules)).toBe(false);
+    expect(isRuleChangePath('a/RULES.md', rules)).toBe(true);
+    expect(isRuleChangePath('RULES.md', rules)).toBe(false);
+    expect(isRuleChangePath('policy/a.md', rules)).toBe(true);
+    expect(isRuleChangePath('x/policy/a.md', rules)).toBe(false);
+    expect(isRuleChangePath('CLAUDE.md', rules)).toBe(false);
+  });
+
+  it('matches nothing without rules', () => {
+    expect(isRuleChangePath('CLAUDE.md', [])).toBe(false);
+  });
+
   it('treats glob characters literally', () => {
     expect(isRuleChangePath('*/CLAUDE.md')).toBe(true);
     expect(isRuleChangePath('**')).toBe(false);

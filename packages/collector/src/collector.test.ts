@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { COLLECTOR_CONFIG } from '../collector.config.ts';
+import { COLLECTOR_CONFIG, companySeatsOf, expandHome } from '../collector.config.ts';
 import { parseCliArgs } from './args.ts';
 
 describe('COLLECTOR_CONFIG', () => {
@@ -37,6 +37,48 @@ describe('COLLECTOR_CONFIG.sessions', () => {
     expect(COLLECTOR_CONFIG.sessions.activityStatePath).toBe(
       `${homedir()}/.mulmoterminal/activity-state.json`,
     );
+  });
+});
+
+describe('expandHome', () => {
+  it.each([
+    ['~', '/home/me'],
+    ['~/conect-management', '/home/me/conect-management'],
+    ['~/a/b c', '/home/me/a/b c'],
+    ['/srv/company', '/srv/company'],
+    ['/srv/~/x', '/srv/~/x'],
+  ])('turns %j into %j', (dir, expected) => {
+    expect(expandHome(dir, '/home/me')).toBe(expected);
+  });
+});
+
+describe('companySeatsOf', () => {
+  const departments = [
+    { label: '経理', sessionDir: '~/c/accounting' },
+    { label: '広報', sessionDir: '/srv/pr' },
+  ] as const;
+
+  it('expands the directories in order, the 司令塔 first', () => {
+    expect(companySeatsOf({ commanderSessionDir: '~/c', departments }, '/home/me')).toEqual([
+      { department: null, cwd: '/home/me/c' },
+      { department: '経理', cwd: '/home/me/c/accounting' },
+      { department: '広報', cwd: '/srv/pr' },
+    ]);
+  });
+
+  it('stops when two seats expand to the same directory', () => {
+    expect(() =>
+      companySeatsOf(
+        { commanderSessionDir: '~', departments: [{ label: '経理', sessionDir: '/home/me' }] },
+        '/home/me',
+      ),
+    ).toThrow(/same directory/);
+    expect(() =>
+      companySeatsOf(
+        { commanderSessionDir: '~/c', departments: [{ label: '経理', sessionDir: '/home/me/c' }] },
+        '/home/me',
+      ),
+    ).toThrow(/same directory/);
   });
 });
 

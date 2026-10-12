@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DEPARTMENT_LABELS } from './settings.ts';
 
 /** Bump when the snapshot shape changes; the web app refuses other versions. */
 export const SNAPSHOT_SCHEMA_VERSION = 2;
@@ -27,8 +28,10 @@ export const snapshotPrSchema = z.strictObject({
   changedFiles: z.array(z.string()),
 });
 
-/** Departments that have a session of their own. かなめ (the 司令塔) is `null`. */
-export const SESSION_DEPARTMENTS = ['経理', '広報', '企画', '総務'] as const;
+/**
+ * Departments that have a session of their own (guild.settings.ts). かなめ (the 司令塔) is `null`.
+ */
+export const SESSION_DEPARTMENTS = DEPARTMENT_LABELS;
 
 /**
  * What a company session is doing right now, read from MulmoTerminal (docs/DESIGN.md 4.7):
@@ -50,7 +53,7 @@ export const snapshotSessionsSchema = z.discriminatedUnion('status', [
   z.strictObject({
     status: z.literal('ok'),
     checkedAt: isoDateTime,
-    // Exactly one entry for かなめ and each department: the collector always writes all five.
+    // Exactly one entry for かなめ and each department: the collector always writes all of them.
     members: z
       .array(snapshotSessionSchema)
       .length(SESSION_DEPARTMENTS.length + 1)
