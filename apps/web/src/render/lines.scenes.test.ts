@@ -14,7 +14,7 @@ import {
 } from './director';
 import { linesOf, type LineScene } from './lineBook';
 import { createLinePicker, type PickLine, type Utterance } from './lines';
-import { sceneContext, scenesShown } from './loop';
+import { sceneContext, sceneContextWhile, scenesShown } from './loop';
 import { LINES, TOSS } from './metrics';
 import {
   DEFAULT_SEATS,
@@ -310,5 +310,33 @@ describe('the render loop’s sources of randomness (sceneContext)', () => {
     expect(talking.lines.given.length).toBeGreaterThan(0);
     expect(withLines.lines.length).toBeGreaterThan(0);
     expect({ ...withLines, lines: [] }).toEqual(withoutLines);
+  });
+});
+
+describe('scenes played while halted (sceneContextWhile)', () => {
+  it('says nothing and draws no line number while halted; the scene plays as without lines', () => {
+    const lines = noted(5);
+    const ctx = sceneContext({ lineRandom: lines.random }, () => 0.5);
+    const halted = scheduleEvent(
+      EMPTY_DIRECTOR,
+      event('issue-closed', '経理'),
+      0,
+      sceneContextWhile(ctx, true),
+    );
+    expect(halted.lines).toEqual([]);
+    expect(halted.bursts).toHaveLength(1);
+    expect(lines.given).toEqual([]);
+  });
+
+  it('keeps the picker when live', () => {
+    const ctx = sceneContext({}, () => 0.5);
+    expect(sceneContextWhile(ctx, false)).toBe(ctx);
+    const live = scheduleEvent(
+      EMPTY_DIRECTOR,
+      event('issue-closed', '経理'),
+      0,
+      sceneContextWhile(ctx, false),
+    );
+    expect(live.lines).toHaveLength(2);
   });
 });

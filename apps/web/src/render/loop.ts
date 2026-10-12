@@ -355,6 +355,11 @@ export function sceneContext(
   };
 }
 
+/** While halted no lines are picked: the lines of the scenes are dropped then (StageParty.halted). */
+export function sceneContextWhile(context: SceneContext, halted: boolean): SceneContext {
+  return halted ? { ...context, pickLine: undefined } : context;
+}
+
 export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   const { canvas, art } = options;
   const now = options.now ?? (() => performance.now());
@@ -401,7 +406,8 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   return {
     play(event) {
       // Members out playing come back first; the scene waits for them (idleCrew.playEvent).
-      director = playEvent(cast.crew, director, event, { t: stageNow(), context });
+      const quiet = sceneContextWhile(context, party.halted);
+      director = playEvent(cast.crew, director, event, { t: stageNow(), context: quiet });
       refresh();
     },
     summon(members) {
