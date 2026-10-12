@@ -19,10 +19,11 @@ const MARK: IdleMark = { kind: 'bubble', glyph: '♪' };
 const ALL: OverheadSources = {
   speeches: { minori: 'はっ！' },
   lines: { minori: 'おまかせを' },
+  remarks: { minori: 'ごしょうにんを' },
   bubbles: { minori: 'awaiting-president' },
 };
 
-function drop(...keys: ('speeches' | 'lines' | 'bubbles')[]): OverheadSources {
+function drop(...keys: ('speeches' | 'lines' | 'remarks' | 'bubbles')[]): OverheadSources {
   return { ...ALL, ...Object.fromEntries(keys.map((key) => [key, {}])) };
 }
 
@@ -33,13 +34,18 @@ describe('overheadOf: one thing over a head, the first that is there', () => {
     ['the words of the king’s call first', ALL, { kind: 'speech', words: 'はっ！' }],
     ['then a line of a scene', drop('speeches'), { kind: 'line', words: 'おまかせを' }],
     [
-      'then the waiting bubble',
+      'then a line on starting to wait',
       drop('speeches', 'lines'),
+      { kind: 'line', words: 'ごしょうにんを' },
+    ],
+    [
+      'then the waiting bubble',
+      drop('speeches', 'lines', 'remarks'),
       { kind: 'bubble', bubble: 'awaiting-president' },
     ],
     [
       'then the sign of an idle spell',
-      drop('speeches', 'lines', 'bubbles'),
+      drop('speeches', 'lines', 'remarks', 'bubbles'),
       { kind: 'mark', mark: MARK },
     ],
   ])('%s', (_name, sources, expected) => {
@@ -47,7 +53,9 @@ describe('overheadOf: one thing over a head, the first that is there', () => {
   });
 
   it('shows nothing when there is nothing', () => {
-    expect(overheadOf({ ...seated, mark: null }, drop('speeches', 'lines', 'bubbles'))).toBeNull();
+    expect(
+      overheadOf({ ...seated, mark: null }, drop('speeches', 'lines', 'remarks', 'bubbles')),
+    ).toBeNull();
   });
 
   it('shows a line of a scene while the member is in it (the waiting bubble hides there)', () => {
@@ -56,10 +64,19 @@ describe('overheadOf: one thing over a head, the first that is there', () => {
     expect(overheadOf(inScene, drop('speeches', 'lines'))).toBeNull();
   });
 
+  it('hides a line on starting to wait in a scene, as the waiting bubble (it is the seat’s)', () => {
+    const inScene = { id: 'minori', inScene: true, mark: MARK } as const;
+    expect(overheadOf(inScene, drop('speeches', 'lines', 'bubbles'))).toEqual({
+      kind: 'mark',
+      mark: MARK,
+    });
+  });
+
   it('looks only at the member’s own entries', () => {
     const others: OverheadSources = {
       speeches: { yukihiro: '！' },
       lines: { kaname: 'それっ！' },
+      remarks: { sasae: 'おねがいね' },
       bubbles: { hibiki: 'awaiting-permission' },
     };
     expect(overheadOf({ ...seated, mark: null }, others)).toBeNull();

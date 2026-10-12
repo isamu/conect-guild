@@ -11,8 +11,9 @@ import type { SpeechLine, Speeches } from './summons';
 
 /**
  * What shows over a member's head: one thing at a time (docs/DESIGN.md 4.11, Issue #47). The first
- * that is there wins: the words of the king's call (summons.ts), a line of a scene (lines.ts), the
- * waiting bubble (bubbles.ts), the sign of a long idle spell (idle.ts). Those below are hidden
+ * that is there wins: the words of the king's call (summons.ts), a line of a scene (lines.ts), a
+ * line on starting to wait (remarks.ts), the waiting bubble (bubbles.ts), the sign of a long idle
+ * spell (idle.ts). Those below are hidden
  * meanwhile, not delayed: each keeps its own times.
  */
 export type Overhead =
@@ -25,6 +26,8 @@ export type Overhead =
 export interface OverheadSources {
   readonly speeches: Speeches;
   readonly lines: SpokenLines;
+  /** Lines on starting to wait: like the waiting bubble, only at the seat out of scenes. */
+  readonly remarks: SpokenLines;
   readonly bubbles: Bubbles;
 }
 
@@ -36,6 +39,8 @@ export function overheadOf(
   if (speech !== undefined) return { kind: 'speech', words: speech };
   const line = sources.lines[member.id];
   if (line !== undefined) return { kind: 'line', words: line };
+  const remark = member.inScene ? undefined : sources.remarks[member.id];
+  if (remark !== undefined) return { kind: 'line', words: remark };
   const bubble = bubbleShown(sources.bubbles, member);
   if (bubble !== null) return { kind: 'bubble', bubble };
   return member.mark === null ? null : { kind: 'mark', mark: member.mark };

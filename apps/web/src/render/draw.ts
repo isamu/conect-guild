@@ -10,6 +10,7 @@ import type { IdleMark } from './idle';
 import { BUBBLE_RISE, DETAIL_SCALE, IDLE, OVERHEAD_OFFSET, TILE_SIZE } from './metrics';
 import { heldLook } from './hands';
 import type { LevelTag } from './levelTags';
+import type { SpokenLines } from './lines';
 import { overheadLift, overheadOf, wordsOf, type Overhead } from './overhead';
 import type { Point } from './path';
 import type { SpeechLine, Speeches } from './summons';
@@ -225,7 +226,7 @@ function drawOverheadOf(ctx: CanvasRenderingContext2D, shown: Overhead, feet: Po
 /**
  * Over everything, after the shade of the night (drawDaylight.ts), so they read the same at any
  * hour: one thing over each head (overhead.ts: the words of the king's summons, a line of a scene,
- * the waiting bubble or the sign of a long idle spell), and confetti.
+ * a line on starting to wait, the waiting bubble or the sign of a long idle spell), and confetti.
  */
 export function drawOverhead(
   ctx: CanvasRenderingContext2D,
@@ -233,6 +234,8 @@ export function drawOverhead(
     readonly frame: StageFrame;
     readonly bubbles: Bubbles;
     readonly speeches: Speeches;
+    /** Lines on starting to wait (remarks.ts). */
+    readonly remarks: SpokenLines;
     /** The 「Lv N」 tags on the desks, which words go over (overhead.overheadLift). */
     readonly tags: readonly LevelTag[];
   },
