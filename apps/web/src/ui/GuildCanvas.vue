@@ -13,6 +13,7 @@ import { ambientMoodsOf } from '../render/ambient';
 import type { GuildArt } from '../render/art';
 import { bubblesOf } from '../render/bubbles';
 import { hourFromQuery } from '../render/daylight';
+import { levelsOf } from '../render/levelTags';
 import { loadArt } from '../render/loadArt';
 import type { IdleSeeds, IdleSince } from '../render/idle';
 import { isShown, startRenderLoop, type RenderLoop, type StageParty } from '../render/loop';
@@ -57,7 +58,13 @@ function setIdleSince(next: IdleSince): void {
 }
 
 function stageParty(rows: readonly PartyRow[]): StageParty {
-  return { bubbles: bubblesOf(rows), moods: ambientMoodsOf(rows), idleSince, halted: props.halted };
+  return {
+    bubbles: bubblesOf(rows),
+    moods: ambientMoodsOf(rows),
+    idleSince,
+    halted: props.halted,
+    levels: levelsOf(rows),
+  };
 }
 
 /**

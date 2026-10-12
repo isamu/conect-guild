@@ -25,11 +25,13 @@ import {
 } from './draw';
 import { drawAnimatedDecor } from './drawDecor';
 import { drawLightPatches, drawShade, drawWindowSun, type ShadeScratch } from './drawDaylight';
+import { drawLevelTags } from './drawLevelTags';
 import { BACK_ANIMATED_DECOR, FRONT_LAYERS } from './layers';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './map';
 import { AMBIENT } from './metrics';
 import type { IdleSeeds, IdleSince } from './idle';
 import { createIdleCrew, playEvent, type IdleCrew } from './idleCrew';
+import { levelTags, type Levels } from './levelTags';
 import { DEFAULT_SEATS } from './scenes';
 import { createCalls, type CallView, type Calls } from './calls';
 import type { Speeches } from './summons';
@@ -84,7 +86,12 @@ export interface StageParty {
   readonly idleSince: IdleSince;
   /** The screen is halted (not live): the king's calls are dropped, to come or playing. */
   readonly halted: boolean;
+  /** The members' levels, shown small under their seats (levelTags.ts). */
+  readonly levels: Levels;
 }
+
+/** Before the first party: no bubbles, no moves, no levels. */
+const NO_PARTY: StageParty = { bubbles: {}, moods: {}, idleSince: {}, halted: false, levels: {} };
 
 export interface RenderLoop {
   /** Starts the scene for an event now (or when its cast is free); dropped while not shown. */
@@ -241,6 +248,7 @@ interface Moment {
   readonly bubbles: Bubbles;
   readonly speeches: Speeches;
   readonly cues: DecorCues;
+  readonly levels: Levels;
 }
 
 /**
@@ -259,6 +267,7 @@ function paint(painter: Painter, scale: number, moment: Moment): void {
   drawAnimatedDecor(ctx, art, moment, BACK_ANIMATED_DECOR);
   drawActors(ctx, moment, art, painter.front);
   drawShade(ctx, painter.scratch, light, lampLights(moment.now));
+  drawLevelTags(ctx, levelTags(moment.levels, DEFAULT_SEATS));
   drawOverhead(ctx, moment);
 }
 
@@ -335,16 +344,16 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   // Narrow screens hide the canvas (display: none): its width is 0 and nothing is drawn.
   let cssWidth = 1;
   let director: Director = EMPTY_DIRECTOR;
-  let bubbles: Bubbles = {};
-  let moods: AmbientMoods = {};
+  let party: StageParty = NO_PARTY;
   let scale = 1;
   let clock: StageClock = RUNNING_CLOCK;
   const stageNow = () => stageTime(clock, now());
 
   function draw(): void {
     const t = stageNow();
+    const { bubbles, moods, levels } = party;
     const { frame, speeches, calling, cues } = stageAt(cast, director, t, moods);
-    paint(painter, scale, { now: t, hour: localHour(), frame, bubbles, speeches, cues });
+    paint(painter, scale, { now: t, hour: localHour(), frame, bubbles, speeches, cues, levels });
     director = prune(director, t);
     // A call needs no more than the ambient pace: its words and turns change every few hundred ms.
     const ambient = Object.keys(moods).length > 0 || ANIMATED_DECOR.length > 0 || calling;
@@ -376,8 +385,8 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
     summon(members) {
       if (cast.calls.add(members, paused() ? null : stageNow())) schedule.now();
     },
-    setParty(party) {
-      ({ bubbles, moods } = party);
+    setParty(next) {
+      party = next;
       director = cast.receive(director, party, stageNow());
       schedule.now();
     },
