@@ -1,4 +1,5 @@
 import type { Snapshot, SnapshotIssue, SnapshotPr } from '@conect-guild/snapshot';
+import { departmentFromBranch as departmentFromBranchIn } from '@conect-guild/snapshot/settings';
 import {
   BRANCH_PREFIX_RULES,
   DEPARTMENT_LABELS,
@@ -49,7 +50,7 @@ export function indexIssues(issues: readonly SnapshotIssue[]): IssueIndex {
 
 /** Department from the branch name prefix table, or null when no rule matches. */
 export function departmentFromBranch(headRef: string): DepartmentLabel | null {
-  return BRANCH_PREFIX_RULES.find((rule) => headRef.startsWith(rule.prefix))?.department ?? null;
+  return departmentFromBranchIn(headRef, BRANCH_PREFIX_RULES);
 }
 
 /** linked Issues' department labels (fixed order) → branch prefix → unknown (かなめの受付). */

@@ -3,6 +3,7 @@ import {
   DEPARTMENT_LABELS,
   GUILD_SETTINGS,
   checkGuildSettings,
+  departmentFromBranch,
   guildSettingsSchema,
   isSessionDir,
   type GuildSettingsInput,
@@ -224,5 +225,32 @@ describe('isSessionDir', () => {
     '/a\tb',
   ])('rejects %j', (dir) => {
     expect(isSessionDir(dir)).toBe(false);
+  });
+});
+
+describe('departmentFromBranch', () => {
+  const rules = [
+    { prefix: 'docs/pr-', department: '広報' },
+    { prefix: 'docs/', department: '総務' },
+    { prefix: 'accounting/', department: '経理' },
+  ] as const;
+
+  it.each([
+    ['docs/pr-release', '広報'],
+    ['docs/other', '総務'],
+    ['accounting/x', '経理'],
+  ] as const)('maps %s to %s with the first rule that matches', (ref, department) => {
+    expect(departmentFromBranch(ref, rules)).toBe(department);
+  });
+
+  it.each(['main', 'accounting', 'xaccounting/foo', 'DOCS/a', ''])(
+    'finds nothing for %j',
+    (ref) => {
+      expect(departmentFromBranch(ref, rules)).toBeNull();
+    },
+  );
+
+  it('finds nothing without rules', () => {
+    expect(departmentFromBranch('accounting/x', [])).toBeNull();
   });
 });
