@@ -38,10 +38,11 @@ export interface Calls {
   /** Halted (the screen is not live): the calls to come and the one playing are dropped. */
   setHalted(halted: boolean): void;
   /**
-   * The frame at `t` with the call playing applied, and its words. Reports a call that starts
-   * (`onCallStart`) and drops the finished ones.
+   * The frame at `t` (built by `build`) with the call playing applied, and its words. First drops
+   * the finished calls (and wakes the king after the last one, before his pose is built), then
+   * reports a call that starts (`onCallStart`).
    */
-  view(frame: StageFrame, t: number): CallView;
+  view(build: () => StageFrame, t: number): CallView;
 }
 
 /**
@@ -66,20 +67,22 @@ export function createCalls(options: CallsOptions): Calls {
         holds = NO_HOLDS;
       }
     },
-    view(frame, t) {
-      const speeches = speechesAt(list, t);
+    view(build, t) {
+      const ended = endedSummons(list, t).length > 0;
+      list = pruneSummons(list, t);
+      // After the last call of a row (the king's pose stays put through all of them), and before
+      // the frame is built, so he is drawn awake at once and not asleep for one more frame.
+      if (ended && list.length === 0)
+        options.onActive?.(['yukihiro'], (options.wallNow ?? Date.now)());
+      const frame = build();
       holds = holdsAt(holds, frame, list, t);
+      const speeches = speechesAt(list, t);
       const applied = withSummons(frame, list, t, { seats: DEFAULT_SEATS, holds });
       const started = newCallStart(list, t, announced);
       if (started !== null) {
         announced = started;
         options.onCallStart?.();
       }
-      const ended = endedSummons(list, t).length > 0;
-      list = pruneSummons(list, t);
-      // After the last call of a row: the king's pose stays put through all of them.
-      if (ended && list.length === 0)
-        options.onActive?.(['yukihiro'], (options.wallNow ?? Date.now)());
       return { frame: applied, speeches, calling: isSummoning(list, t) };
     },
   };

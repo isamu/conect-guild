@@ -314,7 +314,8 @@ function stageAt(
   t: number,
   moods: AmbientMoods,
 ): CallView & { readonly cues: DecorCues } {
-  const view = cast.calls.view(cast.frame(director, t, moods), t);
+  // The king woken by the end of a call (onActive) never leaves the throne: `director` stays good.
+  const view = cast.calls.view(() => cast.frame(director, t, moods), t);
   return { ...view, cues: decorCuesOf(moods, director.bursts, t, view.frame.members) };
 }
 
