@@ -280,7 +280,7 @@ describe('decorPose', () => {
       'coin-pile': 'glint',
       megaphone: 'notes',
       globe: 'spin',
-      'key-board': 'swing',
+      'file-stack': 'papers',
       hourglass: 'sand',
       banner: 'flutter',
     });

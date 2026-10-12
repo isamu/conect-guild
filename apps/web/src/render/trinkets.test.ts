@@ -20,7 +20,6 @@ import {
   SAND_STREAM,
   sandGrainAt,
   spinBandAt,
-  swingAt,
   triggerOf,
   waveAt,
   type DecorCues,
@@ -93,7 +92,14 @@ describe('triggerOf', () => {
     expect(triggerOf({ name: 'coin-pile', row: 5 })).toEqual({ kind: 'working', member: 'minori' });
     expect(triggerOf({ name: 'megaphone', row: 5 })).toEqual({ kind: 'working', member: 'hibiki' });
     expect(triggerOf({ name: 'globe', row: 11 })).toEqual({ kind: 'working', member: 'hirame' });
-    expect(triggerOf({ name: 'key-board', row: 12 })).toEqual({ kind: 'working', member: 'sasae' });
+    expect(triggerOf({ name: 'file-stack', row: 11 })).toEqual({
+      kind: 'working',
+      member: 'sasae',
+    });
+  });
+
+  it('leaves the key board by the door still: it is too far from ささえ to read as hers', () => {
+    expect(triggerOf({ name: 'key-board', row: 12 })).toBeNull();
   });
 
   it('runs the hourglass for the king and flutters each banner for its side of the room', () => {
@@ -264,19 +270,6 @@ describe('spinBandAt', () => {
     expect(previous).toBe(GLOBE_BODY.right - TRINKETS.spinBandPx);
     expect(spinBandAt(0, TRINKETS.spinMs)).toBe(GLOBE_BODY.left);
     expect(spinBandAt(TRINKETS.spinMs / 2, 0)).toBe(spinBandAt(0, TRINKETS.spinMs / 2));
-  });
-});
-
-describe('swingAt', () => {
-  it('swings 0, right, 0, left within the keys’ reach', () => {
-    const quarter = TRINKETS.swingMs / 4;
-    expect([0, 1, 2, 3].map((q) => swingAt(0, q * quarter + 1))).toEqual([
-      0,
-      TRINKETS.swingPx,
-      0,
-      -TRINKETS.swingPx,
-    ]);
-    expect(swingAt(0, TRINKETS.swingMs)).toBe(0);
   });
 });
 

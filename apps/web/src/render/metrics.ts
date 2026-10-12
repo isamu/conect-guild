@@ -62,6 +62,39 @@ export const AMBIENT = {
 } as const;
 
 /**
+ * Long idle spells (idle.ts, Issue #23): after `dozeAfterMs` with nothing to do a member dozes at
+ * the seat, after `sleepAfterMs` they sleep or now and then get up to play. Play goes in cycles of
+ * `playCycleMs` on the wall clock: in each, a member plays with chance `playShare`, leaving up to
+ * `leaveMaxMs` after the cycle starts and staying `stayMinMs`–`stayMaxMs` before walking back, and
+ * sleeps for the rest. Times are ms, distances logical px.
+ */
+export const IDLE = {
+  dozeAfterMs: 10 * 60_000,
+  sleepAfterMs: 30 * 60_000,
+  playCycleMs: 4 * 60_000,
+  playShare: 0.4,
+  leaveMaxMs: 30_000,
+  stayMinMs: 40_000,
+  stayMaxMs: 150_000,
+  /** Dozing: the head nods down `nodPx` for half of every `nodMs`. */
+  nodMs: 1_400,
+  nodPx: 2,
+  /** One dozing cycle: a yawn (the side frame) in every fourth, a "…" in every third. */
+  dozeCycleMs: 6_000,
+  yawnMs: 1_260,
+  dozeDotsMs: 1_680,
+  /** Asleep: sunk a little deeper, a "Z" rising `zRisePx` and fading every `zRiseMs`. */
+  sleepSinkPx: 4,
+  zRiseMs: 2_100,
+  zRisePx: 14,
+  /** At a play spot: bubbles change every `bubbleMs`; at a window, a look aside every `lookMs`. */
+  bubbleMs: 1_680,
+  lookMs: 2_520,
+  /** The last-active times are written to localStorage when one moved on by this much. */
+  persistStepMs: 10_000,
+} as const;
+
+/**
  * How far a member at a seat is drawn below the feet of their tile (logical px), so the furniture
  * in front hides the lower body (seating.ts). Measured on the tiles: a desk's back edge is 12 px
  * below its top, the counter's 3 px, the throne's seat cushion 62 px.
@@ -129,9 +162,18 @@ export const TRINKETS = {
   /** 企画: a band of light crosses the globe once every `spinMs`, as if it turned. */
   spinMs: 1_960,
   spinBandPx: 4,
-  /** 総務: the keys swing `swingPx` at the bottom, once every `swingMs`. */
-  swingMs: 1_260,
-  swingPx: 2,
+  /**
+   * 総務: the papers on ささえ's file stack are sorted. Each turn of `shuffleMs` the top sheet
+   * slides `shuffleSlidePx`, lifts its corner, then lies flat again; on a share of the turns a
+   * sheet floats up off the stack, `floatRisePx` up and `floatDriftPx` aside at the top, and
+   * settles back on it by `floatMs`.
+   */
+  shuffleMs: 1_680,
+  shuffleSlidePx: 3,
+  floatShare: 0.35,
+  floatMs: 1_120,
+  floatRisePx: 14,
+  floatDriftPx: 6,
   /** The hourglass: a grain falls through the neck every `sandMs`. */
   sandMs: 700,
   /** A banner flutters while the confetti flies, `wavePx` at the bottom, one wave every `waveMs`. */

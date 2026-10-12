@@ -5,7 +5,8 @@ import type { DecorPlacement } from './decor';
 import { drawAnimatedDecor } from './drawDecor';
 import { BACK_OBJECTS, BACK_STILL_DECOR, stageSteps, type FrontLayer } from './layers';
 import { GROUND } from './map';
-import { BUBBLE_RISE, DETAIL_SCALE, OVERHEAD_OFFSET, TILE_SIZE } from './metrics';
+import type { IdleMark } from './idle';
+import { BUBBLE_RISE, DETAIL_SCALE, IDLE, OVERHEAD_OFFSET, TILE_SIZE } from './metrics';
 import { heldLook } from './hands';
 import type { Point } from './path';
 import type { DecorCues } from './trinkets';
@@ -49,14 +50,25 @@ export function drawFrontLayer(
   for (const item of layer.still) drawPlacement(ctx, art, item);
 }
 
-const BUBBLE_GLYPHS: Readonly<Record<BubbleKind, { glyph: string; color: string }>> = {
+interface Glyph {
+  readonly glyph: string;
+  readonly color: string;
+}
+
+const BUBBLE_GLYPHS: Readonly<Record<BubbleKind, Glyph>> = {
   'awaiting-permission': { glyph: '?', color: '#1a56b0' },
   'awaiting-president': { glyph: '!', color: '#b0103a' },
   'awaiting-kaname': { glyph: '…', color: '#222222' },
 };
 
+/** The signs of a long idle spell (idle.ts): fixed glyphs, never outside text. */
+const IDLE_GLYPHS: Readonly<Record<'…' | '♪', Glyph>> = {
+  '…': { glyph: '…', color: '#222222' },
+  '♪': { glyph: '♪', color: '#2a7a2a' },
+};
+
 /** A small bubble to the upper right of the head, drawn in detail pixels. */
-function drawBubble(ctx: CanvasRenderingContext2D, kind: BubbleKind, feet: Point): void {
+function drawBubble(ctx: CanvasRenderingContext2D, { glyph, color }: Glyph, feet: Point): void {
   ctx.save();
   ctx.translate(Math.round(feet.x), Math.round(feet.y - OVERHEAD_OFFSET));
   ctx.scale(DETAIL_SCALE, DETAIL_SCALE);
@@ -68,13 +80,36 @@ function drawBubble(ctx: CanvasRenderingContext2D, kind: BubbleKind, feet: Point
   ctx.strokeStyle = '#222222';
   ctx.lineWidth = 1;
   ctx.strokeRect(x + 0.5, y + 0.5, 10, 8);
-  const { glyph, color } = BUBBLE_GLYPHS[kind];
   ctx.fillStyle = color;
   ctx.font = 'bold 8px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(glyph, x + 5.5, y + 5);
   ctx.restore();
+}
+
+/** A "Z" rising from over the head and fading as it goes (`rise` 0 to 1), in detail pixels. */
+function drawSleepZ(ctx: CanvasRenderingContext2D, rise: number, feet: Point): void {
+  ctx.save();
+  ctx.translate(Math.round(feet.x), Math.round(feet.y - OVERHEAD_OFFSET));
+  ctx.scale(DETAIL_SCALE, DETAIL_SCALE);
+  ctx.globalAlpha = 1 - rise;
+  ctx.font = 'bold 8px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#ffffff';
+  ctx.fillStyle = '#1a3a8a';
+  const x = 6 + 2 * rise;
+  const y = -(IDLE.zRisePx / DETAIL_SCALE) * rise;
+  ctx.strokeText('Z', x, y);
+  ctx.fillText('Z', x, y);
+  ctx.restore();
+}
+
+function drawMark(ctx: CanvasRenderingContext2D, mark: IdleMark, feet: Point): void {
+  if (mark.kind === 'z') drawSleepZ(ctx, mark.rise, feet);
+  else drawBubble(ctx, IDLE_GLYPHS[mark.glyph], feet);
 }
 
 function drawConfetti(ctx: CanvasRenderingContext2D, view: ConfettiView): void {
@@ -136,7 +171,7 @@ export function drawActors(
 
 /**
  * Over everything, after the shade of the night (drawDaylight.ts), so they read the same at any
- * hour: the bubbles of the members out of scenes, and confetti.
+ * hour: the bubbles of the members out of scenes (or the signs of a long idle spell), and confetti.
  */
 export function drawOverhead(
   ctx: CanvasRenderingContext2D,
@@ -144,7 +179,8 @@ export function drawOverhead(
 ): void {
   for (const member of stage.frame.members) {
     const bubble = bubbleShown(stage.bubbles, member);
-    if (bubble !== null) drawBubble(ctx, bubble, member.pose.point);
+    if (bubble !== null) drawBubble(ctx, BUBBLE_GLYPHS[bubble], member.pose.point);
+    else if (member.mark !== null) drawMark(ctx, member.mark, member.pose.point);
   }
   for (const view of stage.frame.confetti) drawConfetti(ctx, view);
 }

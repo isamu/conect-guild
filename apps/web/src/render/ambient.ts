@@ -191,11 +191,11 @@ export function ambientPose(
  * Small things that move between scenes: the flames of lamps and candles flicker (a little added
  * light) and the sleeping cat breathes (1 px) and now and then stretches. The others move only at
  * times (trinkets.ts): a glint on the abacus and the coins, notes from the megaphone, the globe
- * turning, the keys swinging, the hourglass running and the banners fluttering. Pure: the time
+ * turning, the papers on ささえ's desk being sorted, the hourglass running and the banners fluttering. Pure: the time
  * and each thing's phase are passed in.
  */
 export type DecorMotion =
-  'flame' | 'breath' | 'glint' | 'notes' | 'spin' | 'swing' | 'sand' | 'flutter';
+  'flame' | 'breath' | 'glint' | 'notes' | 'spin' | 'papers' | 'sand' | 'flutter';
 
 export const DECOR_MOTION: Readonly<Partial<Record<DecorName, DecorMotion>>> = {
   lantern: 'flame',
@@ -207,7 +207,7 @@ export const DECOR_MOTION: Readonly<Partial<Record<DecorName, DecorMotion>>> = {
   'coin-pile': 'glint',
   megaphone: 'notes',
   globe: 'spin',
-  'key-board': 'swing',
+  'file-stack': 'papers',
   hourglass: 'sand',
   banner: 'flutter',
 };

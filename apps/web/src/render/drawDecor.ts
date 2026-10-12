@@ -7,17 +7,20 @@ import { TILE_SIZE, TRINKETS } from './metrics';
 import {
   activeSince,
   catStretchAt,
+  FILE_TOP,
+  floatingSheet,
   GLINT_POINTS,
   GLOBE_BODY,
   glintAt,
   notesAt,
+  papersAt,
   SAND_STREAM,
   sandGrainAt,
   spinBandAt,
-  swingAt,
   waveAt,
   type DecorCues,
   type Note,
+  type SheetRect,
 } from './trinkets';
 
 /**
@@ -166,10 +169,35 @@ function drawSpin(d: Drawing, thing: Thing): void {
   d.ctx.restore();
 }
 
-/** The keys swing: the lower rows go further, the top stays on its hook. */
-function drawSwing(d: Drawing, thing: Thing): void {
-  const dx = swingAt(thing.phaseMs, d.now);
-  drawShifted(d, thing, 2, (top, h) => Math.round((dx * top) / h));
+/** A white sheet with a dark outline around `r`, and a line of writing when it is tall enough. */
+function drawSheet(ctx: CanvasRenderingContext2D, r: SheetRect): void {
+  ctx.fillStyle = '#3a2a1a';
+  ctx.fillRect(r.x - 1, r.y - 1, r.w + 2, r.h + 2);
+  ctx.fillStyle = '#f6f1e2';
+  ctx.fillRect(r.x, r.y, r.w, r.h);
+  if (r.h < 3 || r.w < 5) return;
+  ctx.fillStyle = '#a89878';
+  ctx.fillRect(r.x + 2, r.y + 1, r.w - 4, 1);
+}
+
+/** Width of the lifted corner of the top sheet, px. */
+const CURL_W = 5;
+
+/** ささえ sorts her papers: the top sheet slides and lifts its corner, now and then one floats up. */
+function drawPapers(d: Drawing, thing: Thing): void {
+  d.art.decor.drawDecor(d.ctx, thing.name, thing.x, thing.y);
+  const { slide, curl, float } = papersAt(thing.phaseMs, d.now);
+  const x = thing.x + FILE_TOP.x + slide;
+  const y = thing.y + FILE_TOP.y;
+  const flat = curl ? FILE_TOP.w - CURL_W : FILE_TOP.w;
+  d.ctx.save();
+  drawSheet(d.ctx, { x, y, w: flat, h: FILE_TOP.h });
+  if (curl) drawSheet(d.ctx, { x: x + flat, y: y - 2, w: CURL_W, h: FILE_TOP.h - 1 });
+  if (float !== null) {
+    const sheet = floatingSheet(float);
+    drawSheet(d.ctx, { ...sheet, x: thing.x + sheet.x, y: thing.y + sheet.y });
+  }
+  d.ctx.restore();
 }
 
 /** A thin stream of sand through the neck, with a brighter grain falling down it. */
@@ -193,7 +221,7 @@ const DRAW: Readonly<Record<DecorMotion, (d: Drawing, thing: Thing) => void>> = 
   glint: drawGlint,
   notes: drawNotes,
   spin: drawSpin,
-  swing: drawSwing,
+  papers: drawPapers,
   sand: drawSand,
   flutter: drawFlutter,
 };
