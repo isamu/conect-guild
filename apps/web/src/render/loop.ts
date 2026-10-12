@@ -287,6 +287,8 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   const now = options.now ?? (() => performance.now());
   const localHour = options.localHour ?? (() => hourOf(new Date()));
   const random = options.random ?? Math.random;
+  // Never the injected `random`: an injected (reproducible) sequence keeps its confetti. Both
+  // default to Math.random, which has no sequence anyone could reproduce, so sharing it is harmless.
   const tossRandom = options.tossRandom ?? Math.random;
   const painter = createPainter(context2d(canvas), art);
   const cast = createCast(art, random, options);
