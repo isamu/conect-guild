@@ -1,5 +1,6 @@
 import { documentVisibility, type PageVisibility } from '../adapters/visibility';
 import type { GuildEvent } from '../domain/events';
+import type { MemberId } from '../guild.config';
 import { createAmbientSeeds, type AmbientMoods } from './ambient';
 import type { GuildArt } from './art';
 import type { Bubbles } from './bubbles';
@@ -216,6 +217,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   const ctx = context2d(canvas);
   const { background, front } = cachedScenery(art);
   const seeds = createAmbientSeeds(random);
+  const hasHoldFrames = (id: MemberId): boolean => art.sprites.hasHoldFrames(id);
   const visibility = options.visibility ?? documentVisibility;
   // Narrow screens hide the canvas (display: none): its width is 0 and nothing is drawn.
   let cssWidth = 1;
@@ -228,7 +230,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
 
   function draw(): void {
     const t = stageNow();
-    const frame = frameAt(director, t, DEFAULT_SEATS, { moods, seeds });
+    const frame = frameAt(director, t, DEFAULT_SEATS, { moods, seeds, hasHoldFrames });
     paint(ctx, { background, front, art, scale }, t, { frame, bubbles });
     director = prune(director, t);
     const ambient = Object.keys(moods).length > 0 || ANIMATED_DECOR.length > 0;
