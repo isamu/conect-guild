@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+import { createDemoSession, isDemoQuery } from './app/demo';
 import { useGuild } from './app/useGuild';
 import { useNarration } from './app/useNarration';
 import { useSound } from './app/useSound';
+import DemoStart from './ui/DemoStart.vue';
 import FetchStatus from './ui/FetchStatus.vue';
 import GuildCanvas from './ui/GuildCanvas.vue';
 import KingBubble from './ui/KingBubble.vue';
@@ -9,6 +12,10 @@ import MessageWindow from './ui/MessageWindow.vue';
 import PartyStatus from './ui/PartyStatus.vue';
 import QuestBoard from './ui/QuestBoard.vue';
 import SoundControl from './ui/SoundControl.vue';
+
+/** `?demo=1`: the fictional script instead of /snapshot.json, nothing kept (Issue #49). */
+const demo = isDemoQuery(globalThis.location.search) ? createDemoSession() : null;
+const demoWaiting = computed(() => demo !== null && !demo.started.value);
 
 const {
   state,
@@ -23,13 +30,13 @@ const {
   clearBaseline,
   setStageShown,
   setStage,
-} = useGuild();
+} = useGuild(demo?.guildOptions);
 const {
   settings: soundSettings,
   toggleSound,
   cycleVolume,
   callStarted,
-} = useSound({ message, party, halted: () => state.halted });
+} = useSound({ message, party, halted: () => state.halted }, demo?.storage);
 const { narration, next, idleSeeds, setIdleSince } = useNarration({
   message,
   party,
@@ -37,6 +44,12 @@ const { narration, next, idleSeeds, setIdleSince } = useNarration({
   nextMessage,
   halted: () => state.halted,
 });
+
+/** The canvas on screen or not: the messages stop waiting for scenes, the demo cannot start. */
+function onStageShown(shown: boolean): void {
+  setStageShown(shown);
+  demo?.setStageShown(shown);
+}
 </script>
 
 <template>
@@ -49,10 +62,12 @@ const { narration, next, idleSeeds, setIdleSince } = useNarration({
         :idle-seeds="idleSeeds"
         :summons="summons"
         :halted="state.halted"
-        @stage-shown="setStageShown"
+        :last-active-storage="demo?.storage"
+        @stage-shown="onStageShown"
         @stage="setStage"
         @call-started="callStarted"
         @idle-since="setIdleSince"
+        @ready="demo?.markReady()"
       />
       <section v-if="state.halted" class="rpg-window stage__halt" role="alert">
         <template v-if="state.haltReason === 'repo-mismatch'">
@@ -78,6 +93,12 @@ const { narration, next, idleSeeds, setIdleSince } = useNarration({
           :narration="narration"
           @next="next"
         />
+        <DemoStart
+          v-if="demoWaiting"
+          class="stage__demo"
+          :block="demo?.block.value ?? null"
+          @start="demo?.start()"
+        />
       </template>
       <div class="stage__side">
         <PartyStatus v-if="!state.halted" class="stage__party" :rows="party" />
@@ -85,6 +106,7 @@ const { narration, next, idleSeeds, setIdleSince } = useNarration({
           :status="fetchStatus"
           :effects-available="state.effectsAvailable"
           :baseline-notice="state.baselineNotice"
+          :demo="demo !== null"
           @clear-baseline="clearBaseline"
         >
           <SoundControl
@@ -131,7 +153,8 @@ const { narration, next, idleSeeds, setIdleSince } = useNarration({
 .stage__side,
 .stage__message,
 .stage__king,
-.stage__halt {
+.stage__halt,
+.stage__demo {
   position: absolute;
 }
 
@@ -181,6 +204,14 @@ const { narration, next, idleSeeds, setIdleSince } = useNarration({
   font-size: 1.2em;
 }
 
+/* The demo's はじめる, over the middle of the room. */
+.stage__demo {
+  left: 32%;
+  top: 30%;
+  width: 36%;
+  font-size: 1.1em;
+}
+
 /*
  * Narrow screens: stack the windows. The canvas is hidden because the windows no longer leave
  * its stage free; the king's row still shows 承認まち.
@@ -194,7 +225,8 @@ const { narration, next, idleSeeds, setIdleSince } = useNarration({
   .stage__board,
   .stage__side,
   .stage__message,
-  .stage__halt {
+  .stage__halt,
+  .stage__demo {
     position: static;
     width: auto;
     min-height: 0;

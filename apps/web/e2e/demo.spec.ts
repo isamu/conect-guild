@@ -1,0 +1,103 @@
+// The demo mode (Issue #49) on its own: not the shared fixtures, which serve /snapshot.json and
+// expect it to be read. Here any request for it fails the test.
+import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { drawnTexts, installCanvasTextRecorder } from './canvasText.ts';
+import { installFakeAudio } from './fakeAudio.ts';
+
+/** The first scroll is handed out about 5 s after はじめる (domain/demoScript.ts). */
+const FIRST_EVENT_TIMEOUT = 15_000;
+/** The king's call (summon, audio/scores.ts): D4 then G4, in Hz rounded. */
+const SUMMON_TONES = [294, 392];
+
+/** Errors of the page and every request for a snapshot, checked at the end of each test. */
+async function openDemo(page: Page, context: BrowserContext) {
+  const errors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(`console: ${message.text()}`);
+  });
+  page.on('pageerror', (error) => {
+    errors.push(`page: ${error.message}`);
+  });
+  // Answered here (never by the dev server, which would read apps/web/.data) and counted.
+  const snapshotRequests: string[] = [];
+  await context.route('**/snapshot*.json', (route) => {
+    snapshotRequests.push(route.request().url());
+    return route.fulfill({ status: 404, body: '' });
+  });
+  await page.addInitScript(installFakeAudio);
+  await page.addInitScript(installCanvasTextRecorder);
+  await page.goto('/?demo=1');
+  return { errors, snapshotRequests };
+}
+
+test('?demo=1 plays the fictional script with sound, never reading /snapshot.json', async ({
+  page,
+  context,
+}) => {
+  const { errors, snapshotRequests } = await openDemo(page, context);
+  const start = page.getByRole('button', { name: '▶ はじめる' });
+  await expect(start).toBeVisible();
+  const fetchStatus = page.getByRole('region', { name: '取得のようす' });
+  await expect(fetchStatus).toContainText('デモ（架空のデータ）');
+  await expect(fetchStatus).not.toContainText('情報が古い');
+
+  await start.click();
+  await expect(start).toBeHidden();
+  // First the king's order to かなめ (Issue #28): her session works, the king murmurs, one answer.
+  const rows = page.getByRole('region', { name: 'パーティのようす' }).getByRole('listitem');
+  await expect(rows.nth(0)).toContainText('かなめ');
+  await expect(rows.nth(0)).toContainText('いま作業中');
+  await expect.poll(() => drawnTexts(page)).toContain('ゴニョゴニョ');
+  await expect
+    .poll(async () => (await drawnTexts(page)).filter((t) => t === 'はっ！'))
+    .toEqual(['はっ！']);
+  // Its sound is the first to ring, on a running AudioContext (the click let the browser play).
+  await expect
+    .poll(() => page.evaluate(() => window.e2eToneFrequencies?.slice(0, 2)))
+    .toEqual(SUMMON_TONES);
+  expect(await page.evaluate(() => window.e2eAudioStates?.[0])).toBe('running');
+
+  const message = page.getByRole('region', { name: 'メッセージ' });
+  await expect(message).toContainText('「10 月分の請求書を作る」', {
+    timeout: FIRST_EVENT_TIMEOUT,
+  });
+  await expect(page.getByRole('region', { name: 'クエスト掲示板' })).toContainText(
+    '10 月分の請求書を作る',
+  );
+  // The scroll's sound follows the call's.
+  await expect.poll(() => page.evaluate(() => window.e2eStartedTones)).toBeGreaterThan(2);
+
+  // The levels (Issue #19) come from the demo's made-up history: everybody but the king has one.
+  await expect(rows).toHaveCount(6);
+  for (const i of [0, 1, 2, 3, 4]) await expect(rows.nth(i)).toContainText(/Lv \d+/);
+  await expect(rows.nth(5)).toContainText('おうさま');
+
+  // Nothing of the demo is kept in localStorage.
+  const keys = await page.evaluate(() => Object.keys(localStorage));
+  expect(keys.filter((key) => key.startsWith('conect-guild:'))).toEqual([]);
+  await expect(fetchStatus).not.toContainText('情報が古い');
+  expect(snapshotRequests).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test('on a narrow screen (the room hidden) はじめる waits until the screen is wider', async ({
+  page,
+  context,
+}) => {
+  await page.setViewportSize({ width: 700, height: 900 });
+  const { errors, snapshotRequests } = await openDemo(page, context);
+  const blocked = page.getByRole('button', { name: 'がめんを ひろげてください' });
+  await expect(blocked).toBeVisible();
+  await expect(blocked).toBeDisabled();
+
+  // Wider: the room shows, and the demo can start with the king's call.
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const start = page.getByRole('button', { name: '▶ はじめる' });
+  await expect(start).toBeEnabled();
+  await start.click();
+  await expect
+    .poll(() => page.evaluate(() => window.e2eToneFrequencies?.slice(0, 2)))
+    .toEqual(SUMMON_TONES);
+  expect(snapshotRequests).toEqual([]);
+  expect(errors).toEqual([]);
+});

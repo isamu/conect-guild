@@ -62,6 +62,23 @@ function defaultGetStorage(): StorageLike {
   return globalThis.localStorage;
 }
 
+/**
+ * A Storage kept in memory only: gone with the page. The demo mode (Issue #49) uses it so that it
+ * never touches what the real screen keeps in localStorage.
+ */
+export function createMemoryStorage(): StorageLike {
+  const items = new Map<string, string>();
+  return {
+    getItem: (key) => items.get(key) ?? null,
+    setItem: (key, value) => {
+      items.set(key, value);
+    },
+    removeItem: (key) => {
+      items.delete(key);
+    },
+  };
+}
+
 /** Creates a store over localStorage, or over the injected storage in tests. */
 export function createKeyValueStore(getStorage: GetStorage = defaultGetStorage): KeyValueStore {
   return {
