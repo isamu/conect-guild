@@ -24,6 +24,7 @@ describe('toBaseline', () => {
         { number: 3, state: 'open', mergedAt: null },
         { number: 4, state: 'closed', mergedAt: T0 },
       ],
+      levels: { kaname: 1, minori: 1, hibiki: 1, hirame: 1, sasae: 1 },
     });
   });
 

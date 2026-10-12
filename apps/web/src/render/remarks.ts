@@ -16,7 +16,7 @@ import { LINES } from './metrics';
 import { DEFAULT_SEATS } from './scenes';
 
 /**
- * A word when a member starts waiting on someone (Issue #47, docs/DESIGN.md 4.11): the waiting
+ * A word when a member starts waiting on someone (Issue #47, docs/DESIGN.md 4.12): the waiting
  * bubble (bubbles.ts) is new for them, and now and then (`LINES.remarkChance`) they say a line of
  * that wait for `LINES.remarkMs`; the bubble stays and shows again once the line is over. Pure: the
  * time, the random source (`lineRandom`, render/loop.ts) and who is free to speak are passed in.
@@ -125,6 +125,34 @@ export function receiveParty(remarks: Remarks, party: RemarkParty, moment: Remar
 /** Who says a remark at `t`. */
 export function remarksAt(remarks: Remarks, t: number): SpokenLines {
   return linesAt(remarks.said, t);
+}
+
+/**
+ * The remarks seen over the heads at `t`: those showing where nothing above them has the head (the
+ * king's call, a line of a scene) and the member is in no scene (where the waiting bubble hides too).
+ * Only these count as said for not repeating a line (lines.createLinePicker).
+ */
+export function seenRemarks(
+  remarks: Remarks,
+  t: number,
+  view: {
+    readonly frame: {
+      readonly members: readonly { readonly id: MemberId; readonly inScene: boolean }[];
+      readonly lines: SpokenLines;
+    };
+    readonly speeches: Readonly<Partial<Record<MemberId, unknown>>>;
+  },
+): Utterance[] {
+  const { frame, speeches } = view;
+  const inScene = new Set(frame.members.filter((m) => m.inScene).map((m) => m.id));
+  return remarks.said.filter(
+    (said) =>
+      said.start <= t &&
+      t < said.end &&
+      speeches[said.actor] === undefined &&
+      frame.lines[said.actor] === undefined &&
+      !inScene.has(said.actor),
+  );
 }
 
 /** True while a remark shows or is still to come. */

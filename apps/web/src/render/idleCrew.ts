@@ -128,3 +128,23 @@ export function playEvent(
   const walked = home !== undefined && home !== director.busyUntil[actor];
   return scheduleEvent(back, event, walked ? Math.max(at.t, home) : at.t, at.context);
 }
+
+/** Ms from now until each member is free at their seat (0 when they are already). */
+export type HomeIn = Readonly<Partial<Record<MemberId, number>>>;
+
+/**
+ * Calls `members` back to their seat ahead of their scene (a level-up, Issue #19): those out
+ * playing walk back now. Returns the new director and how long until each is free, which the
+ * message queue waits for so the message, its sound and the scene start together.
+ */
+export function recallHome(
+  crew: IdleCrew,
+  director: Director,
+  members: readonly MemberId[],
+  t: number,
+): { readonly director: Director; readonly homeIn: HomeIn } {
+  const moved = crew.callCast(director, members, t);
+  const homeIn: Partial<Record<MemberId, number>> = {};
+  for (const id of members) homeIn[id] = Math.max((moved.busyUntil[id] ?? t) - t, 0);
+  return { director: moved, homeIn };
+}

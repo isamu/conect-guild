@@ -11,7 +11,7 @@ import type { Point } from './path';
 import type { SpeechLine, Speeches } from './summons';
 
 /**
- * What shows over a member's head: one thing at a time (docs/DESIGN.md 4.11, Issue #47). The first
+ * What shows over a member's head: one thing at a time (docs/DESIGN.md 4.12, Issue #47). The first
  * that is there wins: the words of the king's call (summons.ts), a line of a scene (lines.ts), a
  * line on starting to wait (remarks.ts), the waiting bubble (bubbles.ts), the sign of a long idle
  * spell (idle.ts). Those below are hidden
@@ -144,4 +144,23 @@ function liftOverTags(
   // Now over the highest tag met, the bubble can only meet tags higher still: one step per tag.
   const rest = tags.filter((tag) => tag.top < Math.min(...tops));
   return liftOverTags(feet, bubble, higher, rest);
+}
+
+/**
+ * Where words over `member` are drawn from: the feet lifted as overheadLift lifts them, or null when
+ * no words are over the head (the king's call first, then a line: overheadOf). The words "LEVEL UP"
+ * of a level-up go over them (levelUp.bannerPoint).
+ */
+export function wordsFeet(
+  member: {
+    readonly id: MemberId;
+    readonly pose: { readonly point: Point; readonly held: Held | null };
+  },
+  sources: Pick<OverheadSources, 'speeches' | 'lines'>,
+  tags: readonly LevelTag[],
+): Point | null {
+  const words = sources.speeches[member.id] ?? sources.lines[member.id];
+  if (words === undefined) return null;
+  const { x, y } = member.pose.point;
+  return { x, y: y - overheadLift(member.pose, words, tags) };
 }

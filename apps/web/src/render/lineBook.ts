@@ -2,7 +2,8 @@ import type { MemberId } from '../guild.config';
 
 /**
  * What the members say over their heads at the moments of a scene, and now and then when they
- * start waiting on someone (Issue #47, docs/DESIGN.md 4.11). Fixed lines only: no title, label or branch name from a snapshot ever reaches a bubble,
+ * start waiting on someone (Issue #47, docs/DESIGN.md 4.12). Fixed lines only: no title, label or
+ * branch name from a snapshot ever reaches a bubble,
  * and the types keep it so (a bubble takes a SpokenLine, a union of these literals). Hiragana and
  * katakana with a few signs, at most 7 characters (lines.test.ts checks every one); no names, so
  * renaming a member in guild.settings.ts never puts a wrong name in someone's mouth. Nothing that
@@ -93,6 +94,24 @@ export type SpokenLine = { [M in MemberId]: LinesOf<M> }[MemberId];
 const BOOK: Readonly<
   Record<MemberId, Readonly<Partial<Record<LineScene, readonly SpokenLine[]>>>>
 > = LINE_BOOK;
+
+const SCENES: readonly LineScene[] = [
+  'handOver',
+  'toss',
+  'takeScroll',
+  'deliverChest',
+  'takeChest',
+  'clear',
+  'seeClear',
+  'awaitPresident',
+  'awaitKaname',
+  'awaitPermission',
+];
+
+/** The moment a member says `line` at (a member never has one line at two moments: lineBook.test.ts). */
+export function sceneOfLine(id: MemberId, line: SpokenLine): LineScene | null {
+  return SCENES.find((scene) => linesOf(id, scene).includes(line)) ?? null;
+}
 
 /** The lines a member may say at a moment; none when they say nothing there. */
 export function linesOf(id: MemberId, scene: LineScene): readonly SpokenLine[] {

@@ -18,6 +18,7 @@ import {
   receiveParty,
   remarksAt,
   remarkTurns,
+  seenRemarks,
   silenced,
   type RemarkMoment,
   type RemarkParty,
@@ -228,7 +229,9 @@ describe('receiveParty: several at once, and the lines', () => {
       { actor: 'minori', start: 3_000, end: 5_000 },
     ]);
   });
+});
 
+describe('receiveParty: who speaks when', () => {
   it('lets only those whose draw says yes speak, without a gap for the others', () => {
     const next = receiveParty(
       seen({}),
@@ -258,19 +261,81 @@ describe('receiveParty: several at once, and the lines', () => {
     ]);
   });
 
-  it('never says the same line twice in a row (the picker of the scenes)', () => {
-    const pick = createLinePicker(() => 0);
+  it('never says the same line twice in a row once seen (the picker of the scenes)', () => {
+    const picker = createLinePicker(() => 0);
     let remarks: Remarks = seen({});
     const said: string[] = [];
     for (let i = 0; i < 6; i += 1) {
       const t = i * 10_000;
       const bubbles: Bubbles = i % 2 === 0 ? { minori: 'awaiting-president' } : {};
-      remarks = receiveParty(remarks, party(bubbles), moment({ t, pick }));
+      remarks = receiveParty(remarks, party(bubbles), moment({ t, pick: picker.pick }));
+      picker.saw(seenRemarks(remarks, t, NOTHING_ABOVE), t);
       const line = remarksAt(remarks, t).minori;
       if (line !== undefined) said.push(line);
     }
     expect(said).toHaveLength(3);
     expect(new Set(said).size).toBe(3);
+  });
+
+  it('may say a line again that was never seen (hidden all along)', () => {
+    const picker = createLinePicker(() => 0);
+    const first = receiveParty(
+      seen({}),
+      party({ minori: 'awaiting-president' }),
+      moment({ pick: picker.pick }),
+    );
+    // Not reported to the picker: the next new wait may pick the same first line.
+    const again = receiveParty(
+      { previous: {}, said: [] },
+      party({ minori: 'awaiting-president' }),
+      moment({ t: 20_000, pick: picker.pick }),
+    );
+    expect(again.said[0]?.line).toBe(first.said[0]?.line);
+  });
+});
+
+/** A frame where nothing has the heads and nobody is in a scene. */
+const NOTHING_ABOVE = { frame: { members: [], lines: {} }, speeches: {} };
+
+describe('seenRemarks', () => {
+  const talking = receiveParty(seen({}), party({ minori: 'awaiting-president' }), moment());
+  const minori = (inScene: boolean) => ({ id: 'minori', inScene }) as const;
+
+  it('sees a remark showing with nothing above it', () => {
+    const view = { frame: { members: [minori(false)], lines: {} }, speeches: {} };
+    expect(seenRemarks(talking, 1_000, view)).toEqual(talking.said);
+    expect(seenRemarks(talking, 999, view)).toEqual([]);
+    expect(seenRemarks(talking, 3_000, view)).toEqual([]);
+  });
+
+  it('does not see one under the king’s call, a line of a scene, or in a scene', () => {
+    const members = [minori(false)];
+    expect(
+      seenRemarks(talking, 1_000, {
+        frame: { members, lines: {} },
+        speeches: { minori: 'はっ！' },
+      }),
+    ).toEqual([]);
+    expect(
+      seenRemarks(talking, 1_000, {
+        frame: { members, lines: { minori: 'おまかせを' } },
+        speeches: {},
+      }),
+    ).toEqual([]);
+    expect(
+      seenRemarks(talking, 1_000, { frame: { members: [minori(true)], lines: {} }, speeches: {} }),
+    ).toEqual([]);
+  });
+
+  it('looks only at the member’s own head', () => {
+    const view = {
+      frame: {
+        members: [minori(false), { id: 'hibiki', inScene: true }],
+        lines: { kaname: 'それっ！' },
+      },
+      speeches: { yukihiro: '！' },
+    } as const;
+    expect(seenRemarks(talking, 1_000, view)).toEqual(talking.said);
   });
 });
 
