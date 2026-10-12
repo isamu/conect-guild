@@ -91,5 +91,5 @@ export async function expectNarration(page: Page, timeout?: number): Promise<voi
   const window = page.getByRole('region', { name: 'メッセージ' });
   await expect(window.getByRole('button', { name: NARRATION_BUTTON })).toBeVisible({ timeout });
   await expect(window).not.toContainText(NOTHING_YET);
-  await expect(window).toHaveText(/\S/);
+  await expect(window.getByRole('paragraph')).toHaveText(/\S/);
 }
