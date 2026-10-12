@@ -8,7 +8,7 @@
       "vue",
       "ts"
     ],
-    "complete": false,
+    "complete": true,
     "size": {
       "files": 165,
       "sloc": 8887,
@@ -18,8 +18,8 @@
       {
         "dimension": "architecture",
         "status": "experimental",
-        "score": 100,
-        "coverage": 0.75,
+        "score": 87.5,
+        "coverage": 1,
         "metrics": [
           {
             "metric": "knip.unused_export_ratio",
@@ -30,7 +30,7 @@
               "bad": 0.2
             },
             "weight": 0.3,
-            "points": 40
+            "points": 30
           },
           {
             "metric": "knip.unused_file_ratio",
@@ -41,7 +41,7 @@
               "bad": 0.3
             },
             "weight": 0.25,
-            "points": 33.3333
+            "points": 25
           },
           {
             "metric": "knip.unused_dependencies",
@@ -52,18 +52,18 @@
               "bad": 10
             },
             "weight": 0.2,
-            "points": 26.6667
+            "points": 20
           },
           {
             "metric": "circular.cycle_count",
-            "value": 0,
-            "state": "skipped",
+            "value": 4,
+            "state": "ok",
             "scale": {
               "good": 0,
               "bad": 8
             },
             "weight": 0.25,
-            "points": 0
+            "points": 12.5
           }
         ],
         "confidence": "high",
@@ -669,6 +669,7 @@
       "coverage.line_pct": 77.24,
       "coverage.branch_pct": 85.44,
       "coverage.function_pct": 79.51,
+      "circular.cycle_count": 4,
       "readme-contract.has_readme": 1,
       "readme-contract.readme_words": 359,
       "comment-quality.marker_per_kloc": 0,
@@ -702,111 +703,31 @@
         "tier": 0
       },
       {
-        "rule": "oxlint/consistent-function-scoping",
+        "rule": "oxlint/no-await-in-loop",
         "severity": "warning",
-        "file": "apps/web/src/adapters/snapshot.test.ts",
+        "file": "apps/web/src/app/useNarration.test.ts",
         "line": 1,
-        "message": "Function `fetchFn` does not capture any variables from its parent scope",
+        "message": "Unexpected `await` inside a loop.",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
       },
       {
-        "rule": "oxlint/consistent-function-scoping",
+        "rule": "oxlint/no-await-in-loop",
         "severity": "warning",
-        "file": "apps/web/src/adapters/snapshot.test.ts",
+        "file": "apps/web/src/app/narrator.test.ts",
         "line": 1,
-        "message": "Function `fetchFn` does not capture any variables from its parent scope",
+        "message": "Unexpected `await` inside a loop.",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
       },
       {
-        "rule": "oxlint/consistent-function-scoping",
+        "rule": "oxlint/no-await-in-loop",
         "severity": "warning",
-        "file": "apps/web/src/render/loadArt.ts",
+        "file": "apps/web/src/app/narrator.test.ts",
         "line": 1,
-        "message": "Function `load` does not capture any variables from its parent scope",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/consistent-function-scoping",
-        "severity": "warning",
-        "file": "apps/web/src/render/director.test.ts",
-        "line": 1,
-        "message": "Function `drawnAt` does not capture any variables from its parent scope",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/consistent-function-scoping",
-        "severity": "warning",
-        "file": "apps/web/src/render/director.test.ts",
-        "line": 1,
-        "message": "Function `member` does not capture any variables from its parent scope",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/consistent-function-scoping",
-        "severity": "warning",
-        "file": "apps/web/src/render/director.test.ts",
-        "line": 1,
-        "message": "Function `member` does not capture any variables from its parent scope",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/consistent-function-scoping",
-        "severity": "warning",
-        "file": "apps/web/src/render/director.test.ts",
-        "line": 1,
-        "message": "Function `member` does not capture any variables from its parent scope",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/consistent-function-scoping",
-        "severity": "warning",
-        "file": "apps/web/vite-plugin-snapshot.test.ts",
-        "line": 1,
-        "message": "Function `resolveDone` does not capture any variables from its parent scope",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/consistent-function-scoping",
-        "severity": "warning",
-        "file": "apps/web/src/render/trinkets.papers.test.ts",
-        "line": 1,
-        "message": "Function `look` does not capture any variables from its parent scope",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-map-spread",
-        "severity": "warning",
-        "file": "apps/web/src/audio/judge.test.ts",
-        "line": 1,
-        "message": "Spreading to modify object properties in `map` calls is inefficient",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/consistent-function-scoping",
-        "severity": "warning",
-        "file": "apps/web/src/app/guildStore.events.test.ts",
-        "line": 1,
-        "message": "Function `heads` does not capture any variables from its parent scope",
+        "message": "Unexpected `await` inside a loop.",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -832,51 +753,11 @@
         "tier": 0
       },
       {
-        "rule": "oxlint/no-await-in-loop",
+        "rule": "oxlint/consistent-function-scoping",
         "severity": "warning",
-        "file": "apps/web/src/app/useNarration.test.ts",
+        "file": "apps/web/src/render/loadArt.ts",
         "line": 1,
-        "message": "Unexpected `await` inside a loop.",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-await-in-loop",
-        "severity": "warning",
-        "file": "packages/collector/src/run.ts",
-        "line": 1,
-        "message": "Unexpected `await` inside a loop.",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-await-in-loop",
-        "severity": "warning",
-        "file": "packages/collector/src/run.ts",
-        "line": 1,
-        "message": "Unexpected `await` inside a loop.",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-await-in-loop",
-        "severity": "warning",
-        "file": "apps/web/src/app/narrator.test.ts",
-        "line": 1,
-        "message": "Unexpected `await` inside a loop.",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-await-in-loop",
-        "severity": "warning",
-        "file": "apps/web/src/app/narrator.test.ts",
-        "line": 1,
-        "message": "Unexpected `await` inside a loop.",
+        "message": "Function `load` does not capture any variables from its parent scope",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -884,9 +765,9 @@
       {
         "rule": "oxlint/consistent-function-scoping",
         "severity": "warning",
-        "file": "apps/web/src/render/idle.ts",
+        "file": "apps/web/src/app/lastActive.test.ts",
         "line": 1,
-        "message": "Function `same` does not capture any variables from its parent scope",
+        "message": "Function `setup` does not capture any variables from its parent scope",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -932,11 +813,81 @@
         "tier": 0
       },
       {
+        "rule": "oxlint/no-await-in-loop",
+        "severity": "warning",
+        "file": "packages/collector/src/limit.test.ts",
+        "line": 1,
+        "message": "Unexpected `await` inside a loop.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-await-in-loop",
+        "severity": "warning",
+        "file": "packages/collector/src/limit.test.ts",
+        "line": 1,
+        "message": "Unexpected `await` inside a loop.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-await-in-loop",
+        "severity": "warning",
+        "file": "packages/collector/src/limit.test.ts",
+        "line": 1,
+        "message": "Unexpected `await` inside a loop.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
         "rule": "oxlint/consistent-function-scoping",
         "severity": "warning",
-        "file": "packages/collector/src/sessionFiles.test.ts",
+        "file": "apps/web/src/app/guildView.test.ts",
         "line": 1,
-        "message": "Function `id` does not capture any variables from its parent scope",
+        "message": "Function `live` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/director.test.ts",
+        "line": 1,
+        "message": "Function `drawnAt` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/director.test.ts",
+        "line": 1,
+        "message": "Function `member` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/director.test.ts",
+        "line": 1,
+        "message": "Function `member` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/director.test.ts",
+        "line": 1,
+        "message": "Function `member` does not capture any variables from its parent scope",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -954,7 +905,7 @@
       {
         "rule": "oxlint/no-await-in-loop",
         "severity": "warning",
-        "file": "packages/collector/src/limit.test.ts",
+        "file": "packages/collector/src/run.test.ts",
         "line": 1,
         "message": "Unexpected `await` inside a loop.",
         "probe": "oxlint",
@@ -964,7 +915,7 @@
       {
         "rule": "oxlint/no-await-in-loop",
         "severity": "warning",
-        "file": "packages/collector/src/limit.test.ts",
+        "file": "packages/collector/src/collect.test.ts",
         "line": 1,
         "message": "Unexpected `await` inside a loop.",
         "probe": "oxlint",
@@ -972,11 +923,81 @@
         "tier": 0
       },
       {
-        "rule": "oxlint/no-await-in-loop",
+        "rule": "oxlint/consistent-function-scoping",
         "severity": "warning",
-        "file": "packages/collector/src/limit.test.ts",
+        "file": "apps/web/src/app/guildView.ts",
         "line": 1,
-        "message": "Unexpected `await` inside a loop.",
+        "message": "Function `pad` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/trinkets.papers.test.ts",
+        "line": 1,
+        "message": "Function `look` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/adapters/snapshot.test.ts",
+        "line": 1,
+        "message": "Function `fetchFn` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/adapters/snapshot.test.ts",
+        "line": 1,
+        "message": "Function `fetchFn` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/app/guildStore.events.test.ts",
+        "line": 1,
+        "message": "Function `heads` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/map.test.ts",
+        "line": 1,
+        "message": "Function `byName` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/idle.ts",
+        "line": 1,
+        "message": "Function `same` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-map-spread",
+        "severity": "warning",
+        "file": "apps/web/src/audio/judge.test.ts",
+        "line": 1,
+        "message": "Spreading to modify object properties in `map` calls is inefficient",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -992,11 +1013,21 @@
         "tier": 0
       },
       {
-        "rule": "oxlint/consistent-function-scoping",
+        "rule": "oxlint/no-await-in-loop",
         "severity": "warning",
-        "file": "apps/web/src/app/lastActive.test.ts",
+        "file": "packages/collector/src/run.ts",
         "line": 1,
-        "message": "Function `setup` does not capture any variables from its parent scope",
+        "message": "Unexpected `await` inside a loop.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-await-in-loop",
+        "severity": "warning",
+        "file": "packages/collector/src/run.ts",
+        "line": 1,
+        "message": "Unexpected `await` inside a loop.",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -1004,9 +1035,9 @@
       {
         "rule": "oxlint/consistent-function-scoping",
         "severity": "warning",
-        "file": "apps/web/src/app/narration.test.ts",
+        "file": "apps/web/src/render/layers.test.ts",
         "line": 1,
-        "message": "Function `lines` does not capture any variables from its parent scope",
+        "message": "Function `layer` does not capture any variables from its parent scope",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -1014,9 +1045,19 @@
       {
         "rule": "oxlint/consistent-function-scoping",
         "severity": "warning",
-        "file": "apps/web/src/app/narration.test.ts",
+        "file": "apps/web/src/render/layers.test.ts",
         "line": 1,
-        "message": "Function `lineAt` does not capture any variables from its parent scope",
+        "message": "Function `member` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/layers.test.ts",
+        "line": 1,
+        "message": "Function `names` does not capture any variables from its parent scope",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -1057,46 +1098,6 @@
         "file": "packages/snapshot/src/settings.test.ts",
         "line": 1,
         "message": "Spreading to modify object properties in `map` calls is inefficient",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-map-spread",
-        "severity": "warning",
-        "file": "packages/snapshot/src/settings.test.ts",
-        "line": 1,
-        "message": "Spreading to modify object properties in `map` calls is inefficient",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-map-spread",
-        "severity": "warning",
-        "file": "packages/snapshot/src/settings.test.ts",
-        "line": 1,
-        "message": "Spreading to modify object properties in `map` calls is inefficient",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/consistent-function-scoping",
-        "severity": "warning",
-        "file": "apps/web/src/render/decor.test.ts",
-        "line": 1,
-        "message": "Function `working` does not capture any variables from its parent scope",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/prefer-set-has",
-        "severity": "warning",
-        "file": "apps/web/src/render/decor.test.ts",
-        "line": 1,
-        "message": "should be a `Set`, and use `.has()` to check existence or non-existence.",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -1220,6 +1221,46 @@
         "probe": "jscpd",
         "dimension": "readability",
         "tier": 0
+      },
+      {
+        "rule": "circular-dependency",
+        "severity": "warning",
+        "file": "apps/web/src/render/ambient.ts",
+        "line": 1,
+        "message": "import cycle: apps/web/src/render/ambient.ts → apps/web/src/render/confetti.ts → apps/web/src/render/path.ts → apps/web/src/render/map.ts → apps/web/src/render/decor.ts → apps/web/src/render/ambient.ts",
+        "probe": "circular",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "circular-dependency",
+        "severity": "warning",
+        "file": "apps/web/src/render/map.ts",
+        "line": 1,
+        "message": "import cycle: apps/web/src/render/map.ts → apps/web/src/render/decor.ts → apps/web/src/render/map.ts",
+        "probe": "circular",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "circular-dependency",
+        "severity": "warning",
+        "file": "apps/web/src/render/ambient.ts",
+        "line": 1,
+        "message": "import cycle: apps/web/src/render/ambient.ts → apps/web/src/render/confetti.ts → apps/web/src/render/path.ts → apps/web/src/render/map.ts → apps/web/src/render/decor.ts → apps/web/src/render/trinkets.ts → apps/web/src/render/ambient.ts",
+        "probe": "circular",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "circular-dependency",
+        "severity": "warning",
+        "file": "apps/web/src/render/path.ts",
+        "line": 1,
+        "message": "import cycle: apps/web/src/render/path.ts → apps/web/src/render/map.ts → apps/web/src/render/decor.ts → apps/web/src/render/trinkets.ts → apps/web/src/render/path.ts",
+        "probe": "circular",
+        "dimension": "architecture",
+        "tier": 1
       },
       {
         "rule": "style-block",
@@ -1400,10 +1441,11 @@
       {
         "probe": "circular",
         "status": {
-          "kind": "skipped",
-          "reason": "madge produced no readable report"
+          "kind": "ok"
         },
-        "tools": []
+        "tools": [
+          "madge"
+        ]
       },
       {
         "probe": "readme-contract",
@@ -1432,13 +1474,14 @@
       "jscpd": "4.3.0",
       "typescript": "6.0.3",
       "knip": "6.41.0",
-      "npm": "11.19.1"
+      "npm": "11.19.1",
+      "madge": "8.0.0"
     },
     "overall": {
-      "score": 88.5001,
+      "score": 87.1112,
       "scoredDimensions": 9,
       "comparable": false
     }
   },
-  "createdAt": "2026-10-12T05:29:22.975Z"
+  "createdAt": "2026-10-12T05:36:06.266Z"
 }
