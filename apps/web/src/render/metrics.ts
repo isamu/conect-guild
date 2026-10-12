@@ -129,9 +129,18 @@ export const TRINKETS = {
   /** 企画: a band of light crosses the globe once every `spinMs`, as if it turned. */
   spinMs: 1_960,
   spinBandPx: 4,
-  /** 総務: the keys swing `swingPx` at the bottom, once every `swingMs`. */
-  swingMs: 1_260,
-  swingPx: 2,
+  /**
+   * 総務: the papers on ささえ's file stack are sorted. Each turn of `shuffleMs` the top sheet
+   * slides `shuffleSlidePx`, lifts its corner, then lies flat again; on a share of the turns a
+   * sheet floats up off the stack, `floatRisePx` up and `floatDriftPx` aside at the top, and
+   * settles back on it by `floatMs`.
+   */
+  shuffleMs: 1_680,
+  shuffleSlidePx: 3,
+  floatShare: 0.35,
+  floatMs: 1_120,
+  floatRisePx: 14,
+  floatDriftPx: 6,
   /** The hourglass: a grain falls through the neck every `sandMs`. */
   sandMs: 700,
   /** A banner flutters while the confetti flies, `wavePx` at the bottom, one wave every `waveMs`. */
