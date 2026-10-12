@@ -123,6 +123,16 @@ describe('overheadLift: clear of the level tags', () => {
     expect(overheadLift(seated, null, [under])).toBe(0);
   });
 
+  it('goes on over a tag it meets only once lifted over the first', () => {
+    // Clear of the bubble where it is (its bottom 1 px over the top), met once it goes up.
+    const above: LevelTag = { ...under, y: box.top - 8 };
+    expect(tagBox(above).bottom).toBeLessThan(box.top);
+    const lift = overheadLift(seated, 'はい、どうぞ', [under, above]);
+    const lifted = wordsBox(FEET, 6, lift);
+    expect(tagBox(above).top - lifted.bottom).toBe(LINES.tagGapPx);
+    expect(lift).toBeGreaterThan(overheadLift(seated, 'はい、どうぞ', [under]));
+  });
+
   it('goes over the highest of two tags it meets', () => {
     const higher: LevelTag = { ...under, x: box.left + 20, y: box.top + 2 };
     expect(overheadLift(seated, 'はい、どうぞ', [under, higher])).toBe(

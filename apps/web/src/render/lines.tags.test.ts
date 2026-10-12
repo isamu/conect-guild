@@ -95,6 +95,8 @@ describe('line bubbles and level tags', () => {
         const boxes = bubbleBoxes(member.pose.point, lift, line);
         const met = TAGS.filter((tag) => boxes.some((box) => meet(box, tag)));
         expect({ who: member.id, t, met }).toEqual({ who: member.id, t, met: [] });
+        // Still on the canvas.
+        expect(boxes[0]?.top).toBeGreaterThanOrEqual(0);
         checked += 1;
       }
     }

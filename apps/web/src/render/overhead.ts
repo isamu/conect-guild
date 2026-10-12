@@ -84,7 +84,8 @@ function meet(a: Box, b: Box): boolean {
  * How far up what is over the head goes: clear of an item held up over it (`raisedLiftPx`), and
  * for words, clear of the 「Lv N」 tags on the desks (levelTags.ts) too: a long line from a lower
  * seat reaches the tag on the counter or a desk up the room (ひらめ's to かなめ's, かなめ's to
- * ひびき's), and then goes up until its bottom is `tagGapPx` over the tag.
+ * ひびき's), and then goes up until its bottom is `tagGapPx` over the tag; again if it then meets
+ * another one higher up (at most once per tag, as each step clears the highest one it meets).
  */
 export function overheadLift(
   pose: { readonly point: Point; readonly held: Held | null },
@@ -93,10 +94,16 @@ export function overheadLift(
 ): number {
   const raised = pose.held?.hold === 'raise' ? LINES.raisedLiftPx : 0;
   if (words === null) return raised;
-  const box = wordsBox(pose.point, Array.from(words).length, raised);
-  const tops = tags
-    .map(tagBox)
-    .filter((tag) => meet(box, tag))
-    .map((tag) => tag.top);
-  return tops.length === 0 ? raised : raised + box.bottom - Math.min(...tops) + LINES.tagGapPx;
+  return liftOverTags(pose.point, Array.from(words).length, raised, tags.map(tagBox));
+}
+
+/** `lift`, or more until words of `chars` characters meet none of `tags` (one step per tag). */
+function liftOverTags(feet: Point, chars: number, lift: number, tags: readonly Box[]): number {
+  const box = wordsBox(feet, chars, lift);
+  const tops = tags.filter((tag) => meet(box, tag)).map((tag) => tag.top);
+  if (tops.length === 0) return lift;
+  const higher = lift + box.bottom - Math.min(...tops) + LINES.tagGapPx;
+  // Now over the highest tag met, the bubble can only meet tags higher still: one step per tag.
+  const rest = tags.filter((tag) => tag.top < Math.min(...tops));
+  return liftOverTags(feet, chars, higher, rest);
 }
