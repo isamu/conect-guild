@@ -184,6 +184,18 @@ describe('createSoundController: permissions', () => {
     expect(cues(player)).toEqual(['permission', 'permission']);
   });
 
+  it('takes the first party after a halt as the new starting point, without ringing', () => {
+    const { player, controller } = setup({ enabled: true, volume: 2 });
+    controller.partyChanged(party());
+    controller.setHalted(true);
+    controller.setHalted(false);
+    // Waits that began during the halt were never seen: they do not ring on the way back.
+    controller.partyChanged(party('minori'));
+    expect(player.played).toEqual([]);
+    controller.partyChanged(party('minori', 'hibiki'));
+    expect(cues(player)).toEqual(['permission']);
+  });
+
   it('does not ring for those already waiting on the first snapshot', () => {
     const { player, controller } = setup({ enabled: true, volume: 2 });
     controller.partyChanged([]);

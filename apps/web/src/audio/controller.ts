@@ -92,6 +92,9 @@ export function createSoundController(options: SoundControllerOptions): SoundCon
       hidden = next;
     },
     setHalted(next) {
+      // The party kept from before the halt is stale: the first one after it is only the new
+      // starting point, so waits that began meanwhile do not ring on the way back.
+      if (halted && !next) previousParty = null;
       halted = next;
     },
   };
