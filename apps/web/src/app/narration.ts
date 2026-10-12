@@ -9,7 +9,7 @@ import {
 import type { MemberState } from '../domain/party';
 import { countRecentRewards } from '../domain/reward';
 import type { DayPhase } from '../render/daylight';
-import type { IdleActivity } from '../render/idle';
+import type { IdleActivity, Outing } from '../render/idle';
 import type { PlaySpot } from '../render/idleSpots';
 import type { Random } from '../render/confetti';
 
@@ -36,7 +36,37 @@ export type LineGroup = readonly string[];
 
 const kanameName = (): string => MEMBERS.kaname.name;
 
-function playLines(name: string, spot: PlaySpot): LineGroup {
+/** Where the walk out heads for. */
+function destination(spot: PlaySpot): string {
+  switch (spot.kind) {
+    case 'tea':
+      return 'おちゃの ところ';
+    case 'pet':
+      return `${PET_NAME}の ところ`;
+    case 'window':
+      return 'まどべ';
+    case 'chat':
+      return spot.partner === null ? 'となりの せき' : `${MEMBERS[spot.partner].name}の ところ`;
+  }
+}
+
+export type PlayStep = 'going' | 'staying' | 'returning';
+
+/** Where an outing is at `now` (epoch ms): walking out, at the spot, or walking back (idle.ts). */
+export function playStepAt(outing: Outing, now: number): PlayStep {
+  if (now < outing.out.end) return 'going';
+  return now >= outing.back.start ? 'returning' : 'staying';
+}
+
+function playLines(name: string, outing: Outing, now: number): LineGroup {
+  const step = playStepAt(outing, now);
+  if (step === 'going') return [`${name}は ${destination(outing.spot)}へ むかっている。`];
+  if (step === 'returning') return [`${name}は せきに もどっている。`];
+  return stayLines(name, outing.spot);
+}
+
+/** At the spot: what the canvas shows them doing there. */
+function stayLines(name: string, spot: PlaySpot): LineGroup {
   switch (spot.kind) {
     case 'tea':
       return [`${name}は おちゃを のんで ひといき ついている。`];
@@ -54,7 +84,12 @@ function playLines(name: string, spot: PlaySpot): LineGroup {
 }
 
 /** A member with nothing to do for a while: dozing, asleep, or out playing (render/idle.ts). */
-function idleLines(name: string, activity: IdleActivity, onThrone: boolean): LineGroup {
+function idleLines(
+  name: string,
+  activity: IdleActivity,
+  onThrone: boolean,
+  now: number,
+): LineGroup {
   const where = onThrone ? 'ぎょくざで ' : '';
   switch (activity.kind) {
     case 'doze':
@@ -64,7 +99,7 @@ function idleLines(name: string, activity: IdleActivity, onThrone: boolean): Lin
     case 'sleep':
       return [`${name}は ${where}すやすや ねむっている…`, `${name}は ${where}いびきを かいている…`];
     case 'play':
-      return playLines(name, activity.outing.spot);
+      return playLines(name, activity.outing, now);
   }
 }
 
@@ -117,15 +152,18 @@ function kingLines(member: NarrationMember): LineGroup {
 }
 
 /**
- * How one member looks now (A). `activity` is their long idle spell (render/idle.ts
+ * How one member looks now (A). `activity` is their long idle spell at `now` (epoch ms; render/idle.ts
  * idleActivities); undefined while they are awake or have work.
  */
 export function memberLines(
   member: NarrationMember,
   activity: IdleActivity | undefined,
+  now: number,
 ): LineGroup {
   const king = member.id === 'yukihiro';
-  if (activity !== undefined) return idleLines(king ? KING_TITLE : member.name, activity, king);
+  if (activity !== undefined) {
+    return idleLines(king ? KING_TITLE : member.name, activity, king, now);
+  }
   if (king) return kingLines(member);
   return member.id === 'kaname' ? kanameLines(member) : departmentLines(member);
 }
@@ -232,7 +270,7 @@ export interface NarrationInput {
 export function narrationPools(input: NarrationInput): NarrationPools {
   if (input.party.length === 0) return { scene: [], time: [], record: [] };
   return {
-    scene: input.party.map((member) => memberLines(member, input.activities[member.id])),
+    scene: input.party.map((member) => memberLines(member, input.activities[member.id], input.now)),
     time: [DAY_LINES[input.phase]],
     record: recordLines(input.snapshot, input.now),
   };

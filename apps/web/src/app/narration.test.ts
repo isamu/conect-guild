@@ -23,6 +23,7 @@ import {
   narrationPools,
   PET_NAME,
   pickNarration,
+  playStepAt,
   recordLines,
   type NarrationMember,
   type NarrationPools,
@@ -45,9 +46,14 @@ function spotOf(id: MemberId, kind: PlaySpot['kind']): PlaySpot {
   return spot;
 }
 
+/** Back from the spot starts here; out at 0, so any time between is the stay. */
+const BACK_AT = 1_000_000;
+const STAY = BACK_AT / 2;
+
 function play(spot: PlaySpot): IdleActivity {
-  const segment = walkSegment(spot.path, 0);
-  return { kind: 'play', outing: { spot, out: segment, back: segment } };
+  // The way back is the same tiles; only its times matter here.
+  const back = walkSegment(spot.path, BACK_AT);
+  return { kind: 'play', outing: { spot, out: walkSegment(spot.path, 0), back } };
 }
 
 /** A random source that returns the given draws in turn (then the last one). */
@@ -67,38 +73,42 @@ describe('memberLines: by state (A)', () => {
     ['idle', 'ひびきは せきで のんびり している。'],
   ];
   it.each(cases)('a department member %s', (state, line) => {
-    expect(memberLines(member('hibiki', state), undefined)).toContain(line);
+    expect(memberLines(member('hibiki', state), undefined, NOW)).toContain(line);
   });
 
   it('gives several lines to busy members, all naming them', () => {
-    const lines = memberLines(member('sasae', 'busy'), undefined);
+    const lines = memberLines(member('sasae', 'busy'), undefined, NOW);
     expect(lines.length).toBeGreaterThan(1);
     expect(lines).toContain('ささえは しょるいを さばいている。');
     for (const line of lines) expect(line.startsWith('ささえ')).toBe(true);
   });
 
   it('has its own lines for かなめ at the reception', () => {
-    expect(memberLines(member('kaname', 'working'), undefined)).toEqual([
+    expect(memberLines(member('kaname', 'working'), undefined, NOW)).toEqual([
       'かなめは うけつけで まきものを ととのえている。',
     ]);
-    expect(memberLines(member('kaname', 'awaiting-kaname'), undefined)).toEqual([
+    expect(memberLines(member('kaname', 'awaiting-kaname'), undefined, NOW)).toEqual([
       'かなめは とどいた PRを たしかめている。',
     ]);
-    expect(memberLines(member('kaname', 'awaiting-permission'), undefined)).toEqual([
+    expect(memberLines(member('kaname', 'awaiting-permission'), undefined, NOW)).toEqual([
       'かなめが きょかを まっている！',
     ]);
-    expect(memberLines(member('kaname', 'idle'), undefined)[0]).toMatch(/^かなめは うけつけで/);
+    expect(memberLines(member('kaname', 'idle'), undefined, NOW)[0]).toMatch(
+      /^かなめは うけつけで/,
+    );
   });
 
   it('calls the king おうさま, on the throne', () => {
-    expect(memberLines(member('yukihiro', 'awaiting-president'), undefined)[0]).toMatch(
+    expect(memberLines(member('yukihiro', 'awaiting-president'), undefined, NOW)[0]).toMatch(
       /^おうさまは しょうにんを まつ PRに/,
     );
-    expect(memberLines(member('yukihiro', 'idle'), undefined)[0]).toMatch(/^おうさまは ぎょくざ/);
-    expect(memberLines(member('yukihiro', 'idle'), { kind: 'doze' })).toEqual([
+    expect(memberLines(member('yukihiro', 'idle'), undefined, NOW)[0]).toMatch(
+      /^おうさまは ぎょくざ/,
+    );
+    expect(memberLines(member('yukihiro', 'idle'), { kind: 'doze' }, NOW)).toEqual([
       'おうさまは ぎょくざで まどろんでいる。',
     ]);
-    for (const line of memberLines(member('yukihiro', 'idle'), { kind: 'sleep' })) {
+    for (const line of memberLines(member('yukihiro', 'idle'), { kind: 'sleep' }, NOW)) {
       expect(line).toMatch(/^おうさまは ぎょくざで /);
     }
   });
@@ -106,21 +116,42 @@ describe('memberLines: by state (A)', () => {
 
 describe('memberLines: long idle spells (A)', () => {
   it('dozes and sleeps', () => {
-    expect(memberLines(member('minori', 'idle'), { kind: 'doze' })).toEqual([
+    expect(memberLines(member('minori', 'idle'), { kind: 'doze' }, NOW)).toEqual([
       'みのりは うとうと している…',
     ]);
-    const sleep = memberLines(member('minori', 'done'), { kind: 'sleep' });
+    const sleep = memberLines(member('minori', 'done'), { kind: 'sleep' }, NOW);
     expect(sleep).toContain('みのりは すやすや ねむっている…');
   });
 
   it('tells where a member is out playing', () => {
     const lines = (kind: PlaySpot['kind']) =>
-      memberLines(member('hirame', 'idle'), play(spotOf('hirame', kind)));
+      memberLines(member('hirame', 'idle'), play(spotOf('hirame', kind)), STAY);
     expect(lines('window')).toEqual(['ひらめは まどの そとを ながめている。']);
     expect(lines('tea')).toEqual(['ひらめは おちゃを のんで ひといき ついている。']);
     expect(lines('pet')).toEqual([`ひらめは ${PET_NAME}を なでている。`]);
     // ひらめ chats with ささえ across the counter (idleSpots.ts).
     expect(lines('chat')).toEqual(['ひらめは ささえと おしゃべり している。']);
+  });
+
+  it('walks there and back before and after it (as on the canvas)', () => {
+    const at = (kind: PlaySpot['kind'], now: number) =>
+      memberLines(member('hirame', 'idle'), play(spotOf('hirame', kind)), now);
+    expect(at('window', 0)).toEqual(['ひらめは まどべへ むかっている。']);
+    expect(at('tea', 1)).toEqual(['ひらめは おちゃの ところへ むかっている。']);
+    expect(at('pet', 1)).toEqual([`ひらめは ${PET_NAME}の ところへ むかっている。`]);
+    expect(at('chat', 1)).toEqual(['ひらめは ささえの ところへ むかっている。']);
+    expect(at('tea', BACK_AT)).toEqual(['ひらめは せきに もどっている。']);
+    expect(at('tea', BACK_AT + 1)).toEqual(['ひらめは せきに もどっている。']);
+  });
+
+  it('tells the stay from the moment the walk out ends until the walk back starts', () => {
+    const activity = play(spotOf('hirame', 'tea'));
+    if (activity.kind !== 'play') throw new Error('unreachable');
+    const { out } = activity.outing;
+    expect(playStepAt(activity.outing, out.end - 1)).toBe('going');
+    expect(playStepAt(activity.outing, out.end)).toBe('staying');
+    expect(playStepAt(activity.outing, BACK_AT - 1)).toBe('staying');
+    expect(playStepAt(activity.outing, BACK_AT)).toBe('returning');
   });
 
   it('follows the canvas: idleActivities with the same salts gives the same outing', () => {
@@ -131,7 +162,7 @@ describe('memberLines: long idle spells (A)', () => {
       const now = cycle * IDLE.playCycleMs + IDLE.leaveMaxMs + 5_000;
       const activity = idleActivities(since, seeds, now).hirame;
       if (activity?.kind !== 'play') continue;
-      const line = memberLines(member('hirame', 'idle'), activity)[0] ?? '';
+      const line = memberLines(member('hirame', 'idle'), activity, now)[0] ?? '';
       expect(line.startsWith('ひらめは ')).toBe(true);
       expect(line).not.toContain('うとうと');
       return;
@@ -142,16 +173,16 @@ describe('memberLines: long idle spells (A)', () => {
 
 describe('names come from the settings', () => {
   it('uses MEMBERS for every name, including partners and かなめ', () => {
-    expect(memberLines(member('minori', 'awaiting-kaname'), undefined)[0]).toContain(
+    expect(memberLines(member('minori', 'awaiting-kaname'), undefined, NOW)[0]).toContain(
       `${MEMBERS.kaname.name}の かくにん`,
     );
-    const chat = memberLines(member('minori', 'idle'), play(spotOf('minori', 'chat')))[0];
+    const chat = memberLines(member('minori', 'idle'), play(spotOf('minori', 'chat')), STAY)[0];
     expect(chat).toBe(`${MEMBERS.minori.name}は ${MEMBERS.hibiki.name}と おしゃべり している。`);
   });
 
   it('uses the name passed in the row', () => {
     const renamed = { id: 'sasae', name: 'テスト名', state: 'busy' } as const;
-    for (const line of memberLines(renamed, undefined)) expect(line).toMatch(/^テスト名は /);
+    for (const line of memberLines(renamed, undefined, NOW)) expect(line).toMatch(/^テスト名は /);
   });
 });
 
