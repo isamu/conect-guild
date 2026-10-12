@@ -83,13 +83,13 @@ const NARRATION_BUTTON = 'つぎの ようす';
 const NOTHING_YET = 'あたらしい できごとは まだ ない。';
 
 /**
- * Checks that the message window tells the narration, not an event message. The narration's
- * words depend on chance and the time, so only the window's state and a non-empty line are checked.
+ * Checks that the message window tells the narration, not an event message (its ▼ is then
+ * 「つぎの ようす」). The narration's words depend on chance and the time (they may even say
+ * 「クリアした！」 about the past week), so only the window's state and a non-empty line are checked.
  */
 export async function expectNarration(page: Page, timeout?: number): Promise<void> {
   const window = page.getByRole('region', { name: 'メッセージ' });
   await expect(window.getByRole('button', { name: NARRATION_BUTTON })).toBeVisible({ timeout });
   await expect(window).not.toContainText(NOTHING_YET);
-  await expect(window).not.toContainText('クリアした！');
   await expect(window).toHaveText(/\S/);
 }
