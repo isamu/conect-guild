@@ -1,11 +1,12 @@
+import { memberIdSchema } from '@conect-guild/snapshot/settings';
 import type { MemberId } from '../guild.config';
 import type { Random } from './confetti';
-import { linesOf, type LineScene, type SpokenLine } from './lineBook';
+import { linesOf, sceneOfLine, type LineScene, type SpokenLine } from './lineBook';
 import { LINES } from './metrics';
 
 /**
  * The members' lines at the moments of a scene (Issue #47, docs/DESIGN.md 4.11). Pure but for
- * createLinePicker, whose memory of the last lines is the only state: the times are passed in and
+ * createLinePicker, whose memory of the last lines seen is the only state: the times are passed in and
  * the random source is injected (`lineRandom` in render/loop.ts, apart from the confetti's and the
  * toss's, so their sequences stay as they were).
  *
@@ -29,8 +30,15 @@ export interface Utterance {
   readonly end: number;
 }
 
-/** Chooses what `actor` says at `scene`; null when they say nothing there. */
-export type PickLine = (actor: MemberId, scene: LineScene) => SpokenLine | null;
+/**
+ * Chooses what `actor` says at `scene`, other than the lines of theirs still to show or showing
+ * (`pending`); null when they say nothing there.
+ */
+export type PickLine = (
+  actor: MemberId,
+  scene: LineScene,
+  pending: readonly SpokenLine[],
+) => SpokenLine | null;
 
 /** Who says which line at a moment. */
 export type SpokenLines = Readonly<Partial<Record<MemberId, SpokenLine>>>;
@@ -57,12 +65,22 @@ function avoidedOf<L>(count: number, recent: readonly L[]): readonly L[] {
 }
 
 /**
- * One of `options` that is not among the last ones said (`recent`, oldest first), chosen evenly by
- * `random`; null when there are no options.
+ * One of `options` that is not among the last ones seen (`recent`, oldest first) nor still to show
+ * (`pending`), chosen evenly by `random`; null when there are no options. When that leaves none,
+ * only the pending ones are avoided, then none.
  */
-export function pickLine<L>(options: readonly L[], recent: readonly L[], random: Random): L | null {
-  const avoided = avoidedOf(options.length, recent);
-  const fresh = options.filter((line) => !avoided.includes(line));
+export function pickLine<L>(
+  options: readonly L[],
+  recent: readonly L[],
+  random: Random,
+  pending: readonly L[] = [],
+): L | null {
+  const avoided = [...avoidedOf(options.length, recent), ...pending];
+  const choices = [
+    options.filter((line) => !avoided.includes(line)),
+    options.filter((line) => !pending.includes(line)),
+  ];
+  const fresh = choices.find((list) => list.length > 0) ?? options;
   // No number is drawn for nothing to say, so the sequence goes on as if it was never asked.
   if (fresh.length === 0) return null;
   const index = Math.min(Math.floor(random() * fresh.length), fresh.length - 1);
@@ -74,16 +92,46 @@ export function remember<L>(recent: readonly L[], line: L): L[] {
   return [...recent, line].slice(-LINES.recentLines);
 }
 
-/** Picks from the line book, remembering the last lines of each member at each moment. */
-export function createLinePicker(random: Random): PickLine {
+export interface LinePicker {
+  readonly pick: PickLine;
+  /**
+   * The lines over the heads in a frame (seenLines): each one is remembered once, from the first
+   * frame it is seen in. A line dropped before it shows (halted, a hidden canvas) or hidden all
+   * along (the king's call) is never seen, so it is not among the last ones.
+   */
+  saw(lines: readonly (readonly [MemberId, SpokenLine])[]): void;
+}
+
+/** Picks from the line book, remembering the last lines seen of each member at each moment. */
+export function createLinePicker(random: Random): LinePicker {
   const memory = new Map<string, readonly SpokenLine[]>();
-  return (actor, scene) => {
-    const key = `${actor}:${scene}`;
-    const recent = memory.get(key) ?? [];
-    const line = pickLine(linesOf(actor, scene), recent, random);
-    if (line !== null) memory.set(key, remember(recent, line));
-    return line;
+  const showing = new Map<MemberId, SpokenLine>();
+  return {
+    pick: (actor, scene, pending) =>
+      pickLine(linesOf(actor, scene), memory.get(`${actor}:${scene}`) ?? [], random, pending),
+    saw(lines) {
+      const now = new Map(lines);
+      for (const [actor, line] of now) {
+        const scene = sceneOfLine(actor, line);
+        if (showing.get(actor) === line || scene === null) continue;
+        const key = `${actor}:${scene}`;
+        memory.set(key, remember(memory.get(key) ?? [], line));
+      }
+      showing.clear();
+      for (const [actor, line] of now) showing.set(actor, line);
+    },
   };
+}
+
+/** The lines seen over the heads: those of the scenes, but where the king's call has the head. */
+export function seenLines(
+  lines: SpokenLines,
+  speeches: Readonly<Partial<Record<MemberId, unknown>>>,
+): [MemberId, SpokenLine][] {
+  return memberIdSchema.options.flatMap((actor): [MemberId, SpokenLine][] => {
+    const line = lines[actor];
+    return line === undefined || speeches[actor] !== undefined ? [] : [[actor, line]];
+  });
 }
 
 function overlaps(a: { start: number; end: number }, b: { start: number; end: number }): boolean {
@@ -108,7 +156,8 @@ export function speakInTurn(
     const start = Math.max(turn.at, free);
     const slot = { start, end: start + showMs(turn.scene) };
     const busy = said.some((other) => other.actor === turn.actor && overlaps(other, slot));
-    const line = busy ? null : pick(turn.actor, turn.scene);
+    const pending = said.filter((other) => other.actor === turn.actor).map((other) => other.line);
+    const line = busy ? null : pick(turn.actor, turn.scene, pending);
     if (line === null) continue;
     spoken.push({ actor: turn.actor, line, ...slot });
     free = slot.end;

@@ -33,7 +33,7 @@ import { AMBIENT } from './metrics';
 import type { IdleSeeds, IdleSince } from './idle';
 import { createIdleCrew, playEvent, type IdleCrew } from './idleCrew';
 import { levelTags, type Levels } from './levelTags';
-import { createLinePicker } from './lines';
+import { createLinePicker, seenLines, type LinePicker } from './lines';
 import { DEFAULT_SEATS, type SceneContext } from './scenes';
 import { createCalls, type CallView, type Calls } from './calls';
 import type { Speeches } from './summons';
@@ -344,14 +344,17 @@ function stageAt(
  * Math.random, which has no sequence anyone could reproduce, so sharing it is harmless.
  */
 export function sceneContext(
-  options: Pick<RenderLoopOptions, 'tossRandom' | 'lineRandom'>,
-  random: Random,
-): SceneContext {
+  options: Pick<RenderLoopOptions, 'random' | 'tossRandom' | 'lineRandom'>,
+): SceneContext & { readonly sawLines: LinePicker['saw'] } {
+  const picker = createLinePicker(options.lineRandom ?? Math.random);
   return {
     seats: DEFAULT_SEATS,
-    random,
+    random: options.random ?? Math.random,
     tossRandom: options.tossRandom ?? Math.random,
-    pickLine: createLinePicker(options.lineRandom ?? Math.random),
+    pickLine: picker.pick,
+    sawLines: (lines) => {
+      picker.saw(lines);
+    },
   };
 }
 
@@ -373,10 +376,9 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   const { canvas, art } = options;
   const now = options.now ?? (() => performance.now());
   const localHour = options.localHour ?? (() => hourOf(new Date()));
-  const random = options.random ?? Math.random;
-  const context = sceneContext(options, random);
+  const context = sceneContext(options);
   const painter = createPainter(context2d(canvas), art);
-  const cast = createCast(art, random, options);
+  const cast = createCast(art, context.random, options);
   const visibility = options.visibility ?? documentVisibility;
   // Narrow screens hide the canvas (display: none): its width is 0 and nothing is drawn.
   let cssWidth = 1;
@@ -391,6 +393,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
     const { bubbles, moods, levels } = party;
     const { frame, speeches, calling, cues } = stageAt(cast, director, t, moods);
     paint(painter, scale, { now: t, hour: localHour(), frame, bubbles, speeches, cues, levels });
+    context.sawLines(seenLines(frame.lines, speeches));
     director = prune(director, t);
     // A call needs no more than the ambient pace: its words and turns change every few hundred ms.
     const ambient = Object.keys(moods).length > 0 || ANIMATED_DECOR.length > 0 || calling;

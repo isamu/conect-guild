@@ -74,6 +74,21 @@ const BOOK: Readonly<
   Record<MemberId, Readonly<Partial<Record<LineScene, readonly SpokenLine[]>>>>
 > = LINE_BOOK;
 
+const SCENES: readonly LineScene[] = [
+  'handOver',
+  'toss',
+  'takeScroll',
+  'deliverChest',
+  'takeChest',
+  'clear',
+  'seeClear',
+];
+
+/** The moment a member says `line` at (a member never has one line at two moments: lineBook.test.ts). */
+export function sceneOfLine(id: MemberId, line: SpokenLine): LineScene | null {
+  return SCENES.find((scene) => linesOf(id, scene).includes(line)) ?? null;
+}
+
 /** The lines a member may say at a moment; none when they say nothing there. */
 export function linesOf(id: MemberId, scene: LineScene): readonly SpokenLine[] {
   return BOOK[id][scene] ?? [];
