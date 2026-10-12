@@ -76,4 +76,22 @@ describe('bootStage', () => {
     // The failure is reported before ready, so the screen knows before the demo may start.
     expect(failed.mock.invocationCallOrder[0]).toBeLessThan(ready.mock.invocationCallOrder[0] ?? 0);
   });
+
+  it('still sends ready when reporting the failure throws', () => {
+    const ready = vi.fn();
+    expect(() =>
+      bootStage(
+        () => {
+          throw new Error('no 2D context');
+        },
+        {
+          failed: () => {
+            throw new Error('the report failed');
+          },
+          ready,
+        },
+      ),
+    ).toThrow('the report failed');
+    expect(ready).toHaveBeenCalledOnce();
+  });
 });

@@ -22,18 +22,22 @@ export interface StageBootHooks {
   readonly ready: () => void;
 }
 
-/** Runs `start` (the stage's start once its pictures are in) and tells how it went. Never throws. */
+/**
+ * Runs `start` (the stage's start once its pictures are in) and tells how it went. `ready` is sent
+ * once in every case; only an error of `failed` itself is passed on.
+ */
 export function bootStage(
   start: () => void,
   hooks: StageBootHooks,
 ): Exclude<StageState, 'loading'> {
-  let state: Exclude<StageState, 'loading'> = 'running';
   try {
     start();
+    return 'running';
   } catch (error: unknown) {
-    state = 'failed';
     hooks.failed(error);
+    return 'failed';
+  } finally {
+    // Even when reporting the failure throws: nothing may wait on the stage for ever.
+    hooks.ready();
   }
-  hooks.ready();
-  return state;
 }
