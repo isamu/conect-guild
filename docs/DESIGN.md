@@ -297,7 +297,7 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 ## 7. 依存の方針（具体）
 
 - 実行時: `vue`、`zod`
-- 開発時: `vite`、`typescript`、`vue-tsc`、`vitest`、`eslint` + `eslint-plugin-vue` + `eslint-plugin-sonarjs` + `typescript-eslint`、`prettier`、`@vitest/coverage-v8`（scoria にカバレッジを渡すため。Issue #33）。E2E は M2 以降に `@playwright/test`
+- 開発時: `vite`、`typescript`、`vue-tsc`、`vitest`、`eslint` + `eslint-plugin-vue` + `eslint-plugin-sonarjs` + `typescript-eslint`、`prettier`、`@vitest/coverage-v8`（scoria にカバレッジを渡すため。Issue #33）、`@playwright/test`（画面の E2E。Issue #34）。ブラウザ本体は postinstall では入れず、`npx playwright install chromium` で明示的に入れる
 - 入れ方:
   1. `npm install <pkg> --ignore-scripts --before=<7 日前の日付>` で npm に版を決めさせる（記憶から版を書かない）。`--before` で推移依存も含めて 7 日より前に公開された版だけになり、`--ignore-scripts` で確かめる前にスクリプトが走らない
   2. `npm view <pkg> time --json` で入った版の公開日を確かめる
@@ -334,6 +334,12 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 - ESLint（sonarjs の複雑度・ネスト・引数）をエラー、`max-lines` 400 / `max-lines-per-function` 60 を warning で入れる
 - `npm run verify` = lint + typecheck + test。CI は push と PR で `npm ci --ignore-scripts` → verify → build（サンプルデータのみ）
 - scoria でコードの健康状態を測る（Issue #33）。`.github/workflows/scoria.yml` が PR と main への push で `npm run test:coverage`（`coverage/lcov.info` を出す。遅いので verify には入れない）→ `npx -y scoria@0.3.0` を動かし、`.scoria/baseline.json` からの変化をジョブのサマリーに、指摘を SARIF で code scanning に出す。`mode: report` なので CI は落とさない。scoria は package.json に入れない（scoria 自身の依存の npm audit の警告がこのリポジトリのものに見えるため）
+- 画面の E2E は Playwright（Issue #34）。`npm run test:e2e` で動かし、遅いので verify には入れない。CI は verify と並行の別ジョブ e2e で、ブラウザを Playwright の版ごとにキャッシュして `npx playwright install --with-deps chromium` で入れ、失敗時はレポートを artifact に残す
+  - 設定は `apps/web/playwright.config.ts`、テストは `apps/web/e2e/`。開発サーバーは 5196 番（`--strictPort`、host は vite.config.ts の 127.0.0.1）で立て、既に動いているサーバーは使わない。chromium だけ、headless、retries は CI だけ 1。テストは 1 本ずつ順に動かす（開発サーバーと snapshot を共有するため）
+  - データはダミーだけ: テストのたびに `public/snapshot.sample.json` を guild.settings.ts の repo と固定した時刻に合わせ、`apps/web/.data/snapshot.json` に 0600 で置く。実行の前に `.data` が既にあれば（collector の実データ）触らずに止め、実行の後に自分で作った `.data` を消す
+  - 時刻は `page.clock.setFixedTime` で固定する（タイマーは動かし、5 秒ごとの再取得はそのまま）。音は AudioContext をページ内で偽物に差し替える
+  - 確かめること: 開いて console・ページのエラーが無い、掲示板・パーティ・メッセージ窓・取得のようすに値が出る、Canvas に部屋が描かれる（単色でない）、`?hour=12` と `?hour=21.5` で明るさが違う、「音を出す」と音量の切り替え（再読み込み後も残る）、「基準を消す」、760px 未満で窓が縦に積まれ Canvas が隠れる、別のリポジトリの snapshot で止まる、Issue を閉じると「クリアした！」が出る、メッセージ窓のクリックで次へ進み最後に閉じる
+  - 見た目の比較（スクリーンショットの差分）は OS で描画が違うので後で検討する
 
 ## 10. 決めたこと（2026-10-12）
 
@@ -363,6 +369,8 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 - 参考にしてよい OSS（すべて MIT）: pixel-agents（イベントの設計、hooks の受け方）、pixtuoid（ソケットと 0600 の扱い）。コードの丸写しはせず、仕組みを参考にする
 
 ## 変更履歴
+
+- **Issue #34（2026-10-12）** Playwright で画面の E2E テストを入れた（7 章、9 章）。開発時の依存に `@playwright/test` を足した（社長の承認済み）
 
 - **Issue #33（2026-10-12）** scoria でコードの健康状態を測るようにした（3 章、7 章、9 章）。開発時の依存に `@vitest/coverage-v8` を足した（社長の承認済み）
 
