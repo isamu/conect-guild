@@ -25,11 +25,13 @@ import {
 } from './draw';
 import { drawAnimatedDecor } from './drawDecor';
 import { drawLightPatches, drawShade, drawWindowSun, type ShadeScratch } from './drawDaylight';
+import { drawLevelTags } from './drawLevelTags';
 import { BACK_ANIMATED_DECOR, FRONT_LAYERS } from './layers';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './map';
 import { AMBIENT } from './metrics';
 import type { IdleSeeds, IdleSince } from './idle';
 import { createIdleCrew, playEvent, type IdleCrew } from './idleCrew';
+import { levelTags, type LevelTag, type Levels } from './levelTags';
 import { DEFAULT_SEATS } from './scenes';
 import { decorCuesOf, type DecorCues } from './trinkets';
 
@@ -76,6 +78,8 @@ export interface StageParty {
   readonly bubbles: Bubbles;
   readonly moods: AmbientMoods;
   readonly idleSince: IdleSince;
+  /** The members' levels, shown small under their seats (levelTags.ts). */
+  readonly levels: Levels;
 }
 
 export interface RenderLoop {
@@ -226,6 +230,7 @@ interface Moment {
   readonly frame: StageFrame;
   readonly bubbles: Bubbles;
   readonly cues: DecorCues;
+  readonly tags: readonly LevelTag[];
 }
 
 /**
@@ -244,6 +249,7 @@ function paint(painter: Painter, scale: number, moment: Moment): void {
   drawAnimatedDecor(ctx, art, moment, BACK_ANIMATED_DECOR);
   drawActors(ctx, moment, art, painter.front);
   drawShade(ctx, painter.scratch, light, lampLights(moment.now));
+  drawLevelTags(ctx, moment.tags);
   drawOverhead(ctx, moment);
 }
 
@@ -293,6 +299,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   let director: Director = EMPTY_DIRECTOR;
   let bubbles: Bubbles = {};
   let moods: AmbientMoods = {};
+  let tags: readonly LevelTag[] = [];
   let scale = 1;
   let clock: StageClock = RUNNING_CLOCK;
   const stageNow = () => stageTime(clock, now());
@@ -301,7 +308,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
     const t = stageNow();
     const frame = cast.frame(director, t, moods);
     const cues = decorCuesOf(moods, director.bursts, t, frame.members);
-    paint(painter, scale, { now: t, hour: localHour(), frame, bubbles, cues });
+    paint(painter, scale, { now: t, hour: localHour(), frame, bubbles, cues, tags });
     director = prune(director, t);
     const ambient = Object.keys(moods).length > 0 || ANIMATED_DECOR.length > 0;
     const next = nextDraw({ hidden: paused(), animating: isAnimating(director, t), ambient });
@@ -331,6 +338,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
     },
     setParty(party) {
       ({ bubbles, moods } = party);
+      tags = levelTags(party.levels, DEFAULT_SEATS);
       director = cast.crew.setSince(director, party.idleSince, stageNow());
       schedule.now();
     },
