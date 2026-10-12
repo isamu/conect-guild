@@ -71,10 +71,16 @@ function hasUniqueNumbers(items: readonly { readonly number: number }[]): boolea
   return new Set(items.map((item) => item.number)).size === items.length;
 }
 
-/** An Issue closed as completed. Only its department labels, in the fixed order. */
+/** True when `labels` are distinct and in the fixed order of DEPARTMENT_LABELS. */
+function inFixedOrder(labels: readonly string[]): boolean {
+  const positions = labels.map((label) => DEPARTMENT_LABELS.findIndex((d) => d === label));
+  return positions.every((position, i) => i === 0 || position > (positions[i - 1] ?? -1));
+}
+
+/** An Issue closed as completed. Only its department labels, distinct and in the fixed order. */
 export const historyIssueSchema = z.strictObject({
   number: issueNumber,
-  departments: z.array(departmentLabelSchema),
+  departments: z.array(departmentLabelSchema).refine(inFixedOrder, 'distinct, in the fixed order'),
 });
 
 /**

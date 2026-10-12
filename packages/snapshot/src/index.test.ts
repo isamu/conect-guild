@@ -177,6 +177,14 @@ describe('snapshotSchema: history contents', () => {
       { openedIssueCount: 1, completedIssues: [{ number: 1, departments: ['bug'] }] },
     ],
     [
+      'a department twice',
+      { openedIssueCount: 1, completedIssues: [{ number: 1, departments: ['経理', '経理'] }] },
+    ],
+    [
+      'departments out of the fixed order',
+      { openedIssueCount: 1, completedIssues: [{ number: 1, departments: ['総務', '経理'] }] },
+    ],
+    [
       'a title slipped into an Issue',
       { openedIssueCount: 1, completedIssues: [{ number: 1, departments: [], title: 't' }] },
     ],
