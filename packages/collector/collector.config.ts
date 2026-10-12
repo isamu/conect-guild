@@ -19,6 +19,32 @@ export function expandHome(dir: string, home: string): string {
   return dir.startsWith('~/') ? join(home, dir.slice(2)) : dir;
 }
 
+interface SessionDirSettings {
+  readonly commanderSessionDir: string;
+  readonly departments: readonly {
+    readonly label: SessionDepartment;
+    readonly sessionDir: string;
+  }[];
+}
+
+/**
+ * The company seats with their directories expanded. Two seats on the same directory (say `~` and
+ * the home directory written out) would share one session, so that stops the collector.
+ */
+export function companySeatsOf(settings: SessionDirSettings, home: string): CompanySeat[] {
+  const seats: CompanySeat[] = [
+    { department: null, cwd: expandHome(settings.commanderSessionDir, home) },
+    ...settings.departments.map((d) => ({
+      department: d.label,
+      cwd: expandHome(d.sessionDir, home),
+    })),
+  ];
+  if (new Set(seats.map((seat) => seat.cwd)).size !== seats.length) {
+    throw new Error('guild.settings.ts is invalid: two session dirs point to the same directory');
+  }
+  return seats;
+}
+
 // Fixed on purpose: the target repository, the company sessions, intervals and paths must not be
 // changeable from command-line arguments or environment variables (docs/DESIGN.md 4.1, 4.7). The
 // team's values come from guild.settings.ts at the repository root.
@@ -29,13 +55,7 @@ export const COLLECTOR_CONFIG = {
   snapshotPath: resolve(import.meta.dirname, '../../apps/web/.data/snapshot.json'),
   sessions: {
     intervalMs: 5_000,
-    seats: [
-      { department: null, cwd: expandHome(GUILD_SETTINGS.commanderSessionDir, HOME) },
-      ...GUILD_SETTINGS.departments.map((d): CompanySeat => ({
-        department: d.label,
-        cwd: expandHome(d.sessionDir, HOME),
-      })),
-    ] satisfies readonly CompanySeat[],
+    seats: companySeatsOf(GUILD_SETTINGS, HOME),
     // MulmoTerminal's own files. Read only: never written or locked.
     cwdLogPath: join(MULMOTERMINAL_HOME, 'dev-terminal-cwds.json'),
     activityStatePath: join(MULMOTERMINAL_HOME, 'activity-state.json'),
