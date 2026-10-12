@@ -10,7 +10,7 @@ import {
   TALLEST_WINDOW_EXTENTS,
   type PxRect,
 } from './map';
-import { OVERHEAD_TOP, TILE_SIZE } from './metrics';
+import { BUBBLE_RISE, DETAIL_SCALE, OVERHEAD_OFFSET, OVERHEAD_TOP, TILE_SIZE } from './metrics';
 import { DEFAULT_SEATS } from './scenes';
 
 const ALL: Readonly<Record<Exclude<MemberId, 'yukihiro'>, number>> = {
@@ -84,6 +84,24 @@ describe('levelTags', () => {
       for (const window of Object.values(TALLEST_WINDOW_EXTENTS))
         expect(overlaps(tagRect(tag), window), tag.text).toBe(false);
     }
+  });
+
+  it('stays clear of the king’s summons and the replies (Issue #28) said at the seats', () => {
+    // draw.ts drawBubble: from 3 detail px right of the feet, 11 detail px high from BUBBLE_RISE
+    // over OVERHEAD_OFFSET. 「ゴニョゴニョ」 in bold 7px is about 42 + 6 detail px wide; 60 is generous.
+    const speech = (seat: { col: number; row: number }): PxRect => {
+      const x = seat.col * TILE_SIZE + TILE_SIZE / 2;
+      const top = (seat.row + 1) * TILE_SIZE - OVERHEAD_OFFSET - BUBBLE_RISE * DETAIL_SCALE;
+      return {
+        left: x + 3 * DETAIL_SCALE,
+        right: x + (3 + 60) * DETAIL_SCALE,
+        top,
+        bottom: top + 11 * DETAIL_SCALE,
+      };
+    };
+    for (const tag of tags)
+      for (const seat of Object.values(DEFAULT_SEATS))
+        expect(overlaps(tagRect(tag), speech(seat)), tag.text).toBe(false);
   });
 
   it('keeps かなめ’s tag clear of a visitor standing in front of the counter', () => {
