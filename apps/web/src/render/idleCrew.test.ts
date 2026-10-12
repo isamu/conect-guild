@@ -153,3 +153,19 @@ const SEEDS_ANY = {
   sasae: { phaseMs: 0, intervalMs: 5_000 },
   yukihiro: { phaseMs: 0, intervalMs: 5_000 },
 };
+
+describe('createIdleCrew: shared salts (Issue #30)', () => {
+  it('uses the salts it is given, so the narration tells the same outings', () => {
+    const outing = outingOf('minori');
+    const wall = (outing.out.end + outing.back.start) / 2;
+    // A random source that would draw other salts: the given ones win.
+    const crew = createIdleCrew({
+      random: () => 0.123,
+      seeds: SEEDS,
+      wallNow: () => wall,
+      onActive: undefined,
+    });
+    const director = crew.setSince(EMPTY_DIRECTOR, { minori: wall - 40 * MIN }, 1_000);
+    expect(crew.frame(director, 1_000).minori?.feet).toEqual(tileToPoint(outing.spot.tile));
+  });
+});

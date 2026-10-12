@@ -28,7 +28,7 @@ import { drawLightPatches, drawShade, drawWindowSun, type ShadeScratch } from '.
 import { BACK_ANIMATED_DECOR, FRONT_LAYERS } from './layers';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './map';
 import { AMBIENT } from './metrics';
-import type { IdleSince } from './idle';
+import type { IdleSeeds, IdleSince } from './idle';
 import { createIdleCrew, playEvent, type IdleCrew } from './idleCrew';
 import { DEFAULT_SEATS } from './scenes';
 import { decorCuesOf, type DecorCues } from './trinkets';
@@ -68,6 +68,8 @@ export interface RenderLoopOptions {
   readonly wallNow?: () => number;
   /** Members in a scene at `at` (epoch ms), on every frame that shows them in one. */
   readonly onActive?: (ids: readonly MemberId[], at: number) => void;
+  /** The idle spells' per-member salts, so the narration tells the same outings (Issue #30). */
+  readonly idleSeeds?: IdleSeeds;
 }
 
 export interface StageParty {
@@ -256,12 +258,13 @@ function createPainter(ctx: CanvasRenderingContext2D, art: GuildArt): Painter {
 function createCast(
   art: GuildArt,
   random: Random,
-  options: Pick<RenderLoopOptions, 'wallNow' | 'onActive'>,
+  options: Pick<RenderLoopOptions, 'wallNow' | 'onActive' | 'idleSeeds'>,
 ): { crew: IdleCrew; frame: (director: Director, t: number, moods: AmbientMoods) => StageFrame } {
   const seeds = createAmbientSeeds(random);
   const hasHoldFrames = (id: MemberId): boolean => art.sprites.hasHoldFrames(id);
   const crew = createIdleCrew({
     random,
+    seeds: options.idleSeeds,
     wallNow: options.wallNow ?? (() => Date.now()),
     onActive: options.onActive,
   });

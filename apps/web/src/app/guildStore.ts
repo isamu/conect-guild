@@ -28,6 +28,8 @@ export const REFRESH_INTERVAL_MS = 5_000;
  * one's scene has to wait for its cast (app/messageQueue.ts). The last one stays.
  */
 export const MESSAGE_HOLD_MS = 8_000;
+/** How long the last message stays before the window goes back to the narration (Issue #30). */
+export const MESSAGE_LAST_HOLD_MS = 30_000;
 
 export interface GuildState {
   /** The last successfully loaded snapshot; kept when later fetches fail. */
@@ -152,6 +154,7 @@ function queueInto(
     scheduler: options.scheduler,
     now: options.now,
     holdMs: options.holdMs ?? MESSAGE_HOLD_MS,
+    lastHoldMs: MESSAGE_LAST_HOLD_MS,
     publish: (list) => {
       state.messages = list;
     },

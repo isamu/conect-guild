@@ -13,7 +13,7 @@ import type { GuildArt } from '../render/art';
 import { bubblesOf } from '../render/bubbles';
 import { hourFromQuery } from '../render/daylight';
 import { loadArt } from '../render/loadArt';
-import type { IdleSince } from '../render/idle';
+import type { IdleSeeds, IdleSince } from '../render/idle';
 import { isShown, startRenderLoop, type RenderLoop, type StageParty } from '../render/loop';
 
 const props = defineProps<{
@@ -21,10 +21,16 @@ const props = defineProps<{
   party: readonly PartyRow[];
   /** The event of the message now in the window; its scene starts when it changes. */
   cue: SceneCue | null;
+  /** Per-member salts of the idle spells, shared with the narration (Issue #30). */
+  idleSeeds: IdleSeeds;
 }>();
 
-/** Whether the canvas is on screen (narrow screens hide it); sent on every change. */
-const emit = defineEmits<{ stageShown: [shown: boolean] }>();
+const emit = defineEmits<{
+  /** Whether the canvas is on screen (narrow screens hide it); sent on every change. */
+  stageShown: [shown: boolean];
+  /** Since when each member has had nothing to do, on every change (for the narration). */
+  idleSince: [since: IdleSince];
+}>();
 
 const canvas = useTemplateRef<HTMLCanvasElement>('canvas');
 let loop: RenderLoop | null = null;
@@ -37,6 +43,11 @@ let cues = EMPTY_CUE_QUEUE;
 /** When each member last had work (localStorage), for dozing, sleeping and playing (Issue #23). */
 const lastActive = createLastActiveTracker();
 let idleSince: IdleSince = {};
+
+function setIdleSince(next: IdleSince): void {
+  idleSince = next;
+  emit('idleSince', next);
+}
 
 function stageParty(rows: readonly PartyRow[]): StageParty {
   return { bubbles: bubblesOf(rows), moods: ambientMoodsOf(rows), idleSince };
@@ -63,13 +74,14 @@ function start(element: HTMLCanvasElement, art: GuildArt): void {
     canvas: element,
     art,
     ...(fixedHour === null ? {} : { localHour: () => fixedHour }),
+    idleSeeds: props.idleSeeds,
     onActive: (ids, at) => {
-      idleSince = lastActive.markActive(ids, at);
+      setIdleSince(lastActive.markActive(ids, at));
       loop?.setParty(stageParty(props.party));
     },
   });
   loop = running;
-  idleSince = lastActive.observe(props.party, Date.now());
+  setIdleSince(lastActive.observe(props.party, Date.now()));
   running.setParty(stageParty(props.party));
   running.resize(cssWidth ?? element.clientWidth, globalThis.devicePixelRatio);
   // Messages may have reached the window while the pictures were loading.
@@ -109,7 +121,7 @@ onBeforeUnmount(() => {
 watch(
   () => props.party,
   (rows) => {
-    idleSince = lastActive.observe(rows, Date.now());
+    setIdleSince(lastActive.observe(rows, Date.now()));
     loop?.setParty(stageParty(rows));
   },
 );

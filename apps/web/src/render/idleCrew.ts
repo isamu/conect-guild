@@ -2,7 +2,14 @@ import type { MemberId } from '../guild.config';
 import type { Random } from './confetti';
 import type { GuildEvent } from '../domain/events';
 import { inScene, scheduleEvent, sendHome, type Director } from './director';
-import { createIdleSeeds, homeWalk, idlePosesAt, type IdlePoses, type IdleSince } from './idle';
+import {
+  createIdleSeeds,
+  homeWalk,
+  idlePosesAt,
+  type IdlePoses,
+  type IdleSeeds,
+  type IdleSince,
+} from './idle';
 import { actorOf, castOf, DEFAULT_SEATS, type SceneContext } from './scenes';
 
 /**
@@ -25,6 +32,8 @@ export interface IdleCrew {
 
 export interface IdleCrewOptions {
   readonly random: Random;
+  /** The per-member salts; drawn from `random` when absent. Shared with the narration (Issue #30). */
+  readonly seeds?: IdleSeeds;
   /** Epoch ms: the idle spells go on while the page is hidden. */
   readonly wallNow: () => number;
   /** Members in a scene at `at` (epoch ms), on every frame that shows them in one. */
@@ -42,7 +51,7 @@ const MEMBER_IDS: readonly MemberId[] = [
 
 export function createIdleCrew(options: IdleCrewOptions): IdleCrew {
   const { wallNow, onActive } = options;
-  const seeds = createIdleSeeds(options.random);
+  const seeds = options.seeds ?? createIdleSeeds(options.random);
   let since: IdleSince = {};
   const sceneSeen: Partial<Record<MemberId, number>> = {};
 
