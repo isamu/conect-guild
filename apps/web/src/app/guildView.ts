@@ -161,7 +161,7 @@ function kingRow(waits: WaitCounts): PartyRow {
     return row(MEMBERS.yukihiro, {
       state: 'awaiting-president',
       stateLabel: `承認まち ${String(waits.president)} 件`,
-      tooltip: `ルール（CLAUDE.md・.claude/agents/）を変える PR は${MEMBERS.yukihiro.role}がマージします`,
+      tooltip: `ルールを変える PR は${MEMBERS.yukihiro.role}がマージします`,
       rewards: null,
     });
   }
