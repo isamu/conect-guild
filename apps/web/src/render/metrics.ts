@@ -28,7 +28,10 @@ export const AMBIENT = {
   frameMs: 140,
   minIntervalMs: 5_000,
   maxIntervalMs: 14_000,
-  /** Desk work: an up-and-down bob while typing, and a short turn to the side for papers. */
+  /**
+   * Desk work: typing (the front frame and the arms-in-front frame in turn, or an up-and-down bob
+   * on a sheet without the holding frames), and a short turn to the side for papers.
+   */
   typingMs: 280,
   typingBobPx: 2,
   pageTurnMs: 560,

@@ -16,7 +16,7 @@ import {
   type Director,
 } from './director';
 import { PLACES } from './map';
-import { OVERHEAD_OFFSET, SEATING, TILE_SIZE } from './metrics';
+import { AMBIENT, OVERHEAD_OFFSET, SEATING, TILE_SIZE } from './metrics';
 import { MS_PER_TILE, standingPose, type Pose } from './motion';
 import { tileToPoint } from './path';
 import { DEFAULT_SEATS, PICK_UP_MS } from './scenes';
@@ -277,6 +277,7 @@ describe('director: ambient moves', () => {
   const ambient: AmbientContext = {
     moods: { minori: 'idle', sasae: 'desk-work', yukihiro: 'fidget', kaname: 'tidy-scroll' },
     seeds,
+    hasHoldFrames: () => false,
   };
   const member = (frame: ReturnType<typeof frameAt>, id: string) =>
     frame.members.find((m) => m.id === id);
@@ -322,11 +323,37 @@ describe('director: ambient moves', () => {
   });
 });
 
+describe('director: typing at the desk', () => {
+  const seeds = createAmbientSeeds(() => 0);
+  const member = (frame: ReturnType<typeof frameAt>, id: string) =>
+    frame.members.find((m) => m.id === id);
+
+  it('types with the arms-in-front frame only for members whose sheet has it', () => {
+    const typing: AmbientContext = {
+      moods: { sasae: 'desk-work', minori: 'desk-work' },
+      seeds,
+      hasHoldFrames: (id) => id === 'sasae',
+    };
+    // Two strokes after the turn for papers: the front frame, then the arms in front.
+    const strokes = [AMBIENT.pageTurnMs, AMBIENT.pageTurnMs + AMBIENT.typingMs];
+    const frames = (id: string) =>
+      new Set(
+        strokes.map(
+          (t) => member(frameAt(EMPTY_DIRECTOR, t, DEFAULT_SEATS, typing), id)?.pose.frame,
+        ),
+      );
+    expect(frames('sasae')).toEqual(new Set([0, 5]));
+    expect(frames('minori')).toEqual(new Set([0]));
+  });
+});
+
 describe('director: no ambient move during scenes', () => {
   const seeds = createAmbientSeeds(() => 0);
+  // With the holding frames, so typing would show frame 5 if it leaked into a scene.
   const ambient: AmbientContext = {
     moods: { minori: 'idle', sasae: 'desk-work', kaname: 'tidy-scroll' },
     seeds,
+    hasHoldFrames: () => true,
   };
   const member = (frame: ReturnType<typeof frameAt>, id: string) =>
     frame.members.find((m) => m.id === id);
@@ -359,8 +386,24 @@ describe('director: no ambient move during scenes', () => {
     expect(inScene(director, 'sasae', CONFETTI_MS)).toBe(false);
     const after = member(frameAt(director, CONFETTI_MS, DEFAULT_SEATS, ambient), 'sasae');
     expect(after?.pose).toEqual(
-      expect.objectContaining({ frame: ambientPose('desk-work', seeds.sasae, CONFETTI_MS).frame }),
+      expect.objectContaining({
+        frame: ambientPose('desk-work', seeds.sasae, CONFETTI_MS, true).frame,
+      }),
     );
+  });
+
+  it('does not type with the arms-in-front frame under confetti', () => {
+    const director = play(EMPTY_DIRECTOR, event('issue-closed', '総務'), 0);
+    const typingAt: number[] = [];
+    for (let t = 0; t < CONFETTI_MS; t += 20) {
+      if (ambientPose('desk-work', seeds.sasae, t, true).frame === 5) typingAt.push(t);
+    }
+    expect(typingAt.length).toBeGreaterThan(0);
+    for (const t of typingAt) {
+      expect(member(frameAt(director, t, DEFAULT_SEATS, ambient), 'sasae')?.pose).toEqual(
+        atSeat('sasae'),
+      );
+    }
   });
 
   it('applies the move before a scene queued for later starts', () => {

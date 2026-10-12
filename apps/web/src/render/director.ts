@@ -2,7 +2,7 @@ import type { GuildEvent } from '../domain/events';
 import type { MemberId, TilePos } from '../guild.config';
 import { ambientPose, type AmbientMoods, type AmbientSeeds, type HandProp } from './ambient';
 import { burstOrigin, confettiAt, CONFETTI_MS, type PlacedParticle } from './confetti';
-import { poseOnSegment, standingPose, type Pose } from './motion';
+import { poseOnSegment, standingPose, type Pose, type SpriteFrame } from './motion';
 import type { Point } from './path';
 import { seatedPoint } from './seating';
 import { castOf, planScene, type Burst, type SceneContext, type Track } from './scenes';
@@ -31,10 +31,18 @@ const MEMBER_IDS: readonly MemberId[] = [
 
 export const EMPTY_DIRECTOR: Director = { tracks: [], bursts: [], busyUntil: {} };
 
+/** A member at their seat with an ambient move: may type with a holding frame, holds nothing. */
+export interface SeatPose {
+  readonly point: Point;
+  readonly frame: SpriteFrame;
+  readonly flip: boolean;
+  readonly held: null;
+}
+
 export interface MemberPose {
   readonly id: MemberId;
   /** Drawn here: on a seat the point is sunk into it (seating.ts). */
-  readonly pose: Pose;
+  readonly pose: Pose | SeatPose;
   /**
    * The y of the feet on the tile, before sinking and ambient offsets: members and the furniture in
    * front of them (layers.ts) are drawn back to front by it.
@@ -50,6 +58,8 @@ export interface MemberPose {
 export interface AmbientContext {
   readonly moods: AmbientMoods;
   readonly seeds: AmbientSeeds;
+  /** True when the member's sheet has the holding frames (art.SpriteArt.hasHoldFrames). */
+  readonly hasHoldFrames: (id: MemberId) => boolean;
 }
 
 export interface ConfettiView {
@@ -127,15 +137,15 @@ function withAmbient(
   if (ambient === undefined || mood === undefined || member.inScene) {
     return member;
   }
-  const move = ambientPose(mood, ambient.seeds[member.id], now);
+  const move = ambientPose(mood, ambient.seeds[member.id], now, ambient.hasHoldFrames(member.id));
   const { point } = member.pose;
   return {
     ...member,
     pose: {
-      ...member.pose,
       point: { x: point.x + move.offset.x, y: point.y + move.offset.y },
       frame: move.frame,
       flip: move.flip,
+      held: null,
     },
     hand: move.hand,
   };
