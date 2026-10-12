@@ -1,10 +1,17 @@
 <script setup lang="ts">
 // The demo mode's start (Issue #49). Its click also lets the browser play the sound effects.
+import type { DemoBlock } from '../app/demo';
+
 defineProps<{
-  /** The canvas has its pictures; until then the button waits (the first scenes would be lost). */
-  ready: boolean;
+  /** What the button waits for (the first scenes would be lost); null once it can start. */
+  block: DemoBlock;
 }>();
 const emit = defineEmits<{ start: [] }>();
+
+const BLOCK_LABELS: Readonly<Record<Exclude<DemoBlock, null>, string>> = {
+  loading: 'じゅんびちゅう…',
+  narrow: 'がめんを ひろげてください',
+};
 </script>
 
 <template>
@@ -15,10 +22,10 @@ const emit = defineEmits<{ start: [] }>();
       <button
         type="button"
         class="rpg-button demo-start__button"
-        :disabled="!ready"
+        :disabled="block !== null"
         @click="emit('start')"
       >
-        {{ ready ? '▶ はじめる' : 'じゅんびちゅう…' }}
+        {{ block === null ? '▶ はじめる' : BLOCK_LABELS[block] }}
       </button>
     </p>
   </section>

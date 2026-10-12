@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadSoundSettings } from '../audio/settings';
 import { DEMO_LOOP_MS } from '../domain/demo';
-import { createDemoSession, DEMO_REFRESH_INTERVAL_MS, isDemoQuery } from './demo';
+import { createDemoSession, DEMO_REFRESH_INTERVAL_MS, demoBlock, isDemoQuery } from './demo';
 import { createGuildStore } from './guildStore';
 
 const START = Date.parse('2026-10-12T03:00:00.000Z');
@@ -52,6 +52,15 @@ const storage = {
   removeItem: forbidden('removeItem'),
 };
 
+describe('demoBlock', () => {
+  it('waits for the pictures first, then for the canvas to be on screen', () => {
+    expect(demoBlock(false, false)).toBe('loading');
+    expect(demoBlock(false, true)).toBe('loading');
+    expect(demoBlock(true, false)).toBe('narrow');
+    expect(demoBlock(true, true)).toBeNull();
+  });
+});
+
 describe('the demo session', () => {
   beforeEach(() => {
     vi.useFakeTimers({ now: START });
@@ -80,6 +89,7 @@ describe('the demo session', () => {
     store.start();
     await run(2_000);
     demo.markReady();
+    demo.setStageShown(true);
     demo.start();
     await run(2 * DEMO_LOOP_MS);
     // Two loops: six messages each, all from the fictional script.
@@ -102,6 +112,7 @@ describe('the demo session', () => {
     const { demo, store, heads, run } = setup();
     store.start();
     demo.markReady();
+    demo.setStageShown(true);
     demo.start();
     await run(15_000);
     const seen = heads.length;
@@ -114,7 +125,7 @@ describe('the demo session', () => {
 });
 
 describe('the demo, alone', () => {
-  it('ignores はじめる before the canvas is ready, so the first call of the king is not lost', async () => {
+  it('ignores はじめる until the canvas is ready and on screen, so the first call of the king is not lost', async () => {
     vi.useFakeTimers({ now: START });
     const { demo, store, run } = setup();
     store.start();
@@ -125,8 +136,19 @@ describe('the demo, alone', () => {
     expect(store.state.summons).toBeNull();
     expect(store.state.snapshot?.issues).toEqual([]);
 
+    expect(demo.block.value).toBe('loading');
+
+    // Ready, but the canvas is hidden (a narrow screen): still no start.
     demo.markReady();
-    expect(demo.ready.value).toBe(true);
+    demo.setStageShown(false);
+    expect(demo.block.value).toBe('narrow');
+    demo.start();
+    await run(3_000);
+    expect(demo.started.value).toBe(false);
+    expect(store.state.summons).toBeNull();
+
+    demo.setStageShown(true);
+    expect(demo.block.value).toBeNull();
     demo.start();
     await run(2_000);
     expect(demo.started.value).toBe(true);

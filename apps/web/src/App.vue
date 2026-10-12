@@ -43,6 +43,12 @@ const { narration, next, idleSeeds, setIdleSince } = useNarration({
   nextMessage,
   halted: () => state.halted,
 });
+
+/** The canvas on screen or not: the messages stop waiting for scenes, the demo cannot start. */
+function onStageShown(shown: boolean): void {
+  setStageShown(shown);
+  demo?.setStageShown(shown);
+}
 </script>
 
 <template>
@@ -56,7 +62,7 @@ const { narration, next, idleSeeds, setIdleSince } = useNarration({
         :summons="summons"
         :halted="state.halted"
         :last-active-storage="demo?.storage"
-        @stage-shown="setStageShown"
+        @stage-shown="onStageShown"
         @call-started="callStarted"
         @idle-since="setIdleSince"
         @ready="demo?.markReady()"
@@ -88,7 +94,7 @@ const { narration, next, idleSeeds, setIdleSince } = useNarration({
         <DemoStart
           v-if="demoWaiting"
           class="stage__demo"
-          :ready="demo?.ready.value ?? false"
+          :block="demo?.block.value ?? null"
           @start="demo?.start()"
         />
       </template>
