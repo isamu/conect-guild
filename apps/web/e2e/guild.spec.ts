@@ -7,7 +7,7 @@ import {
   waitForBaseline,
   waitForRoom,
 } from './fixtures.ts';
-import { sampleSnapshot, writeSnapshot } from './snapshotFile.ts';
+import { sampleSnapshot } from './sampleSnapshot.ts';
 
 /** Longer than one refresh (5 s), for waits on the next fetch. */
 const REFRESH_TIMEOUT = 15_000;
@@ -101,7 +101,8 @@ test('「基準を消す」 removes the baseline and the next fetch stores a new
   await page.route('**/snapshot.json', async (route) => {
     held();
     await gate;
-    await route.continue();
+    // On to the fixture's context route (continue() would go to the dev server).
+    await route.fallback();
   });
   await holding;
   await page.getByRole('button', { name: '基準を消す' }).click();
@@ -135,8 +136,8 @@ test('below 760px the windows stack and the canvas is hidden', async ({ page }) 
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(700);
 });
 
-test('a snapshot of another repository halts the screen', async ({ page }) => {
-  await writeSnapshot({ ...(await sampleSnapshot()), repo: 'someone/else' });
+test('a snapshot of another repository halts the screen', async ({ page, snapshotServer }) => {
+  snapshotServer.serve({ ...(await sampleSnapshot()), repo: 'someone/else' });
   await page.goto('/');
   await expect(page.getByRole('alert')).toContainText('収集の対象と設定が違います');
   await expect(page.getByRole('region', { name: 'クエスト掲示板' })).toHaveCount(0);

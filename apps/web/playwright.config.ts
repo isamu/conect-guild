@@ -7,7 +7,7 @@ const ON_CI = process.env.CI !== undefined;
 
 export default defineConfig({
   testDir: './e2e',
-  // All tests share one dev server and one .data/snapshot.json, so they run one at a time.
+  // One at a time: the tests wait on the app's real 5-second refresh, which load could delay.
   fullyParallel: false,
   workers: 1,
   forbidOnly: ON_CI,
@@ -16,7 +16,6 @@ export default defineConfig({
   reporter: ON_CI
     ? [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]]
     : 'list',
-  globalSetup: './e2e/globalSetup.ts',
   use: {
     baseURL: BASE_URL,
     headless: true,

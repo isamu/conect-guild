@@ -1,12 +1,23 @@
 import { test as base, expect, type Locator, type Page } from '@playwright/test';
-import { NOW, sampleSnapshot, writeSnapshot } from './snapshotFile.ts';
+import type { Snapshot } from '@conect-guild/snapshot';
+import { NOW, sampleSnapshot } from './sampleSnapshot.ts';
 
 /** localStorage key of the diff baseline (app/guildStore.ts). */
 export const BASELINE_KEY = 'conect-guild:baseline';
 
+/** Marks the responses the tests served, so one that came from the dev server stands out. */
+const SERVED_HEADER = 'x-e2e-snapshot';
+
+export interface SnapshotServer {
+  /** What /snapshot.json returns from the next request on (the collector's next write). */
+  serve(snapshot: Snapshot): void;
+}
+
 interface GuildFixtures {
   /** Console errors and uncaught page errors; every test ends by checking there are none. */
   pageErrors: string[];
+  /** Answers every /snapshot.json request of the test; starts with the sample. */
+  snapshotServer: SnapshotServer;
 }
 
 /**
@@ -24,9 +35,37 @@ export const test = base.extend<GuildFixtures>({
         errors.push(`page: ${error.message}`);
       });
       await page.clock.setFixedTime(NOW);
-      await writeSnapshot(await sampleSnapshot());
       await use(errors);
       expect(errors).toEqual([]);
+    },
+    { auto: true },
+  ],
+  /**
+   * The dev server's /snapshot.json would read apps/web/.data, where the collector may keep real
+   * data. The context route answers every such request instead, and the test fails if any response
+   * reached the page without the route's mark (one that came from the dev server).
+   */
+  snapshotServer: [
+    async ({ context, page }, use) => {
+      let current = await sampleSnapshot();
+      await context.route('**/snapshot.json', (route) =>
+        route.fulfill({
+          json: current,
+          headers: { 'Cache-Control': 'no-store', [SERVED_HEADER]: '1' },
+        }),
+      );
+      const responses: boolean[] = [];
+      page.on('response', (response) => {
+        if (new URL(response.url()).pathname === '/snapshot.json')
+          responses.push(response.headers()[SERVED_HEADER] === '1');
+      });
+      await use({
+        serve: (snapshot) => {
+          current = snapshot;
+        },
+      });
+      expect(responses.length).toBeGreaterThan(0);
+      expect(responses.filter((served) => !served)).toEqual([]);
     },
     { auto: true },
   ],
