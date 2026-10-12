@@ -149,3 +149,22 @@ describe('the words of the king’s call and level tags', () => {
     expect(checked).toBeGreaterThan(0);
   });
 });
+
+const WAITS = ['awaitPresident', 'awaitKaname', 'awaitPermission'] as const;
+
+describe('lines on starting to wait and level tags (remarks.ts)', () => {
+  const seated = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS).members;
+
+  it.each(EVERYONE)('%s at the seat: the longest line of each wait meets no tag', (id) => {
+    const member = seated.find((m) => m.id === id);
+    if (member === undefined) throw new Error(`no ${id}`);
+    let checked = 0;
+    for (const scene of WAITS) {
+      const line = pick(id, scene);
+      if (line === null) continue;
+      expectClear(member, line, 0);
+      checked += 1;
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+});
