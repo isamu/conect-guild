@@ -7,8 +7,10 @@ import {
   type PartyRow,
   type SceneCue,
 } from '../app/guildView';
+import type { KeyValueStore } from '../adapters/storage';
 import type { Summons } from '../app/guildStore';
 import { createLastActiveTracker } from '../app/lastActive';
+import { bootStage, cueAction, type StageState } from '../app/stageBoot';
 import { ambientMoodsOf } from '../render/ambient';
 import type { GuildArt } from '../render/art';
 import { bubblesOf } from '../render/bubbles';
@@ -29,6 +31,8 @@ const props = defineProps<{
   summons: Summons | null;
   /** The screen is halted: the king's calls stop (to come and playing). */
   halted: boolean;
+  /** Where the idle times are kept; localStorage when absent (the demo keeps them in memory). */
+  lastActiveStorage?: KeyValueStore;
 }>();
 
 const emit = defineEmits<{
@@ -38,6 +42,11 @@ const emit = defineEmits<{
   idleSince: [since: IdleSince];
   /** A call of the king starts on the stage now (its sound rings with it, Issue #28). */
   callStarted: [];
+  /**
+   * The pictures are in and the stage runs: scenes and calls from now on are played. Sent once,
+   * even when the stage failed to start, so that nothing waits on it for ever.
+   */
+  ready: [];
 }>();
 
 const canvas = useTemplateRef<HTMLCanvasElement>('canvas');
@@ -49,7 +58,7 @@ let cssWidth: number | null = null;
 /** Cues seen so far; those that arrive while the pictures load wait for the loop. */
 let cues = EMPTY_CUE_QUEUE;
 /** When each member last had work (localStorage), for dozing, sleeping and playing (Issue #23). */
-const lastActive = createLastActiveTracker();
+const lastActive = createLastActiveTracker(props.lastActiveStorage);
 let idleSince: IdleSince = {};
 
 function setIdleSince(next: IdleSince): void {
@@ -67,16 +76,20 @@ function stageParty(rows: readonly PartyRow[]): StageParty {
   };
 }
 
+/** Loading its pictures, running, or failed to start (app/stageBoot.ts). */
+let stage: StageState = 'loading';
+
 /**
  * Starts the queued scenes in order, once the loop runs. While the canvas is out of sight they are
- * dropped, so they never play late (the message queue does not wait for them either).
+ * dropped, so they never play late (the message queue does not wait for them either); so they are
+ * when the stage failed to start.
  */
 function playCues(): void {
-  const hidden = cssWidth !== null && !isShown(cssWidth);
-  if (loop === null && !hidden) return;
+  const action = cueAction(stage, cssWidth !== null && !isShown(cssWidth));
+  if (action === 'wait') return;
   const taken = takeCues(cues);
   cues = taken.queue;
-  if (hidden) return;
+  if (action === 'drop') return;
   for (const cue of taken.play) loop?.play(cue.event);
 }
 
@@ -98,6 +111,7 @@ function start(element: HTMLCanvasElement, art: GuildArt): void {
     },
   });
   loop = running;
+  stage = 'running';
   setIdleSince(lastActive.observe(props.party, Date.now()));
   running.setParty(stageParty(props.party));
   running.resize(cssWidth ?? element.clientWidth, globalThis.devicePixelRatio);
@@ -124,7 +138,26 @@ onMounted(() => {
   void loadArt().then((art) => {
     const element = canvas.value;
     if (unmounted || element === null) return;
-    start(element, art);
+    // A stage that cannot start (no 2D context, for one) leaves the windows, messages and sounds
+    // going without the room; `ready` is sent either way (the demo's はじめる waits for it).
+    stage = bootStage(
+      () => {
+        start(element, art);
+      },
+      {
+        failed: (error) => {
+          globalThis.console.error('the stage could not start', error);
+          // A loop that started but failed halfway (sizing, the first party) is not trusted: it
+          // stops, and the stage counts as failed (its cues are dropped).
+          loop?.stop();
+          loop = null;
+        },
+        ready: () => {
+          emit('ready');
+        },
+      },
+    );
+    playCues();
   });
 });
 
