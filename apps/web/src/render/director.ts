@@ -57,6 +57,8 @@ export interface MemberPose {
   readonly mark: IdleMark | null;
   /** True while the member's feet are on their seat (isAtSeat). */
   readonly atSeat: boolean;
+  /** True while the member stays by the pet out of scenes (IdlePose.withPet): the pet sits up. */
+  readonly withPet: boolean;
 }
 
 /** The small moves while members are out of scenes (ambient.ts). */
@@ -185,6 +187,7 @@ function idleMember(id: MemberId, idle: IdlePose, atSeat: boolean): MemberPose {
     inScene: false,
     mark: idle.mark,
     atSeat,
+    withPet: idle.withPet,
   };
 }
 
@@ -234,6 +237,7 @@ export function frameAt(
       inScene: scene,
       mark: null,
       atSeat,
+      withPet: false,
     };
   })
     .sort((a, b) => a.depth - b.depth)

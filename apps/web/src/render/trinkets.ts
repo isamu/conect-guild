@@ -31,9 +31,16 @@ export interface DecorCues {
   readonly awaitingPresident: boolean;
   /** When the confetti now flying over each member started (the latest one). */
   readonly clearedAt: Readonly<Partial<Record<MemberId, number>>>;
+  /** Someone out playing stays by the pet now (IdlePose.withPet): it is up and sitting. */
+  readonly petCompany: boolean;
 }
 
-export const NO_CUES: DecorCues = { working: new Set(), awaitingPresident: false, clearedAt: {} };
+export const NO_CUES: DecorCues = {
+  working: new Set(),
+  awaitingPresident: false,
+  clearedAt: {},
+  petCompany: false,
+};
 
 /**
  * The members of a department at work have the desk-work mood (ambient.ambientMoodOf: working or
@@ -42,13 +49,18 @@ export const NO_CUES: DecorCues = { working: new Set(), awaitingPresident: false
  * the seat (`members`, director.isAtSeat): not while they walk in a scene or are out playing
  * (Issue #29). The hourglass and the banners do not look at anyone's seat: the hourglass is the
  * king's sign (he never leaves the throne), and a banner hangs on the wall of its side of the room
- * for a cleared quest, whose confetti flies over the seat wherever its member is.
+ * for a cleared quest, whose confetti flies over the seat wherever its member is. The pet sits up
+ * while anyone stays by it (`withPet`, Issue #39).
  */
 export function decorCuesOf(
   moods: AmbientMoods,
   bursts: readonly { readonly actor: MemberId; readonly start: number }[],
   now: number,
-  members: readonly { readonly id: MemberId; readonly atSeat: boolean }[],
+  members: readonly {
+    readonly id: MemberId;
+    readonly atSeat: boolean;
+    readonly withPet: boolean;
+  }[],
 ): DecorCues {
   const seated = new Set(members.filter((m) => m.atSeat).map((m) => m.id));
   const working = new Set<MemberId>();
@@ -61,7 +73,12 @@ export function decorCuesOf(
     if (start > now || now >= start + CONFETTI.durationMs) continue;
     clearedAt[actor] = Math.max(start, clearedAt[actor] ?? start);
   }
-  return { working, awaitingPresident: moods.yukihiro === 'fidget', clearedAt };
+  return {
+    working,
+    awaitingPresident: moods.yukihiro === 'fidget',
+    clearedAt,
+    petCompany: members.some((m) => m.withPet),
+  };
 }
 
 /** The banner on the back wall is for the upper side (and かなめ), the one on the left wall for the lower. */
@@ -281,9 +298,17 @@ export interface PetPose {
   readonly dy: number;
 }
 
-/** The pet (`asleep`, its sleeping picture) breathes while it sleeps and sits still while it is up. */
-export function petPoseAt(asleep: DecorName, phaseMs: number, now: number): PetPose {
-  if (petAwakeAt(phaseMs, now)) return { name: PET_AWAKE_DECOR, dy: 0 };
+/**
+ * The pet (`asleep`, its sleeping picture) breathes while it sleeps and sits still while it is up:
+ * now and then on its own, and all the while someone stays by it (`company`, DecorCues.petCompany).
+ */
+export function petPoseAt(
+  asleep: DecorName,
+  phaseMs: number,
+  now: number,
+  company: boolean,
+): PetPose {
+  if (company || petAwakeAt(phaseMs, now)) return { name: PET_AWAKE_DECOR, dy: 0 };
   return { name: asleep, dy: decorPose('breath', phaseMs, now).dy };
 }
 

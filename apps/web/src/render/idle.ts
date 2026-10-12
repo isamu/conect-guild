@@ -161,6 +161,8 @@ export interface IdlePose {
   /** Added after the sink (nodding, sleeping deeper), logical px. */
   readonly offset: Point;
   readonly mark: IdleMark | null;
+  /** True while the member stays by the pet (from arriving until the walk back starts). */
+  readonly withPet: boolean;
 }
 
 const STILL: Point = { x: 0, y: 0 };
@@ -189,7 +191,15 @@ function dozePose(seat: TilePos, salt: number, now: number): IdlePose {
   const feet = tileToPoint(seat);
   const step = still(seat);
   if (index % 4 === 0 && elapsed < IDLE.yawnMs) {
-    return { feet, step, frame: 1, flip: index % 8 === 0, offset: STILL, mark: null };
+    return {
+      feet,
+      step,
+      frame: 1,
+      flip: index % 8 === 0,
+      offset: STILL,
+      mark: null,
+      withPet: false,
+    };
   }
   const nod = Math.floor(elapsed / (IDLE.nodMs / 2)) % 2 === 1 ? IDLE.nodPx : 0;
   const dots = index % 3 === 1 && elapsed < IDLE.dozeDotsMs;
@@ -200,6 +210,7 @@ function dozePose(seat: TilePos, salt: number, now: number): IdlePose {
     flip: false,
     offset: { x: 0, y: nod },
     mark: dots ? { kind: 'bubble', glyph: '…' } : null,
+    withPet: false,
   };
 }
 
@@ -212,6 +223,7 @@ function sleepPose(seat: TilePos, salt: number, now: number): IdlePose {
     flip: false,
     offset: { x: 0, y: IDLE.sleepSinkPx },
     mark: { kind: 'z', rise: elapsed / IDLE.zRiseMs },
+    withPet: false,
   };
 }
 
@@ -235,6 +247,7 @@ function stayPose(outing: Outing, now: number): IdlePose {
     flip: false,
     offset: STILL,
     mark: null,
+    withPet: false,
   };
   if (spot.kind === 'chat' && spot.partner !== null) {
     const glyph = step % 2 === 0 ? '…' : '♪';
@@ -249,6 +262,7 @@ function stayPose(outing: Outing, now: number): IdlePose {
       flip,
       offset: { x: 0, y: crouchAt(now - outing.out.end) },
       mark: step % 2 === 0 ? { kind: 'bubble', glyph: '♪' } : null,
+      withPet: true,
     };
   }
   if (spot.kind === 'window') {
@@ -271,6 +285,7 @@ function playPose(outing: Outing, now: number): IdlePose {
     flip: pose.flip,
     offset: STILL,
     mark: null,
+    withPet: false,
   };
 }
 
