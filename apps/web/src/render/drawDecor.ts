@@ -6,7 +6,6 @@ import { decorDraw } from './decorArt';
 import { TILE_SIZE, TRINKETS } from './metrics';
 import {
   activeSince,
-  catStretchAt,
   FILE_TOP,
   floatingSheet,
   GLINT_POINTS,
@@ -14,6 +13,7 @@ import {
   glintAt,
   notesAt,
   papersAt,
+  petPoseAt,
   SAND_STREAM,
   sandGrainAt,
   spinBandAt,
@@ -77,18 +77,10 @@ function drawFlame(d: Drawing, thing: Thing): void {
   if (glow > 0) addLight(d, thing, glow);
 }
 
-/** The cat breathes, and now and then wakes and stretches (scaled around its bottom centre). */
-function drawCat(d: Drawing, thing: Thing): void {
-  const { dy } = decorPose('breath', thing.phaseMs, d.now);
-  const { scaleX, scaleY } = catStretchAt(thing.phaseMs, d.now);
-  const { w, h } = decorDraw(thing.name);
-  d.ctx.save();
-  d.ctx.translate(thing.x + w / 2, thing.y + h);
-  d.ctx.scale(scaleX, scaleY);
-  // Asleep it breathes; awake it is still.
-  const rise = scaleX === 1 && scaleY === 1 ? dy : 0;
-  d.art.decor.drawDecor(d.ctx, thing.name, -w / 2, -h + rise);
-  d.ctx.restore();
+/** The pet breathes, and now and then wakes and sits up (its awake picture, not scaled). */
+function drawPet(d: Drawing, thing: Thing): void {
+  const { name, dy } = petPoseAt(thing.name, thing.phaseMs, d.now);
+  d.art.decor.drawDecor(d.ctx, name, thing.x, thing.y + dy);
 }
 
 /** A four-pointed star in pale gold, `arm` px each way from its centre. */
@@ -217,7 +209,7 @@ function drawFlutter(d: Drawing, thing: Thing): void {
 
 const DRAW: Readonly<Record<DecorMotion, (d: Drawing, thing: Thing) => void>> = {
   flame: drawFlame,
-  breath: drawCat,
+  breath: drawPet,
   glint: drawGlint,
   notes: drawNotes,
   spin: drawSpin,
@@ -227,7 +219,7 @@ const DRAW: Readonly<Record<DecorMotion, (d: Drawing, thing: Thing) => void>> = 
 };
 
 /**
- * The lamps with a flickering flame, the cat, and the things that move at times: still pictures
+ * The lamps with a flickering flame, the pet, and the things that move at times: still pictures
  * while their trigger does not hold (`cues`, trinkets.ts).
  */
 export function drawAnimatedDecor(

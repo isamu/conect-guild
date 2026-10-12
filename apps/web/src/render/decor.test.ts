@@ -25,7 +25,7 @@ describe('decor layout', () => {
     }
   });
 
-  it('fills the room: dozens of things, all four lamp kinds and the cat', () => {
+  it('fills the room: dozens of things, all four lamp kinds and the pet', () => {
     expect(DECOR_PLACEMENTS.length).toBeGreaterThanOrEqual(40);
     const used = new Set(DECOR_PLACEMENTS.map((item) => item.name));
     for (const name of [
@@ -33,10 +33,15 @@ describe('decor layout', () => {
       'sconce',
       'pillar-lamp',
       'candlestick',
-      'sleeping-cat',
+      'sleeping-poodle',
     ] as const) {
       expect(used.has(name)).toBe(true);
     }
+    // The pet is a toy poodle (the president is allergic to cats); the cat's picture stays unused.
+    expect(used.has('sleeping-cat')).toBe(false);
+    expect(DECOR_PLACEMENTS.filter((item) => item.name === 'sleeping-poodle')).toEqual([
+      expect.objectContaining({ col: 18, row: 3 }),
+    ]);
   });
 
   it.each([
@@ -123,7 +128,7 @@ describe('decor drawing lists', () => {
     for (const item of STILL_DECOR) expect(DECOR_MOTION[item.name]).toBeUndefined();
   });
 
-  it('moves the lamps and the cat always, the other moving things only on a trigger', () => {
+  it('moves the lamps and the pet always, the other moving things only on a trigger', () => {
     for (const { placement, motion, trigger } of ANIMATED_DECOR) {
       expect(motion).toBe(DECOR_MOTION[placement.name]);
       const always = motion === 'flame' || motion === 'breath';

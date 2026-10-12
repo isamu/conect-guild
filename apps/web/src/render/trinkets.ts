@@ -1,6 +1,6 @@
 import type { DecorName } from '../../../../assets/decor/decor';
 import type { MemberId } from '../guild.config';
-import type { AmbientMoods } from './ambient';
+import { decorPose, type AmbientMoods } from './ambient';
 import { CONFETTI, TRINKETS } from './metrics';
 import type { Point } from './path';
 
@@ -9,8 +9,8 @@ import type { Point } from './path';
  * abacus and coins, notes and "!" from 広報's megaphone, a band of light turning 企画's globe and
  * the papers sorted on ささえ's file stack (総務) while that department works; the hourglass
  * running while the king has PRs to approve (it stands on ささえ's desk, but it is the king's
- * sign); a banner fluttering when a quest of its side of the room is cleared; the cat waking
- * to stretch now and then, and the light patches drifting with the sun. Pure: the time, each
+ * sign); a banner fluttering when a quest of its side of the room is cleared; the pet waking
+ * to sit up now and then, and the light patches drifting with the sun. Pure: the time, each
  * thing's phase and what the members do are passed in. Distances are px of the decor pictures
  * (logical px), from the picture's top-left.
  */
@@ -259,24 +259,25 @@ export function waveAt(fromTop: number, elapsed: number): number {
   return Math.round(TRINKETS.wavePx * fade * fromTop * Math.sin(angle)) + 0;
 }
 
-export interface CatStretch {
-  readonly scaleX: number;
-  readonly scaleY: number;
+/** The pet's picture while it is up and sitting. */
+export const PET_AWAKE_DECOR: DecorName = 'awake-poodle';
+
+/** The pet wakes and sits up at the start of every TRINKETS.petIntervalMs, for TRINKETS.petSitMs. */
+export function petAwakeAt(phaseMs: number, now: number): boolean {
+  return (now + phaseMs) % TRINKETS.petIntervalMs < TRINKETS.petSitMs;
 }
 
-export const CAT_ASLEEP: CatStretch = { scaleX: 1, scaleY: 1 };
+export interface PetPose {
+  /** The picture to draw: `asleep` or PET_AWAKE_DECOR. */
+  readonly name: DecorName;
+  /** Added to the picture's top, logical px. */
+  readonly dy: number;
+}
 
-/**
- * The cat once every TRINKETS.catIntervalMs: it lifts its head (taller), then stretches out
- * (longer and lower), then sleeps again. The scale is around the bottom centre of the picture.
- */
-export function catStretchAt(phaseMs: number, now: number): CatStretch {
-  const elapsed = (now + phaseMs) % TRINKETS.catIntervalMs;
-  if (elapsed < TRINKETS.catRiseMs) return { scaleX: 1, scaleY: TRINKETS.catRiseY };
-  if (elapsed < TRINKETS.catRiseMs + TRINKETS.catStretchMs) {
-    return { scaleX: TRINKETS.catStretchX, scaleY: TRINKETS.catStretchY };
-  }
-  return CAT_ASLEEP;
+/** The pet (`asleep`, its sleeping picture) breathes while it sleeps and sits still while it is up. */
+export function petPoseAt(asleep: DecorName, phaseMs: number, now: number): PetPose {
+  if (petAwakeAt(phaseMs, now)) return { name: PET_AWAKE_DECOR, dy: 0 };
+  return { name: asleep, dy: decorPose('breath', phaseMs, now).dy };
 }
 
 export interface PatchLook {

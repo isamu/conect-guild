@@ -7,13 +7,13 @@ import { DEFAULT_SEATS } from './scenes';
 
 /**
  * Where members go to play after a long idle spell (idle.ts, Issue #23), worked out once from the
- * map: beside the mugs for tea, in front of the pet, under the nearer window, and beside the seat
+ * map: beside the mugs for tea, beside the pet, under the nearer window, and beside the seat
  * of the neighbouring department for a chat. Only walkable tiles (never under an HTML window) that
  * can be reached from the member's seat are kept. The king never leaves the throne.
  */
 
 /** The pet by the throne. Its picture may change; the play spot follows this one name. */
-export const PET_DECOR: DecorName = 'sleeping-cat';
+export const PET_DECOR: DecorName = 'sleeping-poodle';
 /** The things that mark the tea spot. */
 export const TEA_DECOR: DecorName = 'mugs';
 
@@ -51,11 +51,21 @@ function firstWalkable(tiles: readonly TilePos[]): TilePos | null {
   return tiles.find(isWalkable) ?? null;
 }
 
-/** In front of the pet (below it), else beside it. */
+/**
+ * Beside the pet on its bottom row, left or right. Not in front of it: a member there is taller
+ * than the pet and would hide it.
+ */
 export function petTile(): TilePos | null {
   const pet = decorAt(PET_DECOR);
   if (pet === null) return null;
-  return firstWalkable([at(pet, 0, pet.h), at(pet, -1, 0), at(pet, pet.w, 0)]);
+  const row = pet.h - 1;
+  return firstWalkable([at(pet, -1, row), at(pet, pet.w, row)]);
+}
+
+/** True when a member at `tile` turns left (flipped) to face the pet. */
+export function turnsToPet(tile: TilePos): boolean {
+  const pet = decorAt(PET_DECOR);
+  return pet !== null && pet.col < tile.col;
 }
 
 /** Next to the mugs: behind the desk they stand on, at its left or right, else in front. */

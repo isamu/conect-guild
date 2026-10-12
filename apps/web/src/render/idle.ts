@@ -5,7 +5,7 @@ import { IDLE } from './metrics';
 import { MS_PER_TILE, poseOnSegment, walkSegment, type MoveFrame, type Segment } from './motion';
 import { findPath, tileToPoint, type Point, type TilePath } from './path';
 import { DEFAULT_SEATS } from './scenes';
-import { PLAY_SPOTS, type PlaySpot } from './idleSpots';
+import { PLAY_SPOTS, turnsToPet, type PlaySpot } from './idleSpots';
 
 /**
  * Long idle spells (Issue #23), drawn with the existing frames only: after 10 minutes with nothing
@@ -215,7 +215,7 @@ function sleepPose(seat: TilePos, salt: number, now: number): IdlePose {
   };
 }
 
-/** At the spot: chat bubbles in turn facing the partner, a "♪" by the pet, looks at the window. */
+/** At the spot: chat bubbles in turn facing the partner, a "♪" turned toward the pet, looks at the window. */
 function stayPose(outing: Outing, now: number): IdlePose {
   const { spot } = outing;
   const feet = tileToPoint(spot.tile);
@@ -234,7 +234,13 @@ function stayPose(outing: Outing, now: number): IdlePose {
     return { ...base, frame: 1, flip, mark: { kind: 'bubble', glyph } };
   }
   if (spot.kind === 'pet') {
-    return { ...base, mark: step % 2 === 0 ? { kind: 'bubble', glyph: '♪' } : null };
+    const flip = turnsToPet(spot.tile);
+    return {
+      ...base,
+      frame: 1,
+      flip,
+      mark: step % 2 === 0 ? { kind: 'bubble', glyph: '♪' } : null,
+    };
   }
   if (spot.kind === 'window') {
     const look = Math.floor((now - outing.out.end) / IDLE.lookMs) % 4;

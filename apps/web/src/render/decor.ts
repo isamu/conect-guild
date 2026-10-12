@@ -58,7 +58,7 @@ export const DECOR_PLACEMENTS: readonly DecorPlacement[] = [
   place('open-book', 20, 5),
   place('flyers', 21, 5),
   place('mugs', 22, 5),
-  place('sleeping-cat', 18, 3),
+  place('sleeping-poodle', 18, 3),
   // かなめ's counter and the hall
   place('jar', 14, 8),
   place('flower-vase', 18, 8),
@@ -107,11 +107,11 @@ export interface AnimatedDecor {
   readonly motion: DecorMotion;
   /** Shifts this one's flicker or breath against the others. */
   readonly phaseMs: number;
-  /** When it moves (trinkets.ts); null when it always does (the lamps and the cat). */
+  /** When it moves (trinkets.ts); null when it always does (the lamps and the pet). */
   readonly trigger: DecorTrigger | null;
 }
 
-/** Drawn every frame (the lamps, the cat and the things that move at times), under the members. */
+/** Drawn every frame (the lamps, the pet and the things that move at times), under the members. */
 export const ANIMATED_DECOR: readonly AnimatedDecor[] = DECOR_PLACEMENTS.flatMap((placement) => {
   const motion = DECOR_MOTION[placement.name];
   return motion === undefined ? [] : [{ placement, motion, phaseMs: 0 }];
