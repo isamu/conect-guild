@@ -114,9 +114,10 @@ export interface AnimatedDecor {
 /** Drawn every frame (the lamps, the pet and the things that move at times), under the members. */
 export const ANIMATED_DECOR: readonly AnimatedDecor[] = DECOR_PLACEMENTS.flatMap((placement) => {
   const motion = DECOR_MOTION[placement.name];
-  return motion === undefined ? [] : [{ placement, motion, phaseMs: 0 }];
-}).map((item, index) => ({
-  ...item,
+  return motion === undefined ? [] : [{ placement, motion }];
+}).map(({ placement, motion }, index) => ({
+  placement,
+  motion,
   phaseMs: index * AMBIENT.decorPhaseStepMs,
-  trigger: triggerOf(item.placement),
+  trigger: triggerOf(placement),
 }));
