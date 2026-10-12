@@ -4,9 +4,13 @@ import type { LevelTag } from './levelTags';
 import { BUBBLE_RISE, DETAIL_SCALE, HOLD, LINES, OVERHEAD_OFFSET } from './metrics';
 import { carry, raise } from './motion';
 import { raisedItemPoint } from './toss';
+import { tileToPoint } from './path';
+import { DEFAULT_SEATS } from './scenes';
+import { TALLEST_WINDOW_EXTENTS } from './map';
 import {
   overheadLift,
   overheadOf,
+  overheadSide,
   tagBox,
   wordsBox,
   wordsOf,
@@ -186,4 +190,50 @@ describe('overheadLift: clear of the raised item', () => {
       }
     },
   );
+});
+
+describe('overheadSide: words keep clear of the HTML windows', () => {
+  const sasae = { point: tileToPoint(DEFAULT_SEATS.sasae), held: null };
+  const party = TALLEST_WINDOW_EXTENTS.party;
+
+  it('puts words on the right as long as they stay left of the party column', () => {
+    expect(overheadSide(sasae, 'はっ！')).toBe('right');
+    expect(wordsBox(sasae.point, 3, 0, 'right').right).toBeLessThanOrEqual(party.left);
+  });
+
+  it('puts words on the left when on the right they would go under the party column', () => {
+    expect(wordsBox(sasae.point, 4, 0, 'right').right).toBeGreaterThan(party.left);
+    expect(overheadSide(sasae, 'おまたせ')).toBe('left');
+    expect(overheadSide(sasae, 'いいかしら？')).toBe('left');
+  });
+
+  it('mirrors the bubble on the left: as wide, ending 3 detail px left of the feet', () => {
+    const right = wordsBox(sasae.point, 6, 0, 'right');
+    const left = wordsBox(sasae.point, 6, 0, 'left');
+    expect(left.right).toBe(sasae.point.x - 3 * DETAIL_SCALE);
+    expect(left.right - left.left).toBe(right.right - right.left);
+    expect({ top: left.top, bottom: left.bottom }).toEqual({
+      top: right.top,
+      bottom: right.bottom,
+    });
+  });
+
+  it('keeps the waiting bubble and the signs (no words) on the right', () => {
+    expect(overheadSide(sasae, null)).toBe('right');
+  });
+
+  it('keeps words on the right for a seat far from the windows, whatever their length', () => {
+    const hirame = { point: tileToPoint(DEFAULT_SEATS.hirame), held: null };
+    expect(overheadSide(hirame, 'おうさま、ぜひ')).toBe('right');
+  });
+
+  it('lifts the words on the side they are drawn on', () => {
+    const tag = {
+      x: sasae.point.x - 60,
+      y: wordsBox(sasae.point, 6, 0, 'left').bottom,
+      text: 'Lv 9',
+    };
+    expect(overheadLift(sasae, 'いいかしら？', [tag])).toBeGreaterThan(0);
+    expect(overheadLift(sasae, 'はっ！', [tag])).toBe(0);
+  });
 });

@@ -6,9 +6,9 @@ import { levelTags, type LevelTag } from './levelTags';
 import { linesOf } from './lineBook';
 import type { PickLine } from './lines';
 import { BUBBLE_RISE, DETAIL_SCALE, OVERHEAD_OFFSET } from './metrics';
-import { overheadLift } from './overhead';
+import { overheadLift, overheadSide, type Side } from './overhead';
 import type { Point } from './path';
-import { LOGICAL_WIDTH } from './map';
+import { LOGICAL_WIDTH, TALLEST_WINDOW_EXTENTS } from './map';
 import { DEFAULT_SEATS, type SceneContext } from './scenes';
 import { NO_HOLDS, speechesAt, summonsEnd, withSummons } from './summons';
 
@@ -26,18 +26,20 @@ interface Box {
 
 /**
  * A line bubble over feet drawn at `feet` (draw.ts drawBubble): the box, 9 detail px high and as
- * wide as the text (a full-width character of the 7 px font is 7 px, plus 6 px), and its tail, 2 by
- * 2 detail px under the box's left end.
+ * wide as the text (a full-width character of the 7 px font is 7 px, plus 6 px), 3 detail px right
+ * of the feet (or left of them on the left side), and its tail, 2 by 2 detail px under the box's
+ * end next to the head.
  */
-function bubbleBoxes(feet: Point, lift: number, line: string): Box[] {
+function bubbleBoxes(feet: Point, lift: number, line: string, side: Side): Box[] {
   const width = (Array.from(line).length * 7 + 6) * DETAIL_SCALE;
-  const left = feet.x + 3 * DETAIL_SCALE;
+  const left = side === 'right' ? feet.x + 3 * DETAIL_SCALE : feet.x - 3 * DETAIL_SCALE - width;
   const top = feet.y - OVERHEAD_OFFSET - BUBBLE_RISE * DETAIL_SCALE - lift;
+  const tail = side === 'right' ? left + DETAIL_SCALE : left + width - 3 * DETAIL_SCALE;
   return [
     { left, right: left + width, top, bottom: top + 9 * DETAIL_SCALE },
     {
-      left: left + DETAIL_SCALE,
-      right: left + 3 * DETAIL_SCALE,
+      left: tail,
+      right: tail + 2 * DETAIL_SCALE,
       top: top + 9 * DETAIL_SCALE,
       bottom: top + 11 * DETAIL_SCALE,
     },
@@ -73,12 +75,16 @@ const CASES = (['issue-opened', 'pr-merged', 'issue-closed'] as const).flatMap((
   ),
 );
 
-/** Asserts that words over `member` meet no tag and stay on the canvas. */
+const WINDOWS = Object.values(TALLEST_WINDOW_EXTENTS);
+
+/** Asserts that words over `member` meet no tag nor HTML window and stay on the canvas. */
 function expectClear(member: MemberPose, words: string, t: number): void {
   const lift = overheadLift(member.pose, words, LEVEL_TAGS);
-  const boxes = bubbleBoxes(member.pose.point, lift, words);
+  const boxes = bubbleBoxes(member.pose.point, lift, words, overheadSide(member.pose, words));
   const met = TAGS.filter((tag) => boxes.some((box) => meet(box, tag)));
   expect({ who: member.id, t, met }).toEqual({ who: member.id, t, met: [] });
+  const under = WINDOWS.filter((area) => boxes.some((box) => meet(box, area)));
+  expect({ who: member.id, t, words, under }).toEqual({ who: member.id, t, words, under: [] });
   const [box] = boxes;
   expect(box?.top).toBeGreaterThanOrEqual(0);
   expect(box?.left).toBeGreaterThanOrEqual(0);
