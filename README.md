@@ -68,6 +68,8 @@ GitHub の Issue・PR で仕事を回しているチームなら、設定ファ�
 
 部門の数は、いまは 4 つに決まっています。席・机・通路を部門の数に合わせて並べる作業は [#18](https://github.com/yukihiroyamaguchi569/conect-guild/issues/18) で進めます。4 つ以外にすると、設定の検証で止まります。
 
+`npm run verify`（lint・型検査・テスト）は、このリポジトリを開発するためのものです。テストは conect.llc の設定を前提にしているので、自分のチーム向けに設定を変えると通りません。設定を変えたら `npm run collect` と `npm run dev` を使ってください。テストを通したいときは、設定を戻すか、#18 の対応を待ってください。
+
 ### MulmoTerminal との関係
 
 - MulmoTerminal が無くても動きます。GitHub の Issue・PR から、掲示板・パーティの状態・受け渡しの演出までを出します
