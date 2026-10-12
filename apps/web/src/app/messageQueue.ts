@@ -49,6 +49,8 @@ export interface MessageQueueOptions {
   readonly now: () => number;
   /** How long a message stays at least before the next one replaces it. */
   readonly holdMs: number;
+  /** How long the last message stays before it closes by itself (the window goes back to the narration). */
+  readonly lastHoldMs: number;
   readonly publish: (messages: readonly GuildMessage[]) => void;
 }
 
@@ -82,8 +84,11 @@ function withHeadScene(director: Director, head: GuildMessage, t: number): Direc
 interface Pacer {
   /** `head` reached the window: its hold starts now, and so does its scene on the canvas. */
   headShown(head: GuildMessage): void;
-  /** Ms until `next` may show (nextShowAt); null while stopped (hidden page or halted screen). */
-  delayFor(next: GuildMessage): number | null;
+  /**
+   * Ms until `next` may show (nextShowAt), or until the head closes when it is the last one; null
+   * while stopped (hidden page or halted screen).
+   */
+  delayFor(next: GuildMessage | undefined): number | null;
   /** The ▼ button: ends the head's hold. True when `next` (if any) may show at once. */
   skipHold(next: GuildMessage | undefined): boolean;
   setHidden(hidden: boolean): void;
@@ -92,7 +97,11 @@ interface Pacer {
   setStageShown(shown: boolean): void;
 }
 
-function createPacer(wallNow: () => number, holdMs: number): Pacer {
+function createPacer(
+  wallNow: () => number,
+  holds: Pick<MessageQueueOptions, 'holdMs' | 'lastHoldMs'>,
+): Pacer {
+  const { holdMs, lastHoldMs } = holds;
   let clock: StageClock = RUNNING_CLOCK;
   let director: Director = EMPTY_DIRECTOR;
   let stageShown = true;
@@ -109,6 +118,7 @@ function createPacer(wallNow: () => number, holdMs: number): Pacer {
       if (halted || clock.pausedAt !== null) return null;
       const t = now();
       holdStart ??= t;
+      if (next === undefined) return Math.max(holdStart + lastHoldMs - t, 0);
       return Math.max(nextShowAt(director, holdStart + holdMs, next) - t, 0);
     },
     skipHold(next) {
@@ -134,12 +144,12 @@ function createPacer(wallNow: () => number, holdMs: number): Pacer {
 
 /**
  * The message window's queue. Each message shows once: the head stays at least `holdMs`, and the
- * next one waits until its scene can start (nextShowAt); the last one stays until the next push or
- * `next()`. Every change is handed to `publish` as a new array.
+ * next one waits until its scene can start (nextShowAt); the last one closes after `lastHoldMs`
+ * (or on `next()`), unless another one is pushed meanwhile. Every change is handed to `publish` as a new array.
  */
 export function createMessageQueue(options: MessageQueueOptions): MessageQueue {
   const { scheduler, publish } = options;
-  const pacer = createPacer(options.now, options.holdMs);
+  const pacer = createPacer(options.now, options);
   let messages: readonly GuildMessage[] = [];
   let cancelHold: Cancel | null = null;
   let nextId = 1;
@@ -157,9 +167,8 @@ export function createMessageQueue(options: MessageQueueOptions): MessageQueue {
   }
 
   function scheduleHold(): void {
-    const following = messages[1];
-    if (cancelHold !== null || following === undefined) return;
-    const delay = pacer.delayFor(following);
+    if (cancelHold !== null || messages.length === 0) return;
+    const delay = pacer.delayFor(messages[1]);
     // advance() clears the handle (cancelling a timer that has fired does nothing).
     if (delay !== null) cancelHold = scheduler.after(delay, advance);
   }
@@ -180,7 +189,8 @@ export function createMessageQueue(options: MessageQueueOptions): MessageQueue {
     push(entries) {
       if (entries.length === 0) return;
       set([...messages, ...entries.map((entry) => ({ id: nextId++, ...entry }))]);
-      scheduleHold();
+      // The last one's closing gives way to the hold before the new ones.
+      reschedule();
     },
     next() {
       if (pacer.skipHold(messages[1])) advance();

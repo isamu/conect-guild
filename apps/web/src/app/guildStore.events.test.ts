@@ -259,10 +259,11 @@ describe('createGuildStore: no repeated or missing events', () => {
     store.start();
     await settle();
     await vi.advanceTimersByTimeAsync(REFRESH_INTERVAL_MS);
-    const ids = store.state.messages.map((m) => m.id);
+    expect(store.state.messages.length).toBeGreaterThan(0);
     await vi.advanceTimersByTimeAsync(REFRESH_INTERVAL_MS * 2);
-    // Only the hold timer moved the queue; nothing new was added.
-    expect(store.state.messages.map((m) => m.id)).toEqual(ids.slice(-1));
+    // Only the hold timers moved the queue (the last one closed by itself); nothing was added, not
+    // even by the fetch that just ran.
+    expect(store.state.messages).toEqual([]);
     store.stop();
   });
 

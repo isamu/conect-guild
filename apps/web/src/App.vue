@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useGuild } from './app/useGuild';
+import { useNarration } from './app/useNarration';
 import { useSound } from './app/useSound';
 import FetchStatus from './ui/FetchStatus.vue';
 import GuildCanvas from './ui/GuildCanvas.vue';
@@ -26,12 +27,26 @@ const {
   toggleSound,
   cycleVolume,
 } = useSound({ message, party, halted: () => state.halted });
+const { narration, next, idleSeeds, setIdleSince } = useNarration({
+  message,
+  party,
+  snapshot: () => state.snapshot,
+  nextMessage,
+  halted: () => state.halted,
+});
 </script>
 
 <template>
   <main class="guild">
     <div class="stage" :class="{ 'stage--halted': state.halted }">
-      <GuildCanvas class="stage__art" :party="party" :cue="cue" @stage-shown="setStageShown" />
+      <GuildCanvas
+        class="stage__art"
+        :party="party"
+        :cue="cue"
+        :idle-seeds="idleSeeds"
+        @stage-shown="setStageShown"
+        @idle-since="setIdleSince"
+      />
       <section v-if="state.halted" class="rpg-window stage__halt" role="alert">
         <template v-if="state.haltReason === 'repo-mismatch'">
           <h2 class="rpg-window__title">収集の対象と設定が違います</h2>
@@ -53,7 +68,8 @@ const {
           class="stage__message"
           :message="message"
           :remaining="Math.max(state.messages.length - 1, 0)"
-          @next="nextMessage"
+          :narration="narration"
+          @next="next"
         />
       </template>
       <div class="stage__side">
