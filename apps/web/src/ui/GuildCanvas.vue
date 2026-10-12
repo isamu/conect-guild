@@ -40,7 +40,10 @@ const emit = defineEmits<{
   idleSince: [since: IdleSince];
   /** A call of the king starts on the stage now (its sound rings with it, Issue #28). */
   callStarted: [];
-  /** The pictures are in and the stage runs: scenes and calls from now on are played. */
+  /**
+   * The pictures are in and the stage runs: scenes and calls from now on are played. Sent once,
+   * even when the stage failed to start, so that nothing waits on it for ever.
+   */
   ready: [];
 }>();
 
@@ -101,7 +104,6 @@ function start(element: HTMLCanvasElement, art: GuildArt): void {
   running.resize(cssWidth ?? element.clientWidth, globalThis.devicePixelRatio);
   // Messages may have reached the window while the pictures were loading.
   playCues();
-  emit('ready');
 }
 
 /** Follows the displayed width, from mount on, so the message queue knows it before the art. */
@@ -123,7 +125,12 @@ onMounted(() => {
   void loadArt().then((art) => {
     const element = canvas.value;
     if (unmounted || element === null) return;
-    start(element, art);
+    try {
+      start(element, art);
+    } finally {
+      // Also when the stage could not start (no 2D context): nothing would ever wait on it.
+      emit('ready');
+    }
   });
 });
 
