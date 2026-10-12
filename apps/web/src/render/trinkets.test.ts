@@ -303,9 +303,11 @@ describe('papersAt', () => {
     for (const turn of floating) {
       const start = turn * TRINKETS.shuffleMs;
       expect(papersAt(0, start).float).toEqual({ x: 0, y: 0 });
-      const late = papersAt(0, start + TRINKETS.floatMs - 1).float;
-      expect(late?.y).toBeLessThan(-TRINKETS.floatRisePx + 2);
-      expect(late?.x).toBeGreaterThan(TRINKETS.floatDriftPx - 2);
+      expect(papersAt(0, start + TRINKETS.floatMs / 2).float).toEqual({
+        x: TRINKETS.floatDriftPx,
+        y: -TRINKETS.floatRisePx,
+      });
+      expect(papersAt(0, start + TRINKETS.floatMs - 1).float).toEqual({ x: 0, y: 0 });
       expect(papersAt(0, start + TRINKETS.floatMs).float).toBeNull();
     }
     for (const turn of resting) {
@@ -316,21 +318,27 @@ describe('papersAt', () => {
     }
   });
 
-  it('rises the floating sheet steadily within its reach', () => {
-    const turn = floating[0] ?? 0;
-    let previous = 1;
+  it('rises the floating sheet, then settles it back on the stack, within its reach', () => {
+    // The test above finds floating turns among the first 200.
+    const start = (floating[0] ?? 0) * TRINKETS.shuffleMs;
+    let previous = 0;
     for (let t = 0; t < TRINKETS.floatMs; t += 20) {
-      const float = papersAt(0, turn * TRINKETS.shuffleMs + t).float;
+      const float = papersAt(0, start + t).float;
       expect(float).not.toBeNull();
       const y = float?.y ?? 0;
-      expect(y).toBeLessThanOrEqual(previous);
+      if (t <= TRINKETS.floatMs / 2) expect(y).toBeLessThanOrEqual(previous);
+      else expect(y).toBeGreaterThanOrEqual(previous);
       expect(y).toBeGreaterThanOrEqual(-TRINKETS.floatRisePx);
+      expect(y).toBeLessThanOrEqual(0);
       expect(float?.x).toBeGreaterThanOrEqual(0);
       expect(float?.x).toBeLessThanOrEqual(TRINKETS.floatDriftPx);
       previous = y;
     }
+    expect(previous).toBeGreaterThan(-2);
   });
+});
 
+describe('FILE_TOP', () => {
   it('keeps the top sheet on the stack’s picture as it slides', () => {
     expect(FILE_TOP.x).toBeGreaterThanOrEqual(0);
     expect(FILE_TOP.y).toBeGreaterThanOrEqual(0);

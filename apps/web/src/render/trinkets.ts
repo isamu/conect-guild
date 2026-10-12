@@ -201,7 +201,7 @@ export interface PapersLook {
 /**
  * The papers on ささえ's file stack at `now`: each turn the top sheet lies flat, slides, lifts its
  * corner and lies flat again, in quarters; on some turns (fixed per turn) a sheet floats up and
- * aside from the start of the turn for TRINKETS.floatMs.
+ * aside from the start of the turn, then settles back on the stack by TRINKETS.floatMs.
  */
 export function papersAt(phaseMs: number, now: number): PapersLook {
   const t = now + phaseMs;
@@ -210,15 +210,16 @@ export function papersAt(phaseMs: number, now: number): PapersLook {
   const quarter = Math.floor((elapsed / TRINKETS.shuffleMs) * 4);
   const slid = quarter === 1 || quarter === 2;
   const floats = hashStep(turn) < TRINKETS.floatShare && elapsed < TRINKETS.floatMs;
-  const age = elapsed / TRINKETS.floatMs;
+  // 0 at the start, 1 halfway, back to 0 at the end: up, then down onto the stack.
+  const lift = 1 - Math.abs((2 * elapsed) / TRINKETS.floatMs - 1);
   return {
     slide: slid ? TRINKETS.shuffleSlidePx : 0,
     curl: quarter === 2,
     float: floats
       ? {
-          x: Math.round(age * TRINKETS.floatDriftPx),
+          x: Math.round(lift * TRINKETS.floatDriftPx),
           // + 0 turns -0 into 0.
-          y: -Math.round(age * TRINKETS.floatRisePx) + 0,
+          y: -Math.round(lift * TRINKETS.floatRisePx) + 0,
         }
       : null,
   };

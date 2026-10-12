@@ -132,7 +132,8 @@ export const TRINKETS = {
   /**
    * 総務: the papers on ささえ's file stack are sorted. Each turn of `shuffleMs` the top sheet
    * slides `shuffleSlidePx`, lifts its corner, then lies flat again; on a share of the turns a
-   * sheet floats up off the stack for `floatMs`, `floatRisePx` up and `floatDriftPx` aside.
+   * sheet floats up off the stack, `floatRisePx` up and `floatDriftPx` aside at the top, and
+   * settles back on it by `floatMs`.
    */
   shuffleMs: 1_680,
   shuffleSlidePx: 3,
