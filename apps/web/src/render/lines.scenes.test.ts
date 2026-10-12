@@ -204,7 +204,7 @@ describe('lines and the other users of randomness', () => {
       ['pr-merged', '総務'],
       ['issue-closed', '広報'],
     ] as const) {
-      const withLines = planScene(event(kind, label), 0, context(createLinePicker(() => 0.3)));
+      const withLines = planScene(event(kind, label), 0, context(createLinePicker(() => 0.3).pick));
       const without = planScene(event(kind, label), 0, context(undefined));
       expect(withLines).toEqual(without);
     }
@@ -300,10 +300,11 @@ describe('the render loop’s sources of randomness (sceneContext)', () => {
     });
     const talking = { confetti: noted(1), toss: noted(2), lines: noted(3) };
     const withLines = playAll(
-      sceneContext(
-        { tossRandom: talking.toss.random, lineRandom: talking.lines.random },
-        talking.confetti.random,
-      ),
+      sceneContext({
+        random: talking.confetti.random,
+        tossRandom: talking.toss.random,
+        lineRandom: talking.lines.random,
+      }),
     );
     expect(talking.confetti.given).toEqual(quiet.confetti.given);
     expect(talking.toss.given).toEqual(quiet.toss.given);
@@ -316,7 +317,7 @@ describe('the render loop’s sources of randomness (sceneContext)', () => {
 describe('scenes played while halted (sceneContextWhile)', () => {
   it('says nothing and draws no line number while halted; the scene plays as without lines', () => {
     const lines = noted(5);
-    const ctx = sceneContext({ lineRandom: lines.random }, () => 0.5);
+    const ctx = sceneContext({ random: () => 0.5, lineRandom: lines.random });
     const halted = scheduleEvent(
       EMPTY_DIRECTOR,
       event('issue-closed', '経理'),
@@ -329,7 +330,7 @@ describe('scenes played while halted (sceneContextWhile)', () => {
   });
 
   it('keeps the picker when live', () => {
-    const ctx = sceneContext({}, () => 0.5);
+    const ctx = sceneContext({ random: () => 0.5 });
     expect(sceneContextWhile(ctx, false)).toBe(ctx);
     const live = scheduleEvent(
       EMPTY_DIRECTOR,
@@ -351,7 +352,7 @@ describe('isQuiet', () => {
 
   it('keeps the lines said last those that were seen: a dropped scene picks none', () => {
     const lines = noted(9);
-    const ctx = sceneContext({ lineRandom: lines.random }, () => 0.5);
+    const ctx = sceneContext({ random: () => 0.5, lineRandom: lines.random });
     const hidden = scheduleEvent(
       EMPTY_DIRECTOR,
       event('issue-closed', '経理'),
@@ -360,5 +361,20 @@ describe('isQuiet', () => {
     );
     expect(scenesShown(hidden, 0)).toEqual(EMPTY_DIRECTOR);
     expect(lines.given).toEqual([]);
+  });
+});
+
+describe('lines of scenes queued for the same member', () => {
+  it('never picks a line still to show for the next scene, before either is seen', () => {
+    const picker = createLinePicker(() => 0);
+    const first = scheduleEvent(
+      EMPTY_DIRECTOR,
+      event('issue-closed', '経理'),
+      0,
+      context(picker.pick),
+    );
+    const both = scheduleEvent(first, event('issue-closed', '経理'), 10_000, context(picker.pick));
+    const said = both.lines.filter((l) => l.actor === 'minori').map((l) => l.line);
+    expect(said).toEqual([linesOf('minori', 'clear')[0], linesOf('minori', 'clear')[1]]);
   });
 });

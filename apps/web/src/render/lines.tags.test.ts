@@ -8,7 +8,7 @@ import type { PickLine } from './lines';
 import { BUBBLE_RISE, DETAIL_SCALE, OVERHEAD_OFFSET } from './metrics';
 import { overheadLift } from './overhead';
 import type { Point } from './path';
-import { LOGICAL_WIDTH } from './map';
+import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './map';
 import { DEFAULT_SEATS, type SceneContext } from './scenes';
 import { NO_HOLDS, speechesAt, summonsEnd, withSummons } from './summons';
 
@@ -79,10 +79,12 @@ function expectClear(member: MemberPose, words: string, t: number): void {
   const boxes = bubbleBoxes(member.pose.point, lift, words);
   const met = TAGS.filter((tag) => boxes.some((box) => meet(box, tag)));
   expect({ who: member.id, t, met }).toEqual({ who: member.id, t, met: [] });
-  const [box] = boxes;
-  expect(box?.top).toBeGreaterThanOrEqual(0);
-  expect(box?.left).toBeGreaterThanOrEqual(0);
-  expect(box?.right).toBeLessThanOrEqual(LOGICAL_WIDTH);
+  for (const box of boxes) {
+    expect(box.top).toBeGreaterThanOrEqual(0);
+    expect(box.left).toBeGreaterThanOrEqual(0);
+    expect(box.right).toBeLessThanOrEqual(LOGICAL_WIDTH);
+    expect(box.bottom).toBeLessThanOrEqual(LOGICAL_HEIGHT);
+  }
 }
 
 function contextFor(toss: number): SceneContext {

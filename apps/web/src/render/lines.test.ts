@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { linesOf, type SpokenLine } from './lineBook';
+import type { MemberId } from '../guild.config';
+import { linesOf, type LineScene, type SpokenLine } from './lineBook';
 import {
   createLinePicker,
   linesAt,
@@ -7,6 +8,8 @@ import {
   remember,
   showMs,
   speakInTurn,
+  seenLines,
+  type LinePicker,
   type PickLine,
   type Turn,
   type Utterance,
@@ -78,19 +81,32 @@ describe('remember', () => {
   });
 });
 
+/** Picks for `actor` at `scene` and sees the line at once, as a frame would show it. */
+function sayNow(picker: LinePicker, actor: MemberId, scene: LineScene): SpokenLine | null {
+  const line = picker.pick(actor, scene, []);
+  if (line !== null) {
+    picker.saw([[actor, line]]);
+    picker.saw([]);
+  }
+  return line;
+}
+
 describe('createLinePicker', () => {
   it('picks the same lines from the same random sequence', () => {
     const a = createLinePicker(seeded(7));
     const b = createLinePicker(seeded(7));
-    const said = (pick: PickLine) =>
-      Array.from({ length: 12 }, () => [pick('hibiki', 'clear'), pick('kaname', 'toss')]);
+    const said = (picker: LinePicker) =>
+      Array.from({ length: 12 }, () => [
+        sayNow(picker, 'hibiki', 'clear'),
+        sayNow(picker, 'kaname', 'toss'),
+      ]);
     expect(said(a)).toEqual(said(b));
   });
 
-  it('never says a line again while it is among the last ones of that member and moment', () => {
+  it('never says a line again while it is among the last ones seen of that member and moment', () => {
     for (const seed of [1, 2, 3, 4, 5]) {
-      const pick = createLinePicker(seeded(seed));
-      const said = Array.from({ length: 60 }, () => pick('kaname', 'handOver'));
+      const picker = createLinePicker(seeded(seed));
+      const said = Array.from({ length: 60 }, () => sayNow(picker, 'kaname', 'handOver'));
       for (let i = 1; i < said.length; i += 1) {
         const window = said.slice(Math.max(0, i - LINES.recentLines), i);
         expect(window).not.toContain(said[i]);
@@ -99,29 +115,88 @@ describe('createLinePicker', () => {
   });
 
   it('says every line of a moment over time', () => {
-    const pick = createLinePicker(seeded(11));
-    const said = new Set(Array.from({ length: 40 }, () => pick('hirame', 'takeScroll')));
+    const picker = createLinePicker(seeded(11));
+    const said = new Set(Array.from({ length: 40 }, () => sayNow(picker, 'hirame', 'takeScroll')));
     expect(said).toEqual(new Set(linesOf('hirame', 'takeScroll')));
   });
 
   it('remembers each member and moment apart', () => {
     // Always the first fresh line: the memory of one moment never steers another.
-    const pick = createLinePicker(() => 0);
-    const first = linesOf('minori', 'clear')[0];
-    expect(pick('minori', 'clear')).toBe(first);
-    expect(pick('minori', 'takeScroll')).toBe(linesOf('minori', 'takeScroll')[0]);
-    expect(pick('hibiki', 'clear')).toBe(linesOf('hibiki', 'clear')[0]);
-    expect(pick('minori', 'clear')).toBe(linesOf('minori', 'clear')[1]);
+    const picker = createLinePicker(() => 0);
+    expect(sayNow(picker, 'minori', 'clear')).toBe(linesOf('minori', 'clear')[0]);
+    expect(sayNow(picker, 'minori', 'takeScroll')).toBe(linesOf('minori', 'takeScroll')[0]);
+    expect(sayNow(picker, 'hibiki', 'clear')).toBe(linesOf('hibiki', 'clear')[0]);
+    expect(sayNow(picker, 'minori', 'clear')).toBe(linesOf('minori', 'clear')[1]);
   });
 
   it('says nothing (and draws no number) at a moment the member has no lines for', () => {
     let draws = 0;
-    const pick = createLinePicker(() => {
+    const picker = createLinePicker(() => {
       draws += 1;
       return 0;
     });
-    expect(pick('yukihiro', 'handOver')).toBeNull();
+    expect(picker.pick('yukihiro', 'handOver', [])).toBeNull();
     expect(draws).toBe(0);
+  });
+});
+
+describe('createLinePicker: only what is seen counts', () => {
+  const [first, second] = linesOf('minori', 'clear');
+
+  it('does not remember a line picked but never seen (dropped when halted, hidden all along)', () => {
+    const picker = createLinePicker(() => 0);
+    expect(picker.pick('minori', 'clear', [])).toBe(first);
+    // Never shown: the next pick may say it after all.
+    expect(picker.pick('minori', 'clear', [])).toBe(first);
+  });
+
+  it('avoids the lines still to show (pending) even before they are seen', () => {
+    const picker = createLinePicker(() => 0);
+    expect(picker.pick('minori', 'clear', [first ?? 'かんりょう！'])).toBe(second);
+  });
+
+  it('remembers a line once however many frames show it', () => {
+    const picker = createLinePicker(() => 0);
+    for (let frame = 0; frame < 30; frame += 1) picker.saw([['minori', first ?? 'かんりょう！']]);
+    picker.saw([]);
+    // Only one line is remembered: the second one is still free to say.
+    expect(picker.pick('minori', 'clear', [])).toBe(second);
+  });
+
+  it('remembers the same line again when it shows again later', () => {
+    const picker = createLinePicker(() => 0);
+    const shown = first ?? 'かんりょう！';
+    picker.saw([['minori', shown]]);
+    picker.saw([]);
+    picker.saw([['minori', shown]]);
+    picker.saw([]);
+    // Seen twice in a row: the last two remembered are both it, so the first fresh one is next.
+    expect(picker.pick('minori', 'clear', [])).toBe(second);
+  });
+
+  it('ignores a line the member has no moment for', () => {
+    const picker = createLinePicker(() => 0);
+    picker.saw([['yukihiro', 'それっ！']]);
+    expect(picker.pick('yukihiro', 'seeClear', [])).toBe(linesOf('yukihiro', 'seeClear')[0]);
+  });
+});
+
+describe('pickLine with pending lines', () => {
+  it('avoids only the pending ones when the recent and pending leave nothing', () => {
+    expect(pickLine(['x', 'y', 'z'], ['x', 'y'], () => 0, ['z'])).toBe('x');
+  });
+
+  it('says one of the pending ones when every option is pending', () => {
+    expect(pickLine(['x', 'y'], [], () => 0.9999, ['x', 'y'])).toBe('y');
+  });
+});
+
+describe('seenLines', () => {
+  it('gives the lines over the heads, but none where the king’s call has the head', () => {
+    expect(seenLines({ minori: 'かんりょう！', kaname: 'それっ！' }, { minori: 'はっ！' })).toEqual(
+      [['kaname', 'それっ！']],
+    );
+    expect(seenLines({}, {})).toEqual([]);
   });
 });
 

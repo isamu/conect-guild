@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MemberId } from '../guild.config';
-import { LINE_BOOK, linesOf, type LineScene, type SpokenLine } from './lineBook';
+import { LINE_BOOK, linesOf, sceneOfLine, type LineScene, type SpokenLine } from './lineBook';
 
 const MEMBERS: readonly MemberId[] = ['kaname', 'minori', 'hibiki', 'hirame', 'sasae', 'yukihiro'];
 const SCENES: readonly LineScene[] = [
@@ -71,6 +71,14 @@ describe('line book: each moment', () => {
       );
     },
   );
+
+  it.each(MEMBERS)('gives %s no line at two moments (a line tells its moment)', (id) => {
+    const own = ENTRIES.filter((entry) => entry.id === id).flatMap((entry) => entry.lines);
+    expect(new Set(own).size).toBe(own.length);
+    for (const entry of ENTRIES.filter((e) => e.id === id)) {
+      for (const line of entry.lines) expect(sceneOfLine(id, line)).toBe(entry.scene);
+    }
+  });
 
   it('lets the king react only to a clear', () => {
     expect(Object.keys(LINE_BOOK.yukihiro)).toEqual(['seeClear']);
