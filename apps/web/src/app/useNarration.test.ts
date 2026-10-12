@@ -37,16 +37,24 @@ function setup() {
   const party = ref<PartyRow[]>([]);
   const loaded = ref(false);
   const nextMessage = vi.fn();
+  const halted = ref(false);
   let n = 0;
   const scope = effectScope();
   const binding = scope.run(() =>
     bindNarration(
-      { message, party, snapshot: () => (loaded.value ? snapshot : null), nextMessage },
+      {
+        message,
+        party,
+        snapshot: () => (loaded.value ? snapshot : null),
+        nextMessage,
+        halted: () => halted.value,
+      },
       {
         scheduler: globalScheduler,
         // Walks through the lines, so every draw differs.
         random: () => (n++ * 0.37) % 1,
-        now: () => Date.parse(T0),
+        // The fake timers move it (beforeEach starts it at T0).
+        now: Date.now,
         hour: () => 12,
       },
     ),
@@ -58,11 +66,12 @@ function setup() {
     party.value = rows();
     await nextTick();
   };
-  return { message, binding, load, nextMessage, scope };
+  return { message, binding, load, nextMessage, scope, halted };
 }
 
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.setSystemTime(Date.parse(T0));
 });
 
 afterEach(() => {
@@ -128,6 +137,46 @@ describe('bindNarration', () => {
     binding.stop();
     await vi.advanceTimersByTimeAsync(NARRATION_INTERVAL_MS * 3);
     expect(binding.narration.value?.id).toBe(last);
+    scope.stop();
+  });
+});
+
+describe('bindNarration: hidden page and halted screen', () => {
+  it('keeps the line while the page is hidden, and goes on with the rest after', async () => {
+    const { binding, load, scope } = setup();
+    await load();
+    const first = binding.narration.value?.id;
+    await vi.advanceTimersByTimeAsync(5_000);
+    binding.setHidden(true);
+    await vi.advanceTimersByTimeAsync(NARRATION_INTERVAL_MS * 4);
+    expect(binding.narration.value?.id).toBe(first);
+    binding.setHidden(false);
+    await vi.advanceTimersByTimeAsync(NARRATION_INTERVAL_MS - 5_000 - 1);
+    expect(binding.narration.value?.id).toBe(first);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(binding.narration.value?.id).not.toBe(first);
+    binding.stop();
+    scope.stop();
+  });
+
+  it('keeps the line while the screen is halted, and goes on after', async () => {
+    const { binding, load, scope, halted } = setup();
+    await load();
+    const first = binding.narration.value?.id;
+    halted.value = true;
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(NARRATION_INTERVAL_MS * 4);
+    expect(binding.narration.value?.id).toBe(first);
+    // Hidden and halted together: it waits until both are over.
+    binding.setHidden(true);
+    halted.value = false;
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(NARRATION_INTERVAL_MS * 2);
+    expect(binding.narration.value?.id).toBe(first);
+    binding.setHidden(false);
+    await vi.advanceTimersByTimeAsync(NARRATION_INTERVAL_MS);
+    expect(binding.narration.value?.id).not.toBe(first);
+    binding.stop();
     scope.stop();
   });
 });

@@ -32,6 +32,7 @@ const { narration, next, idleSeeds, setIdleSince } = useNarration({
   party,
   snapshot: () => state.snapshot,
   nextMessage,
+  halted: () => state.halted,
 });
 </script>
 

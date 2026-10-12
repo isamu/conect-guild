@@ -10,6 +10,7 @@ function setup(lines: (string | null)[]) {
   let i = 0;
   const narrator = createNarrator({
     scheduler: globalScheduler,
+    now: Date.now,
     intervalMs: INTERVAL,
     compose: (prev) => {
       previous.push(prev);
@@ -78,6 +79,66 @@ describe('narrator', () => {
     const { narrator, published } = setup(['a', 'b']);
     narrator.next();
     narrator.stop();
+    await vi.advanceTimersByTimeAsync(INTERVAL * 3);
+    expect(published).toHaveLength(1);
+  });
+});
+
+describe('narrator: paused while the window cannot be seen', () => {
+  it('stops the interval while paused and keeps the rest of it', async () => {
+    const { narrator, published } = setup(['a', 'b', 'c']);
+    narrator.next();
+    await vi.advanceTimersByTimeAsync(5_000);
+    narrator.setPaused(true);
+    await vi.advanceTimersByTimeAsync(INTERVAL * 5);
+    expect(published).toHaveLength(1);
+    narrator.setPaused(false);
+    await vi.advanceTimersByTimeAsync(INTERVAL - 5_000 - 1);
+    expect(published).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(published.map((n) => n?.text)).toEqual(['a', 'b']);
+    // Then a whole interval again.
+    await vi.advanceTimersByTimeAsync(INTERVAL);
+    expect(published).toHaveLength(3);
+    narrator.stop();
+  });
+
+  it('keeps the rest over several pauses, and ignores repeated ones', async () => {
+    const { narrator, published } = setup(['a', 'b']);
+    narrator.next();
+    for (let i = 0; i < 4; i += 1) {
+      await vi.advanceTimersByTimeAsync(4_000);
+      narrator.setPaused(true);
+      narrator.setPaused(true);
+      await vi.advanceTimersByTimeAsync(60_000);
+      narrator.setPaused(false);
+      narrator.setPaused(false);
+    }
+    expect(published).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(INTERVAL - 16_000);
+    expect(published).toHaveLength(2);
+    narrator.stop();
+  });
+
+  it('tells at once on next() while paused, and counts a whole interval from the resume', async () => {
+    const { narrator, published } = setup(['a', 'b', 'c']);
+    narrator.setPaused(true);
+    narrator.next();
+    expect(published).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(INTERVAL * 3);
+    expect(published).toHaveLength(1);
+    narrator.setPaused(false);
+    await vi.advanceTimersByTimeAsync(INTERVAL);
+    expect(published).toHaveLength(2);
+    narrator.stop();
+  });
+
+  it('does not start again after stop(), even when unpaused', async () => {
+    const { narrator, published } = setup(['a', 'b']);
+    narrator.next();
+    narrator.setPaused(true);
+    narrator.stop();
+    narrator.setPaused(false);
     await vi.advanceTimersByTimeAsync(INTERVAL * 3);
     expect(published).toHaveLength(1);
   });
