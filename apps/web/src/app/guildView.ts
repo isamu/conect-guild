@@ -4,7 +4,6 @@ import {
   DEPARTMENT_LABELS,
   DEPARTMENT_MEMBER,
   MEMBERS,
-  type DepartmentLabel,
   type MemberConfig,
   type MemberId,
 } from '../guild.config';
@@ -30,8 +29,10 @@ import type { GuildMessage } from './messageQueue';
 type SnapshotLists = Pick<Snapshot, 'issues' | 'prs'>;
 
 export interface BoardGroup {
-  /** 'reception' or the department label. */
-  readonly key: 'reception' | DepartmentLabel;
+  /**
+   * Unique key: 'reception', or `department:` + the label (a label may itself be "reception").
+   */
+  readonly key: 'reception' | `department:${string}`;
   readonly label: string;
   readonly color: string;
   readonly quests: readonly Quest[];
@@ -59,7 +60,7 @@ export function buildBoard(snapshot: SnapshotLists): BoardGroup[] {
   const departments = DEPARTMENT_LABELS.map((department): BoardGroup => {
     const member = MEMBERS[DEPARTMENT_MEMBER[department]];
     return {
-      key: department,
+      key: `department:${department}`,
       label: `${member.name}（${department}）`,
       color: member.color,
       quests: open.filter((quest) => quest.department === department),
