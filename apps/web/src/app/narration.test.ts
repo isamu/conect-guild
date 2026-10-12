@@ -134,14 +134,14 @@ describe('memberLines: long idle spells (A)', () => {
   });
 
   it('walks there and back before and after it (as on the canvas)', () => {
-    const at = (kind: PlaySpot['kind'], now: number) =>
+    const lineAt = (kind: PlaySpot['kind'], now: number) =>
       memberLines(member('hirame', 'idle'), play(spotOf('hirame', kind)), now);
-    expect(at('window', 0)).toEqual(['ひらめは まどべへ むかっている。']);
-    expect(at('tea', 1)).toEqual(['ひらめは おちゃの ところへ むかっている。']);
-    expect(at('pet', 1)).toEqual([`ひらめは ${PET_NAME}の ところへ むかっている。`]);
-    expect(at('chat', 1)).toEqual(['ひらめは ささえの ところへ むかっている。']);
-    expect(at('tea', BACK_AT)).toEqual(['ひらめは せきに もどっている。']);
-    expect(at('tea', BACK_AT + 1)).toEqual(['ひらめは せきに もどっている。']);
+    expect(lineAt('window', 0)).toEqual(['ひらめは まどべへ むかっている。']);
+    expect(lineAt('tea', 1)).toEqual(['ひらめは おちゃの ところへ むかっている。']);
+    expect(lineAt('pet', 1)).toEqual([`ひらめは ${PET_NAME}の ところへ むかっている。`]);
+    expect(lineAt('chat', 1)).toEqual(['ひらめは ささえの ところへ むかっている。']);
+    expect(lineAt('tea', BACK_AT)).toEqual(['ひらめは せきに もどっている。']);
+    expect(lineAt('tea', BACK_AT + 1)).toEqual(['ひらめは せきに もどっている。']);
   });
 
   it('tells the stay from the moment the walk out ends until the walk back starts', () => {
