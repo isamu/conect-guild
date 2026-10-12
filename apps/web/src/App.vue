@@ -18,6 +18,7 @@ const {
   fetchStatus,
   message,
   cue,
+  summons,
   nextMessage,
   clearBaseline,
   setStageShown,
@@ -26,7 +27,7 @@ const {
   settings: soundSettings,
   toggleSound,
   cycleVolume,
-} = useSound({ message, party, halted: () => state.halted });
+} = useSound({ message, party, summons, halted: () => state.halted });
 const { narration, next, idleSeeds, setIdleSince } = useNarration({
   message,
   party,

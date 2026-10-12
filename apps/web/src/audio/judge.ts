@@ -18,6 +18,26 @@ export function cueForMessage(message: { readonly event: GuildEvent | null }): S
   return message.event === null ? 'text' : EVENT_CUES[message.event.kind];
 }
 
+/** The sound of the head message when it newly reached the window (its id is not `lastId`). */
+export function messageCue(
+  message: { readonly id: number; readonly event: GuildEvent | null } | null,
+  lastId: number | null,
+): SoundCue | null {
+  return message === null || message.id === lastId ? null : cueForMessage(message);
+}
+
+/**
+ * The king's call for a new order of the president (Issue #28; its id is not `lastId`), unless
+ * `other` starts with it: two sounds never start together, and the call gives way.
+ */
+export function summonsCue(
+  summons: { readonly id: number } | null,
+  lastId: number | null,
+  other: SoundCue | null,
+): SoundCue | null {
+  return summons === null || summons.id === lastId || other !== null ? null : 'summon';
+}
+
 export interface PartyMember {
   readonly id: MemberId;
   readonly state: MemberState;

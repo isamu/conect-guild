@@ -4,12 +4,15 @@ import { documentVisibility } from '../adapters/visibility';
 import { createSoundController } from '../audio/controller';
 import type { PartyMember } from '../audio/judge';
 import { createTonePlayer } from '../audio/player';
+import type { Summons } from './guildStore';
 import type { GuildMessage } from './messageQueue';
 
 export interface SoundSources {
   /** The head of the message queue (useGuild). */
   readonly message: Readonly<Ref<GuildMessage | null>>;
   readonly party: Readonly<Ref<readonly PartyMember[]>>;
+  /** The president's latest order (useGuild): the king's call rings once per order. */
+  readonly summons: Readonly<Ref<Summons | null>>;
   readonly halted: () => boolean;
 }
 
@@ -41,13 +44,14 @@ export function useSound(sources: SoundSources) {
     for (const type of UNLOCK_EVENTS) document.removeEventListener(type, unlock, { capture: true });
   });
 
-  // One watcher for the halt, the party and the message: a fetch that changes several of them is
+  // One watcher for the halt, the party, the message and the summons: a fetch that changes several of them is
   // handed over whole, so the controller judges them in its own order, not the watchers'.
   watch(
     () => ({
       halted: sources.halted(),
       party: sources.party.value,
       message: sources.message.value,
+      summons: sources.summons.value,
     }),
     (screen) => {
       controller.screenChanged(screen);

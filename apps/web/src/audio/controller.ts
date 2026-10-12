@@ -1,6 +1,6 @@
 import type { KeyValueStore } from '../adapters/storage';
 import type { GuildEvent } from '../domain/events';
-import { cueForMessage, mayPlay, newlyAwaiting, type PartyMember } from './judge';
+import { mayPlay, messageCue, newlyAwaiting, summonsCue, type PartyMember } from './judge';
 import type { TonePlayer } from './player';
 import { SCORES, type SoundCue } from './scores';
 import {
@@ -26,7 +26,8 @@ export interface SoundController {
   unlock(): void;
   /**
    * What the screen shows now, handed over whole on every change so that a fetch that changes
-   * several parts at once is judged in one fixed order: the halt, then the party, then the message.
+   * several parts at once is judged in one fixed order: the halt, the party, the message, then the
+   * king's summons.
    */
   screenChanged(screen: SoundScreen): void;
   setHidden(hidden: boolean): void;
@@ -38,6 +39,11 @@ export interface SoundScreen {
   readonly party: readonly PartyMember[];
   /** The head of the message queue; it rings once, when a new id reaches the window. */
   readonly message: { readonly id: number; readonly event: GuildEvent | null } | null;
+  /**
+   * The president's latest order (Issue #28); a new id rings the king's call once, unless another
+   * sound starts with it (two sounds never start together).
+   */
+  readonly summons: { readonly id: number } | null;
 }
 
 export interface SoundControllerOptions {
@@ -52,6 +58,7 @@ export function createSoundController(options: SoundControllerOptions): SoundCon
   let halted = false;
   let previousParty: readonly PartyMember[] | null = null;
   let lastMessageId: number | null = null;
+  let lastSummonsId: number | null = null;
 
   function play(cue: SoundCue): void {
     if (!mayPlay({ enabled: settings.enabled, hidden, halted })) return;
@@ -63,13 +70,14 @@ export function createSoundController(options: SoundControllerOptions): SoundCon
     saveSoundSettings(storage, settings);
   }
 
-  function partyChanged(rows: readonly PartyMember[]): void {
+  /** The permission cue when someone newly waits for a permission; null otherwise. */
+  function partyChanged(rows: readonly PartyMember[]): SoundCue | null {
     // No rows before the first snapshot: the first real party is the starting point.
-    if (rows.length === 0) return;
+    if (rows.length === 0) return null;
     const fresh = newlyAwaiting(previousParty, rows);
     previousParty = rows;
     // One alert however many start waiting together.
-    if (fresh.length > 0) play('permission');
+    return fresh.length > 0 ? 'permission' : null;
   }
 
   /** The feedback blip of the buttons, once the audio is unlocked by the same click. */
@@ -97,10 +105,12 @@ export function createSoundController(options: SoundControllerOptions): SoundCon
       // is only the new starting point, so waits that began meanwhile do not ring.
       if (halted && !screen.halted) previousParty = null;
       halted = screen.halted;
-      partyChanged(screen.party);
-      const message = screen.message;
-      if (message !== null && message.id !== lastMessageId) play(cueForMessage(message));
-      lastMessageId = message?.id ?? null;
+      const permission = partyChanged(screen.party);
+      const message = messageCue(screen.message, lastMessageId);
+      const summons = summonsCue(screen.summons, lastSummonsId, permission ?? message);
+      lastMessageId = screen.message?.id ?? null;
+      lastSummonsId = screen.summons?.id ?? null;
+      for (const cue of [permission, message, summons]) if (cue !== null) play(cue);
     },
     setHidden(next) {
       hidden = next;

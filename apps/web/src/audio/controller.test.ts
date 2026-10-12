@@ -25,7 +25,7 @@ class FakeStorage implements StorageLike {
   }
 }
 
-const CUES: readonly SoundCue[] = ['scroll', 'chest', 'clear', 'permission', 'text'];
+const CUES: readonly SoundCue[] = ['scroll', 'chest', 'clear', 'permission', 'summon', 'text'];
 
 /** Records what would ring, by cue name. */
 class FakePlayer implements TonePlayer {
@@ -67,7 +67,7 @@ function setup(stored?: { enabled: boolean; volume: 1 | 2 | 3 }) {
   if (stored !== undefined) storage.items.set(SOUND_STORAGE_KEY, JSON.stringify(stored));
   const player = new FakePlayer();
   const controller = createSoundController({ player, storage: createKeyValueStore(() => storage) });
-  let screen: SoundScreen = { halted: false, party: [], message: null };
+  let screen: SoundScreen = { halted: false, party: [], message: null, summons: null };
   let nextId = 1;
   /** Hands over the screen with `patch` applied, as the one watcher in app/useSound.ts does. */
   const show = (patch: Partial<SoundScreen>) => {
@@ -238,5 +238,44 @@ describe('createSoundController: permissions', () => {
     muted.controller.toggle();
     muted.show({ party: party('minori') });
     expect(cues(muted.player).filter((cue) => cue === 'permission')).toEqual([]);
+  });
+});
+
+describe("createSoundController: the king's summons", () => {
+  it('rings once per order, not again while the same one stays', () => {
+    const { player, show } = setup({ enabled: true, volume: 2 });
+    show({ party: party() });
+    show({ summons: { id: 1 } });
+    show({ party: party() });
+    show({ summons: { id: 1 } });
+    show({ summons: { id: 2 } });
+    expect(cues(player)).toEqual(['summon', 'summon']);
+  });
+
+  it('is silent before the first order, while muted, hidden or halted, and does not catch up', () => {
+    const { player, controller, show } = setup({ enabled: true, volume: 2 });
+    show({ summons: null });
+    controller.setHidden(true);
+    show({ summons: { id: 1 } });
+    controller.setHidden(false);
+    show({ halted: true, summons: { id: 2 } });
+    show({ halted: false });
+    expect(player.played).toEqual([]);
+
+    const muted = setup();
+    muted.show({ summons: { id: 1 } });
+    muted.controller.toggle();
+    muted.show({ party: party() });
+    expect(cues(muted.player).filter((cue) => cue === 'summon')).toEqual([]);
+  });
+
+  it('gives way to a message or a permission sound that starts with it', () => {
+    const { player, show, message } = setup({ enabled: true, volume: 2 });
+    show({ party: party() });
+    show({ message: message('issue-opened'), summons: { id: 1 } });
+    show({ party: party('minori'), summons: { id: 2 } });
+    expect(cues(player)).toEqual(['scroll', 'permission']);
+    show({ summons: { id: 3 } });
+    expect(cues(player)).toEqual(['scroll', 'permission', 'summon']);
   });
 });
