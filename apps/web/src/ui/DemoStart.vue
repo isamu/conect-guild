@@ -6,7 +6,7 @@ const emit = defineEmits<{ start: [] }>();
 <template>
   <section class="rpg-window demo-start" aria-label="デモ">
     <h2 class="rpg-window__title">デモ</h2>
-    <p>架空のクエストで、ギルドの 1 日を くり返し 再生します。効果音が 鳴ります。</p>
+    <p>架空のクエストで ギルドの ようすを くり返します。効果音が 鳴ります。</p>
     <p class="demo-start__actions">
       <button type="button" class="rpg-button demo-start__button" @click="emit('start')">
         ▶ はじめる
