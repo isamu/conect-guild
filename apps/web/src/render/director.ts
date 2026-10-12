@@ -4,7 +4,7 @@ import { ambientPose, type AmbientMoods, type AmbientSeeds, type HandProp } from
 import { burstOrigin, confettiAt, CONFETTI_MS, type PlacedParticle } from './confetti';
 import type { IdleMark, IdlePose, IdlePoses } from './idle';
 import { poseOnSegment, standingPose, type Pose, type Segment, type SpriteFrame } from './motion';
-import type { Point } from './path';
+import { tileToPoint, type Point } from './path';
 import { seatedPoint } from './seating';
 import { castOf, planScene, type Burst, type SceneContext, type Track } from './scenes';
 
@@ -55,6 +55,8 @@ export interface MemberPose {
   readonly inScene: boolean;
   /** A sign over the head in a long idle spell ("Z", "…", "♪"); null otherwise. */
   readonly mark: IdleMark | null;
+  /** True while the member's feet are on their seat (isAtSeat). */
+  readonly atSeat: boolean;
 }
 
 /** The small moves while members are out of scenes (ambient.ts). */
@@ -147,8 +149,28 @@ export function inScene(director: Director, id: MemberId, now: number): boolean 
   );
 }
 
+/**
+ * True while the member's feet are on their seat at `now`: false while they walk or stand away in a
+ * scene (a handover), are out playing in a long idle spell (`idle`, idle.ts) or walk back from it
+ * (director.sendHome). Picking up or holding up an item at the seat, confetti over it, dozing and
+ * sleeping keep them at the seat. Ambient moves are not counted: they never leave the seat.
+ */
+export function isAtSeat(
+  director: Director,
+  now: number,
+  member: { readonly id: MemberId; readonly seat: TilePos; readonly idle: IdlePose | undefined },
+): boolean {
+  const { id, seat, idle } = member;
+  const feet =
+    idle !== undefined && !inScene(director, id, now)
+      ? idle.feet
+      : poseAt(director, id, now, seat).point;
+  const home = tileToPoint(seat);
+  return feet.x === home.x && feet.y === home.y;
+}
+
 /** The member as their long idle spell shows them: dozing, asleep or out playing. */
-function idleMember(id: MemberId, idle: IdlePose): MemberPose {
+function idleMember(id: MemberId, idle: IdlePose, atSeat: boolean): MemberPose {
   const sunk = seatedPoint(idle.feet);
   return {
     id,
@@ -162,6 +184,7 @@ function idleMember(id: MemberId, idle: IdlePose): MemberPose {
     hand: null,
     inScene: false,
     mark: idle.mark,
+    atSeat,
   };
 }
 
@@ -200,7 +223,8 @@ export function frameAt(
   const members = MEMBER_IDS.map((id): MemberPose => {
     const scene = inScene(director, id, now);
     const idle = ambient?.idle?.[id];
-    if (!scene && idle !== undefined) return idleMember(id, idle);
+    const atSeat = isAtSeat(director, now, { id, seat: seats[id], idle });
+    if (!scene && idle !== undefined) return idleMember(id, idle, atSeat);
     const pose = poseAt(director, id, now, seats[id]);
     return {
       id,
@@ -209,6 +233,7 @@ export function frameAt(
       hand: null,
       inScene: scene,
       mark: null,
+      atSeat,
     };
   })
     .sort((a, b) => a.depth - b.depth)
