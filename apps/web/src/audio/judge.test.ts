@@ -47,15 +47,19 @@ describe('messageCue', () => {
 
 describe('summonsCue', () => {
   it('rings the king for an order whose id is new', () => {
-    expect(summonsCue({ id: 1 }, null, null)).toBe('summon');
-    expect(summonsCue({ id: 2 }, 1, null)).toBe('summon');
+    expect(summonsCue({ id: 1 }, null, { other: null, stageShown: true })).toBe('summon');
+    expect(summonsCue({ id: 2 }, 1, { other: null, stageShown: true })).toBe('summon');
   });
 
   it('stays silent for the same order, no order, or when another sound starts with it', () => {
-    expect(summonsCue({ id: 1 }, 1, null)).toBeNull();
-    expect(summonsCue(null, 1, null)).toBeNull();
-    expect(summonsCue({ id: 2 }, 1, 'permission')).toBeNull();
-    expect(summonsCue({ id: 2 }, 1, 'scroll')).toBeNull();
+    expect(summonsCue({ id: 1 }, 1, { other: null, stageShown: true })).toBeNull();
+    expect(summonsCue(null, 1, { other: null, stageShown: true })).toBeNull();
+    expect(summonsCue({ id: 2 }, 1, { other: 'permission', stageShown: true })).toBeNull();
+    expect(summonsCue({ id: 2 }, 1, { other: 'scroll', stageShown: true })).toBeNull();
+  });
+
+  it('stays silent while the canvas is not shown (the call is not played there)', () => {
+    expect(summonsCue({ id: 2 }, 1, { other: null, stageShown: false })).toBeNull();
   });
 });
 

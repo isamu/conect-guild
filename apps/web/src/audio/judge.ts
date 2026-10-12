@@ -28,14 +28,16 @@ export function messageCue(
 
 /**
  * The king's call for a new order of the president (Issue #28; its id is not `lastId`), unless
- * `other` starts with it: two sounds never start together, and the call gives way.
+ * `other` starts with it (two sounds never start together, and the call gives way) or the canvas is
+ * not shown (the call is not played there, so it is not heard either).
  */
 export function summonsCue(
   summons: { readonly id: number } | null,
   lastId: number | null,
-  other: SoundCue | null,
+  context: { readonly other: SoundCue | null; readonly stageShown: boolean },
 ): SoundCue | null {
-  return summons === null || summons.id === lastId || other !== null ? null : 'summon';
+  if (summons === null || summons.id === lastId) return null;
+  return context.other === null && context.stageShown ? 'summon' : null;
 }
 
 export interface PartyMember {

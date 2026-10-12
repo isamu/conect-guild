@@ -67,7 +67,13 @@ function setup(stored?: { enabled: boolean; volume: 1 | 2 | 3 }) {
   if (stored !== undefined) storage.items.set(SOUND_STORAGE_KEY, JSON.stringify(stored));
   const player = new FakePlayer();
   const controller = createSoundController({ player, storage: createKeyValueStore(() => storage) });
-  let screen: SoundScreen = { halted: false, party: [], message: null, summons: null };
+  let screen: SoundScreen = {
+    halted: false,
+    party: [],
+    message: null,
+    summons: null,
+    stageShown: true,
+  };
   let nextId = 1;
   /** Hands over the screen with `patch` applied, as the one watcher in app/useSound.ts does. */
   const show = (patch: Partial<SoundScreen>) => {
@@ -267,6 +273,15 @@ describe("createSoundController: the king's summons", () => {
     muted.controller.toggle();
     muted.show({ party: party() });
     expect(cues(muted.player).filter((cue) => cue === 'summon')).toEqual([]);
+  });
+
+  it('is silent for an order that comes while the canvas is hidden, and does not catch up', () => {
+    const { player, show } = setup({ enabled: true, volume: 2 });
+    show({ stageShown: false, summons: { id: 1 } });
+    show({ stageShown: true });
+    expect(player.played).toEqual([]);
+    show({ summons: { id: 2 } });
+    expect(cues(player)).toEqual(['summon']);
   });
 
   it('gives way to a message or a permission sound that starts with it', () => {

@@ -13,6 +13,8 @@ export interface SoundSources {
   readonly party: Readonly<Ref<readonly PartyMember[]>>;
   /** The president's latest order (useGuild): the king's call rings once per order. */
   readonly summons: Readonly<Ref<Summons | null>>;
+  /** Whether the canvas is on screen; the king's call rings only with its scene. */
+  readonly stageShown: Readonly<Ref<boolean>>;
   readonly halted: () => boolean;
 }
 
@@ -52,6 +54,7 @@ export function useSound(sources: SoundSources) {
       party: sources.party.value,
       message: sources.message.value,
       summons: sources.summons.value,
+      stageShown: sources.stageShown.value,
     }),
     (screen) => {
       controller.screenChanged(screen);

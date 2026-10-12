@@ -44,6 +44,8 @@ export interface SoundScreen {
    * sound starts with it (two sounds never start together).
    */
   readonly summons: { readonly id: number } | null;
+  /** False while narrow screens hide the canvas: the call is not played there, so it is not heard. */
+  readonly stageShown: boolean;
 }
 
 export interface SoundControllerOptions {
@@ -107,7 +109,10 @@ export function createSoundController(options: SoundControllerOptions): SoundCon
       halted = screen.halted;
       const permission = partyChanged(screen.party);
       const message = messageCue(screen.message, lastMessageId);
-      const summons = summonsCue(screen.summons, lastSummonsId, permission ?? message);
+      const summons = summonsCue(screen.summons, lastSummonsId, {
+        other: permission ?? message,
+        stageShown: screen.stageShown,
+      });
       lastMessageId = screen.message?.id ?? null;
       lastSummonsId = screen.summons?.id ?? null;
       for (const cue of [permission, message, summons]) if (cue !== null) play(cue);

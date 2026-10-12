@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, onMounted } from 'vue';
+import { computed, onBeforeUnmount, onMounted, shallowRef } from 'vue';
 import { documentVisibility } from '../adapters/visibility';
 import { createGuildStore, type GuildStoreOptions } from './guildStore';
 import { buildBoard, buildFetchStatus, buildKingBubble, buildParty, sceneCue } from './guildView';
@@ -38,6 +38,8 @@ export function useGuild(options: GuildStoreOptions = {}) {
   const cue = computed(() => sceneCue(message.value));
   // The president's latest order (Issue #28): the king calls on the canvas, with a sound.
   const summons = computed(() => state.summons);
+  // Whether the canvas is on screen (narrow screens hide it): the king's call is not heard unseen.
+  const stageShown = shallowRef(true);
 
   return {
     state,
@@ -48,10 +50,12 @@ export function useGuild(options: GuildStoreOptions = {}) {
     message,
     cue,
     summons,
+    stageShown,
     nextMessage: () => {
       store.nextMessage();
     },
     setStageShown: (shown: boolean) => {
+      stageShown.value = shown;
       store.setStageShown(shown);
     },
     clearBaseline: () => {
