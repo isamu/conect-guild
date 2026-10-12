@@ -61,7 +61,10 @@ export function createCalls(options: CallsOptions): Calls {
     },
     setHalted(next) {
       halted = next;
-      if (halted) list = [];
+      if (halted) {
+        list = [];
+        holds = NO_HOLDS;
+      }
     },
     view(frame, t) {
       const speeches = speechesAt(list, t);

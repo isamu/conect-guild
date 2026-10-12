@@ -137,11 +137,13 @@ export function holdsAt(
 ): Holds {
   const summons = playing(list, now);
   if (summons === undefined) return NO_HOLDS;
-  // The next call of a row keeps the king where the one before held him (no gap between them).
+  // The next call of a row (it starts right as the held one ends) keeps the king where he was.
   const king = holds.points[KING];
+  const follows =
+    holds.start !== null && summonsEnd({ start: holds.start, members: [] }) === summons.start;
   let points: Partial<Record<MemberId, Point>> = {};
   if (summons.start === holds.start) points = { ...holds.points };
-  else if (holds.start !== null && king !== undefined) points = { [KING]: king };
+  else if (follows && king !== undefined) points = { [KING]: king };
   for (const member of frame.members) {
     if (points[member.id] === undefined && heldAt(summons, member, now)) {
       points[member.id] = member.pose.point;

@@ -100,3 +100,27 @@ describe('createCalls: halted', () => {
     expect(calls.view(frame, 3 * END).speeches).toEqual({ yukihiro: '！' });
   });
 });
+
+describe('createCalls: holds after a halt', () => {
+  it('forgets where the king was held, so a call after the halt holds him where it finds him', () => {
+    const { calls, frame } = setup();
+    calls.add(['kaname'], 0);
+    calls.view(frame, 0);
+    calls.setHalted(true);
+    calls.setHalted(false);
+    // The next call starts right when the dropped one would have ended.
+    calls.add(['sasae'], END);
+    const sunk: StageFrame = {
+      ...frame,
+      members: frame.members.map((m) =>
+        m.id === 'yukihiro'
+          ? { ...m, pose: { ...m.pose, point: { x: m.pose.point.x, y: m.pose.point.y + 4 } } }
+          : m,
+      ),
+    };
+    // Past the "！" (when he rises a little), in the murmur.
+    const king = calls.view(sunk, END + 1_000).frame.members.find((m) => m.id === 'yukihiro');
+    const before = sunk.members.find((m) => m.id === 'yukihiro');
+    expect(king?.pose.point).toEqual(before?.pose.point);
+  });
+});
