@@ -1,3 +1,4 @@
+import type { MemberId } from '../guild.config';
 import type { GuildArt } from './art';
 import { bubbleShown, type BubbleKind, type Bubbles } from './bubbles';
 import type { ConfettiView, MemberPose, StageFrame } from './director';
@@ -9,6 +10,7 @@ import type { IdleMark } from './idle';
 import { BUBBLE_RISE, DETAIL_SCALE, IDLE, OVERHEAD_OFFSET, TILE_SIZE } from './metrics';
 import { heldLook } from './hands';
 import type { Point } from './path';
+import { flyingItemPoint } from './toss';
 import type { DecorCues } from './trinkets';
 
 /** Canvas side effects only: every decision was made in the pure modules. Logical pixels. */
@@ -149,6 +151,16 @@ function drawHeldItem(ctx: CanvasRenderingContext2D, member: MemberPose, art: Gu
   }
 }
 
+/** Items in the air (toss.ts): over every member and the furniture, as they fly over the room. */
+function drawFlights(ctx: CanvasRenderingContext2D, frame: StageFrame, art: GuildArt): void {
+  const feetOf = (id: MemberId) => frame.members.find((m) => m.id === id)?.pose.point;
+  const hasHoldFrames = (id: MemberId) => art.sprites.hasHoldFrames(id);
+  for (const view of frame.flights) {
+    const at = flyingItemPoint(view, feetOf, hasHoldFrames);
+    if (at !== null) art.sprites.drawProp(ctx, view.prop, at, 'raise');
+  }
+}
+
 /**
  * Members (back to front) between the front layers, so the furniture in front of a member covers
  * their lower body, with the moving things on that furniture; then what they hold (sunk into a
@@ -167,6 +179,7 @@ export function drawActors(
     ctx.drawImage(step.layer.image, 0, 0);
     drawAnimatedDecor(ctx, art, stage, step.layer.layer.animated);
   }
+  drawFlights(ctx, stage.frame, art);
 }
 
 /**

@@ -7,6 +7,7 @@ import { poseOnSegment, standingPose, type Pose, type Segment, type SpriteFrame 
 import { tileToPoint, type Point } from './path';
 import { seatedPoint } from './seating';
 import { castOf, planScene, type Burst, type SceneContext, type Track } from './scenes';
+import { flightAt, type Flight, type FlightView } from './toss';
 
 /**
  * Plays scenes back: which scenes are running, where every member is at a given time, and when
@@ -17,6 +18,8 @@ import { castOf, planScene, type Burst, type SceneContext, type Track } from './
 export interface Director {
   readonly tracks: readonly Track[];
   readonly bursts: readonly Burst[];
+  /** Items in the air (toss.ts). */
+  readonly flights: readonly Flight[];
   /** When each member's last scheduled track ends. */
   readonly busyUntil: Readonly<Partial<Record<MemberId, number>>>;
 }
@@ -30,7 +33,7 @@ const MEMBER_IDS: readonly MemberId[] = [
   'yukihiro',
 ];
 
-export const EMPTY_DIRECTOR: Director = { tracks: [], bursts: [], busyUntil: {} };
+export const EMPTY_DIRECTOR: Director = { tracks: [], bursts: [], flights: [], busyUntil: {} };
 
 /** A member at their seat with an ambient move: may type with a holding frame, holds nothing. */
 export interface SeatPose {
@@ -78,6 +81,8 @@ export interface StageFrame {
   /** Every member, back to front (by `depth`). */
   readonly members: readonly MemberPose[];
   readonly confetti: readonly ConfettiView[];
+  /** Items in the air now (drawn between the raised hands of the two members: toss.ts). */
+  readonly flights: readonly FlightView[];
 }
 
 export function trackEnd(track: Track): number {
@@ -108,6 +113,7 @@ export function scheduleEvent(
   return {
     tracks: [...director.tracks, ...scene.tracks],
     bursts: [...director.bursts, ...scene.bursts],
+    flights: [...director.flights, ...scene.flights],
     busyUntil,
   };
 }
@@ -245,14 +251,18 @@ export function frameAt(
       particles: confettiAt(burst.particles, now - burst.start),
     }))
     .filter((view) => view.particles.length > 0);
-  return { members, confetti };
+  const flights = director.flights
+    .map((flight) => flightAt(flight, now))
+    .filter((view) => view !== null);
+  return { members, confetti, flights };
 }
 
 /** True while anything is moving or still to come (the loop may sleep otherwise). */
 export function isAnimating(director: Director, now: number): boolean {
   return (
     director.tracks.some((track) => trackEnd(track) > now) ||
-    director.bursts.some((burst) => burst.start + CONFETTI_MS > now)
+    director.bursts.some((burst) => burst.start + CONFETTI_MS > now) ||
+    director.flights.some((flight) => flight.end > now)
   );
 }
 
@@ -266,6 +276,7 @@ export function prune(director: Director, now: number): Director {
   return {
     tracks: director.tracks.filter((track) => trackEnd(track) > now),
     bursts: director.bursts.filter((burst) => burst.start + CONFETTI_MS > now),
+    flights: director.flights.filter((flight) => flight.end > now),
     busyUntil,
   };
 }

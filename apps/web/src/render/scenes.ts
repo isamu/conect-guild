@@ -12,6 +12,7 @@ import {
   type Segment,
 } from './motion';
 import { findPath, type TilePath } from './path';
+import { planToss, shouldToss, type Flight } from './toss';
 
 /**
  * Event → scene script (docs/DESIGN.md 4.4 and chapter 6 M2). Pure: the start time and the random
@@ -27,6 +28,8 @@ import { findPath, type TilePath } from './path';
  *   counter; かなめ holds it up a while, the member walks back to the seat
  * - issue-closed: confetti over the member's seat
  * - no department: かなめ only raises the scroll / chest at the reception (confetti stays the same)
+ * - issue-opened to a near desk, now and then: かなめ tosses the scroll from the counter and the
+ *   member catches it at the seat (toss.ts, Issue #12)
  *
  * A handover takes about 10–14 s in all (scenes.test.ts checks every department).
  */
@@ -57,6 +60,8 @@ export interface Burst {
 export interface Scene {
   readonly tracks: readonly Track[];
   readonly bursts: readonly Burst[];
+  /** Items in the air (toss.ts). */
+  readonly flights: readonly Flight[];
 }
 
 export interface SceneContext {
@@ -210,12 +215,40 @@ function handoverTracks(
     : deliver(item, start, seats);
 }
 
+/** かなめ tosses the scroll from her seat; the member catches it at theirs (toss.ts). */
+function tossScene(actor: MemberId, start: number, seats: SceneContext['seats']): Scene {
+  const toss = planToss({ from: 'kaname', to: actor, prop: 'scroll' }, start, seats, {
+    pickUpMs: PICK_UP_MS,
+    holdUpMs: HOLD_UP_MS,
+  });
+  return {
+    tracks: [
+      { actor: 'kaname', segments: toss.thrower },
+      { actor, segments: toss.catcher },
+    ],
+    bursts: [],
+    flights: [toss.flight],
+  };
+}
+
 export function planScene(event: GuildEvent, start: number, context: SceneContext): Scene {
   const actor = actorOf(event);
   if (event.kind === 'issue-closed') {
-    return { tracks: [], bursts: [{ actor, start, particles: createConfetti(context.random) }] };
+    return {
+      tracks: [],
+      bursts: [{ actor, start, particles: createConfetti(context.random) }],
+      flights: [],
+    };
   }
-  return { tracks: handoverTracks(event.kind, actor, start, context.seats), bursts: [] };
+  const { seats, random } = context;
+  if (
+    event.kind === 'issue-opened' &&
+    actor !== 'kaname' &&
+    shouldToss(seats.kaname, seats[actor], random)
+  ) {
+    return tossScene(actor, start, seats);
+  }
+  return { tracks: handoverTracks(event.kind, actor, start, seats), bursts: [], flights: [] };
 }
 
 /** Seats from the guild config. */
