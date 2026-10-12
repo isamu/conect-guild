@@ -283,7 +283,7 @@ function paint(painter: Painter, scale: number, moment: Moment): void {
   const tags = levelTags(moment.levels, DEFAULT_SEATS);
   drawLevelTags(ctx, tags);
   drawOverhead(ctx, { ...moment, tags });
-  drawLevelUpBanners(ctx, moment);
+  drawLevelUpBanners(ctx, { ...moment, tags });
 }
 
 /** The canvas, the scenery drawn once and an empty canvas for the shade. */

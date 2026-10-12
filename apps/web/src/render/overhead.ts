@@ -140,3 +140,22 @@ function liftOverTags(
   const rest = tags.filter((tag) => tag.top < Math.min(...tops));
   return liftOverTags(feet, bubble, higher, rest);
 }
+
+/**
+ * Where words over `member` are drawn from: the feet lifted as overheadLift lifts them, or null when
+ * no words are over the head (the king's call first, then a line: overheadOf). The words "LEVEL UP"
+ * of a level-up go over them (levelUp.bannerPoint).
+ */
+export function wordsFeet(
+  member: {
+    readonly id: MemberId;
+    readonly pose: { readonly point: Point; readonly held: Held | null };
+  },
+  sources: Pick<OverheadSources, 'speeches' | 'lines'>,
+  tags: readonly LevelTag[],
+): Point | null {
+  const words = sources.speeches[member.id] ?? sources.lines[member.id];
+  if (words === undefined) return null;
+  const { x, y } = member.pose.point;
+  return { x, y: y - overheadLift(member.pose, words, tags) };
+}
