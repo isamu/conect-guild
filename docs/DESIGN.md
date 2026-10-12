@@ -390,6 +390,7 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 - ESLint（sonarjs の複雑度・ネスト・引数）をエラー、`max-lines` 400 / `max-lines-per-function` 60 を warning で入れる
 - `npm run verify` = lint + typecheck + test。CI は push と PR で `npm ci --ignore-scripts` → verify → build（サンプルデータのみ）
 - scoria でコードの健康状態を測る（Issue #33）。`.github/workflows/scoria.yml` が PR と main への push で `npm run test:coverage`（`coverage/lcov.info` を出す。遅いので verify には入れない）→ `npx -y scoria@0.3.0` を動かし、`.scoria/baseline.json` からの変化をジョブのサマリーに、指摘を SARIF で code scanning に出す。`mode: report` なので CI は落とさない。scoria は package.json に入れない（scoria 自身の依存の npm audit の警告がこのリポジトリのものに見えるため）
+  - scoria の出力の「detection drift: vue is in the config but no longer detected」は誤検知で、計測には影響しない（Issue #50）。scoria 0.3.0 は stack をリポジトリ直下の package.json の依存だけで検出するが、vue は `apps/web/package.json` にある。計測は scoria.config.json の `stacks` に書いた値で行うので、`.vue` は数えられている。`stacks` から vue を外すと `.vue` の 8 ファイルと ui-consistency が測られなくなり、`targets` で workspace ごとに分けると knip・audit・coverage・circular が飛ばされる。依存を足さない設定では消せないため、そのままにする。案内に従って `scoria init` を実行しない（vue が外れる）。上流で workspace の package.json も読むようになれば消える
   - 循環 import の検査は、scoria が動かす madge が受け持つ。scoria は madge に tsconfig を渡さないので、リポジトリ直下の `.madgerc` で `apps/web/tsconfig.app.json` を渡す（Issue #44）。これが無いと madge は `.vue` の import を JavaScript として解こうとし、直前に読んだ `.js` の構文木を流用するか、`.vue` を JavaScript として読んで SyntaxError で止まる。止まると scoria は circular を測らないまま `complete: false` になる。どのファイルを先に読むかで結果が変わり、`coverage/` の HTML レポートがあると止まり、`apps/web/dist/` があると通っていた。通ったときも、`.vue` から拡張子なしで読む `.ts` の import（18 本）が依存のグラフから抜け、`.vue` を通る循環は見えていなかった
   - `.madgerc` は JSON で書く（コメント可）。先頭が `{` でないと INI として読まれるので、コメントは括弧の中に書く
   - scoria の実行結果で `complete: true` と「probes not scored」に circular が無いことを確かめる。原因は madge の依存（filing-cabinet・precinct）にあり、上流で直れば `.madgerc` は要らなくなる
@@ -429,6 +430,7 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 
 ## 変更履歴
 
+- **Issue #50（2026-10-12）** scoria の「vue is in the config but no longer detected」を調べた。stack の検出がリポジトリ直下の package.json しか読まないための誤検知で、計測は設定の `stacks` で行われ `.vue` も数えられている。設定では消せないため、設定と baseline は変えず、理由を 9 章に書いた。依存は足していない
 - **Issue #28（2026-10-12）** 社長がセッションに指示を出したら、王様が話しかけ、相手が「はっ！」と返事をするようにした（4.10、4.8、3 章）。効果音に王様の呼びかけを足した
   - 席にいないメンバーはその場で返事をする（向きは変えない）ことにした。席に戻るのを待つと返事が遅れ、演出を止めると瞬間移動になるため（実装時の判断。PR で社長に確認する）
   - 王様の言葉は「！」のあとに「ゴニョゴニョ」と続けることにした（Issue の「！」か「ゴニョゴニョ」を両方使う）
