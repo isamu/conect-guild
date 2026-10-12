@@ -104,3 +104,48 @@ describe('loadArt with a picture that never arrives', () => {
     for (const id of IDS) expect(art.sprites.hasHoldFrames(id)).toBe(false);
   });
 });
+
+/** Bitmaps handed out by a fake createImageBitmap, with their close() recorded. */
+function trackedBitmaps() {
+  const closed = vi.fn<(width: number) => void>();
+  const make = (width = 7 * SPRITE_SIZE): ImageBitmap => ({
+    width,
+    height: SPRITE_SIZE,
+    close: () => {
+      closed(width);
+    },
+  });
+  return { closed, make };
+}
+
+describe('loadArt with a picture whose decoding never ends', () => {
+  it('gives up at the same deadline and closes a bitmap that is finished too late', async () => {
+    vi.useFakeTimers();
+    const { closed, make } = trackedBitmaps();
+    const late: (() => void)[] = [];
+    vi.stubGlobal('fetch', vi.fn<(url: string) => Promise<Response>>(ok));
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn<(blob: Blob) => Promise<ImageBitmap>>(
+        () =>
+          new Promise((resolve) => {
+            late.push(() => {
+              resolve(make());
+            });
+          }),
+      ),
+    );
+    let done = false;
+    const loading = loadArt().finally(() => {
+      done = true;
+    });
+    await vi.advanceTimersByTimeAsync(PICTURE_TIMEOUT_MS);
+    expect(done).toBe(true);
+    const art = await loading;
+    for (const id of IDS) expect(art.sprites.hasHoldFrames(id)).toBe(false);
+    // Decoding finishes after the deadline: nobody uses those bitmaps, so they are closed.
+    for (const finish of late) finish();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(closed).toHaveBeenCalledTimes(9);
+  });
+});

@@ -36,25 +36,43 @@ const SPRITE_URLS: Readonly<Record<MemberId, string>> = {
   yukihiro: yukihiroUrl,
 };
 
-/** How long one picture may take to arrive (as adapters/snapshot.ts). */
+/** How long one picture may take to arrive and be decoded (as adapters/snapshot.ts). */
 export const PICTURE_TIMEOUT_MS = 10_000;
+
+async function fetchPicture(url: string, signal: AbortSignal): Promise<ImageBitmap> {
+  const response = await fetch(url, { cache: 'no-cache', signal });
+  if (!response.ok) throw new Error(`picture: HTTP ${String(response.status)}`);
+  return createImageBitmap(await response.blob());
+}
 
 /**
  * Fetched and revalidated, not through an <img>: in development the URLs carry no content hash, so
  * when the art is loaded again in the same page (a component remounted by HMR) an <img> of the same
  * URL comes from the page's image cache, and a 4-frame sheet stayed after the 7-frame one replaced
- * it (hands.hasHoldFrames: items raised without lifting the hands). A picture that does not arrive
- * within PICTURE_TIMEOUT_MS is given up, so its part falls back to the placeholders.
+ * it (hands.hasHoldFrames: items raised without lifting the hands). A picture that has not arrived
+ * and been decoded within PICTURE_TIMEOUT_MS is given up (its part falls back to the placeholders);
+ * the fetch is aborted, and a bitmap decoded after that is closed.
  */
 async function loadImage(url: string): Promise<ImageBitmap> {
   const controller = new AbortController();
-  const timer = setTimeout(() => {
-    controller.abort();
-  }, PICTURE_TIMEOUT_MS);
+  const work = fetchPicture(url, controller.signal);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error('picture: timeout'));
+    }, PICTURE_TIMEOUT_MS);
+  });
   try {
-    const response = await fetch(url, { cache: 'no-cache', signal: controller.signal });
-    if (!response.ok) throw new Error(`picture: HTTP ${String(response.status)}`);
-    return await createImageBitmap(await response.blob());
+    return await Promise.race([work, deadline]);
+  } catch (error) {
+    work.then(
+      (late) => {
+        late.close();
+      },
+      () => undefined,
+    );
+    throw error;
   } finally {
     clearTimeout(timer);
   }
