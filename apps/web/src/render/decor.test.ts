@@ -123,10 +123,27 @@ describe('decor drawing lists', () => {
     for (const item of STILL_DECOR) expect(DECOR_MOTION[item.name]).toBeUndefined();
   });
 
-  it('moves only the lamps (flame) and the sleeping cat (breath)', () => {
-    for (const { placement, motion } of ANIMATED_DECOR) {
-      expect(motion).toBe(placement.name === 'sleeping-cat' ? 'breath' : 'flame');
+  it('moves the lamps and the cat always, the other moving things only on a trigger', () => {
+    for (const { placement, motion, trigger } of ANIMATED_DECOR) {
+      expect(motion).toBe(DECOR_MOTION[placement.name]);
+      const always = motion === 'flame' || motion === 'breath';
+      expect(trigger === null).toBe(always);
     }
+  });
+
+  it('gives each department its own moving things, and a banner to each side of the room', () => {
+    const working = (name: string) =>
+      ANIMATED_DECOR.filter((item) => item.placement.name === name).map((item) => item.trigger);
+    expect(working('abacus')).toEqual([{ kind: 'working', member: 'minori' }]);
+    expect(working('coin-pile')).toEqual([{ kind: 'working', member: 'minori' }]);
+    expect(working('megaphone')).toEqual([{ kind: 'working', member: 'hibiki' }]);
+    expect(working('globe')).toEqual([{ kind: 'working', member: 'hirame' }]);
+    expect(working('key-board')).toEqual([{ kind: 'working', member: 'sasae' }]);
+    expect(working('hourglass')).toEqual([{ kind: 'awaiting-president' }]);
+    expect(working('banner')).toEqual([
+      { kind: 'cleared', members: ['kaname', 'minori', 'hibiki'] },
+      { kind: 'cleared', members: ['hirame', 'sasae'] },
+    ]);
   });
 
   it('draws lower still things last, so they overlap the ones behind them', () => {

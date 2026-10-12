@@ -189,9 +189,13 @@ export function ambientPose(
 
 /**
  * Small things that move between scenes: the flames of lamps and candles flicker (a little added
- * light) and the sleeping cat breathes (1 px). Pure: the time and each thing's phase are passed in.
+ * light) and the sleeping cat breathes (1 px) and now and then stretches. The others move only at
+ * times (trinkets.ts): a glint on the abacus and the coins, notes from the megaphone, the globe
+ * turning, the keys swinging, the hourglass running and the banners fluttering. Pure: the time
+ * and each thing's phase are passed in.
  */
-export type DecorMotion = 'flame' | 'breath';
+export type DecorMotion =
+  'flame' | 'breath' | 'glint' | 'notes' | 'spin' | 'swing' | 'sand' | 'flutter';
 
 export const DECOR_MOTION: Readonly<Partial<Record<DecorName, DecorMotion>>> = {
   lantern: 'flame',
@@ -199,6 +203,13 @@ export const DECOR_MOTION: Readonly<Partial<Record<DecorName, DecorMotion>>> = {
   'pillar-lamp': 'flame',
   candlestick: 'flame',
   'sleeping-cat': 'breath',
+  abacus: 'glint',
+  'coin-pile': 'glint',
+  megaphone: 'notes',
+  globe: 'spin',
+  'key-board': 'swing',
+  hourglass: 'sand',
+  banner: 'flutter',
 };
 
 export interface DecorPose {
@@ -213,7 +224,11 @@ function flicker(step: number): number {
   return (Math.imul(step, 2_654_435_761) >>> 0) / 2 ** 32;
 }
 
-export function decorPose(motion: DecorMotion, phaseMs: number, now: number): DecorPose {
+export function decorPose(
+  motion: Extract<DecorMotion, 'flame' | 'breath'>,
+  phaseMs: number,
+  now: number,
+): DecorPose {
   const t = now + phaseMs;
   if (motion === 'flame') {
     return { dy: 0, glow: AMBIENT.flameGlow * flicker(Math.floor(t / AMBIENT.flameStepMs)) };

@@ -1,19 +1,14 @@
-import { decorPose } from './ambient';
 import type { GuildArt } from './art';
 import { bubbleShown, type BubbleKind, type Bubbles } from './bubbles';
 import type { ConfettiView, MemberPose, StageFrame } from './director';
-import { FLOOR_PATCH_DECOR, type AnimatedDecor, type DecorPlacement } from './decor';
-import {
-  BACK_ANIMATED_DECOR,
-  BACK_OBJECTS,
-  BACK_STILL_DECOR,
-  stageSteps,
-  type FrontLayer,
-} from './layers';
+import type { DecorPlacement } from './decor';
+import { drawAnimatedDecor } from './drawDecor';
+import { BACK_OBJECTS, BACK_STILL_DECOR, stageSteps, type FrontLayer } from './layers';
 import { GROUND } from './map';
 import { BUBBLE_RISE, DETAIL_SCALE, OVERHEAD_OFFSET, TILE_SIZE } from './metrics';
 import { heldLook } from './hands';
 import type { Point } from './path';
+import type { DecorCues } from './trinkets';
 
 /** Canvas side effects only: every decision was made in the pure modules. Logical pixels. */
 
@@ -23,8 +18,8 @@ function drawPlacement(ctx: CanvasRenderingContext2D, art: GuildArt, item: Decor
 
 /**
  * Ground, the furniture behind the members and the small things that never move: the loop draws
- * them once into a cached layer. The lamps and the cat are left out (drawAnimatedDecor), and so is
- * the furniture in front of the members (drawFrontLayer).
+ * them once into a cached layer. The things that move are left out (drawDecor.ts), and so are the
+ * light patches (drawDaylight.ts) and the furniture in front of the members (drawFrontLayer).
  */
 export function drawStatic(ctx: CanvasRenderingContext2D, art: GuildArt): void {
   GROUND.forEach((cells, row) => {
@@ -32,7 +27,6 @@ export function drawStatic(ctx: CanvasRenderingContext2D, art: GuildArt): void {
       art.tiles.drawTile(ctx, tile, { col, row, w: 1, h: 1 });
     });
   });
-  for (const item of FLOOR_PATCH_DECOR) drawPlacement(ctx, art, item);
   for (const object of BACK_OBJECTS) art.tiles.drawTile(ctx, object.tile, object);
   for (const item of BACK_STILL_DECOR) drawPlacement(ctx, art, item);
 }
@@ -53,27 +47,6 @@ export function drawFrontLayer(
     ctx.restore();
   }
   for (const item of layer.still) drawPlacement(ctx, art, item);
-}
-
-/** Lamps with a flickering flame (a little light added over them) and the breathing cat. */
-export function drawAnimatedDecor(
-  ctx: CanvasRenderingContext2D,
-  art: GuildArt,
-  now: number,
-  items: readonly AnimatedDecor[] = BACK_ANIMATED_DECOR,
-): void {
-  for (const { placement, motion, phaseMs } of items) {
-    const { dy, glow } = decorPose(motion, phaseMs, now);
-    const x = placement.col * TILE_SIZE;
-    const y = placement.row * TILE_SIZE + dy;
-    art.decor.drawDecor(ctx, placement.name, x, y);
-    if (glow <= 0) continue;
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = glow;
-    art.decor.drawDecor(ctx, placement.name, x, y);
-    ctx.restore();
-  }
 }
 
 const BUBBLE_GLYPHS: Readonly<Record<BubbleKind, { glyph: string; color: string }>> = {
@@ -143,26 +116,35 @@ function drawHeldItem(ctx: CanvasRenderingContext2D, member: MemberPose, art: Gu
 
 /**
  * Members (back to front) between the front layers, so the furniture in front of a member covers
- * their lower body; then what they hold (sunk into a seat, the hands are just over the desk or the
- * counter, which would hide the item), the bubbles of those out of scenes, and confetti on top.
+ * their lower body, with the moving things on that furniture; then what they hold (sunk into a
+ * seat, the hands are just over the desk or the counter, which would hide the item).
  */
 export function drawActors(
   ctx: CanvasRenderingContext2D,
-  stage: { readonly frame: StageFrame; readonly bubbles: Bubbles; readonly now: number },
+  stage: { readonly frame: StageFrame; readonly now: number; readonly cues: DecorCues },
   art: GuildArt,
   front: readonly CachedFrontLayer[],
 ): void {
-  const { frame, bubbles, now } = stage;
-  for (const step of stageSteps(frame.members, front)) {
+  for (const step of stageSteps(stage.frame.members, front)) {
     if (step.kind === 'member') drawMemberPose(ctx, step.member, art);
     if (step.kind === 'held') drawHeldItem(ctx, step.member, art);
     if (step.kind !== 'layer') continue;
     ctx.drawImage(step.layer.image, 0, 0);
-    drawAnimatedDecor(ctx, art, now, step.layer.layer.animated);
+    drawAnimatedDecor(ctx, art, stage, step.layer.layer.animated);
   }
-  for (const member of frame.members) {
-    const bubble = bubbleShown(bubbles, member);
+}
+
+/**
+ * Over everything, after the shade of the night (drawDaylight.ts), so they read the same at any
+ * hour: the bubbles of the members out of scenes, and confetti.
+ */
+export function drawOverhead(
+  ctx: CanvasRenderingContext2D,
+  stage: { readonly frame: StageFrame; readonly bubbles: Bubbles },
+): void {
+  for (const member of stage.frame.members) {
+    const bubble = bubbleShown(stage.bubbles, member);
     if (bubble !== null) drawBubble(ctx, bubble, member.pose.point);
   }
-  for (const view of frame.confetti) drawConfetti(ctx, view);
+  for (const view of stage.frame.confetti) drawConfetti(ctx, view);
 }
