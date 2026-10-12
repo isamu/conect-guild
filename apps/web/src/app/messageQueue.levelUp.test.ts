@@ -153,6 +153,23 @@ describe('messageQueue: a level-up with nobody to wait for', () => {
     }
   });
 
+  it('keeps the message waiting when more messages are queued behind it', async () => {
+    const { stage, recall } = createStage();
+    goOutPlaying(stage, 'minori');
+    const pushedAt = stageNow();
+    const { queue, shown } = setupQueue(recall);
+    queue.push([{ text: 'みのりは レベル 4 に あがった！', event: minoriUp }]);
+    const back = stage.director.busyUntil.minori ?? pushedAt;
+    await vi.advanceTimersByTimeAsync(1_000);
+    queue.push([{ text: 'お知らせ', event: null }]);
+    expect(shown).toEqual([]);
+    await vi.advanceTimersByTimeAsync(back - pushedAt - 1_001);
+    expect(shown).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(shown.map((s) => [s.message.event?.id, s.at])).toEqual([[minoriUp.id, back]]);
+    queue.dispose();
+  });
+
   it('ignores ▼ while the message waits, and waits on while the page is hidden', async () => {
     const { stage, recall } = createStage();
     goOutPlaying(stage, 'minori');

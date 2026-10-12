@@ -226,7 +226,8 @@ function createLine(pacer: Pacer, publish: MessageQueueOptions['publish']): Line
       const head = next[0];
       const fresh = head !== undefined && head.id !== messages[0]?.id;
       messages = next;
-      held = fresh && (pacer.headDelay(head) ?? 0) > 0;
+      // A head already held stays held when more messages are queued behind it.
+      held = fresh ? (pacer.headDelay(head) ?? 0) > 0 : held && head !== undefined;
       if (fresh && !held) pacer.headShown(head);
       publish(held ? [] : messages);
     },
