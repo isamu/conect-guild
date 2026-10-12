@@ -4,6 +4,7 @@ import type { IdleMark } from './idle';
 import type { LevelTag } from './levelTags';
 import type { SpokenLine } from './lineBook';
 import type { SpokenLines } from './lines';
+import { TALLEST_WINDOW_EXTENTS } from './map';
 import { BUBBLE_RISE, DETAIL_SCALE, LINES, OVERHEAD_OFFSET } from './metrics';
 import type { Held } from './motion';
 import type { Point } from './path';
@@ -59,20 +60,20 @@ export interface Box {
   readonly bottom: number;
 }
 
+/** Which side of the head a bubble of words goes: the upper right, or the upper left. */
+export type Side = 'right' | 'left';
+
 /**
  * Where a bubble of `chars` characters is drawn over feet at `feet`, `lift` px up (draw.ts
- * drawBubble: 3 detail px right of the feet, 9 high with a 2 px tail under it, the text in the 7 px
- * font, a full-width character 7 px wide, plus 6 px). The tail's height spans the whole width.
+ * drawBubble: 3 detail px right of the feet, or left of them on the left side, 9 high with a 2 px
+ * tail under it, the text in the 7 px font, a full-width character 7 px wide, plus 6 px). The tail's
+ * height spans the whole width.
  */
-export function wordsBox(feet: Point, chars: number, lift: number): Box {
-  const left = feet.x + 3 * DETAIL_SCALE;
+export function wordsBox(feet: Point, chars: number, lift: number, side: Side = 'right'): Box {
+  const width = (chars * 7 + 6) * DETAIL_SCALE;
+  const left = side === 'right' ? feet.x + 3 * DETAIL_SCALE : feet.x - 3 * DETAIL_SCALE - width;
   const top = feet.y - OVERHEAD_OFFSET - BUBBLE_RISE * DETAIL_SCALE - lift;
-  return {
-    left,
-    right: left + (chars * 7 + 6) * DETAIL_SCALE,
-    top,
-    bottom: top + 11 * DETAIL_SCALE,
-  };
+  return { left, right: left + width, top, bottom: top + 11 * DETAIL_SCALE };
 }
 
 /** Where a 「Lv N」 tag is drawn (drawLevelTags.ts: bold 10 px, centred, a 1 px outline). */
@@ -83,6 +84,32 @@ export function tagBox(tag: LevelTag): Box {
 
 function meet(a: Box, b: Box): boolean {
   return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+}
+
+const WINDOWS: readonly Box[] = Object.values(TALLEST_WINDOW_EXTENTS);
+
+/** How far up what is over the head goes for an item held up over it. */
+function raisedLift(held: Held | null): number {
+  return held?.hold === 'raise' ? LINES.raisedLiftPx : 0;
+}
+
+/**
+ * Which side of the head words go: the upper right as every bubble, unless they would go under an
+ * HTML window there and not on the left (ささえ's seat is a few tiles left of the party column, so
+ * more than 3 characters reach under it). Other bubbles are one glyph wide and fit on the right.
+ */
+export function overheadSide(
+  pose: { readonly point: Point; readonly held: Held | null },
+  words: string | null,
+): Side {
+  if (words === null) return 'right';
+  const chars = Array.from(words).length;
+  const lift = raisedLift(pose.held);
+  const under = (side: Side): boolean => {
+    const box = wordsBox(pose.point, chars, lift, side);
+    return WINDOWS.some((area) => meet(box, area));
+  };
+  return under('right') && !under('left') ? 'left' : 'right';
 }
 
 /**
@@ -97,18 +124,24 @@ export function overheadLift(
   words: string | null,
   tags: readonly LevelTag[],
 ): number {
-  const raised = pose.held?.hold === 'raise' ? LINES.raisedLiftPx : 0;
+  const raised = raisedLift(pose.held);
   if (words === null) return raised;
-  return liftOverTags(pose.point, Array.from(words).length, raised, tags.map(tagBox));
+  const bubble = { chars: Array.from(words).length, side: overheadSide(pose, words) };
+  return liftOverTags(pose.point, bubble, raised, tags.map(tagBox));
 }
 
-/** `lift`, or more until words of `chars` characters meet none of `tags` (one step per tag). */
-function liftOverTags(feet: Point, chars: number, lift: number, tags: readonly Box[]): number {
-  const box = wordsBox(feet, chars, lift);
+/** `lift`, or more until the words meet none of `tags` (one step per tag). */
+function liftOverTags(
+  feet: Point,
+  bubble: { readonly chars: number; readonly side: Side },
+  lift: number,
+  tags: readonly Box[],
+): number {
+  const box = wordsBox(feet, bubble.chars, lift, bubble.side);
   const tops = tags.filter((tag) => meet(box, tag)).map((tag) => tag.top);
   if (tops.length === 0) return lift;
   const higher = lift + box.bottom - Math.min(...tops) + LINES.tagGapPx;
   // Now over the highest tag met, the bubble can only meet tags higher still: one step per tag.
   const rest = tags.filter((tag) => tag.top < Math.min(...tops));
-  return liftOverTags(feet, chars, higher, rest);
+  return liftOverTags(feet, bubble, higher, rest);
 }
