@@ -297,7 +297,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   function draw(): void {
     const t = stageNow();
     const frame = cast.frame(director, t, moods);
-    const cues = decorCuesOf(moods, director.bursts, t);
+    const cues = decorCuesOf(moods, director.bursts, t, frame.members);
     paint(painter, scale, { now: t, hour: localHour(), frame, bubbles, cues });
     director = prune(director, t);
     const ambient = Object.keys(moods).length > 0 || ANIMATED_DECOR.length > 0;
