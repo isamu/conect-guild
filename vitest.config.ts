@@ -6,5 +6,13 @@ export default defineConfig({
   plugins: [vue()],
   test: {
     include: ['apps/web/src/**/*.test.ts', 'apps/web/*.test.ts', 'packages/**/*.test.ts'],
+    // Used only by `npm run test:coverage`; scoria reads coverage/lcov.info.
+    coverage: {
+      provider: 'v8',
+      reporter: ['lcov', 'text-summary'],
+      reportsDirectory: 'coverage',
+      include: ['apps/web/src/**/*.{ts,vue}', 'packages/*/src/**/*.ts'],
+      exclude: ['**/*.test.ts', '**/*.d.ts'],
+    },
   },
 });
