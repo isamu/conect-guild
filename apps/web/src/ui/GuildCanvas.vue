@@ -7,12 +7,14 @@ import {
   type PartyRow,
   type SceneCue,
 } from '../app/guildView';
+import { createLastActiveTracker } from '../app/lastActive';
 import { ambientMoodsOf } from '../render/ambient';
 import type { GuildArt } from '../render/art';
 import { bubblesOf } from '../render/bubbles';
 import { hourFromQuery } from '../render/daylight';
 import { loadArt } from '../render/loadArt';
-import { isShown, startRenderLoop, type RenderLoop } from '../render/loop';
+import type { IdleSince } from '../render/idle';
+import { isShown, startRenderLoop, type RenderLoop, type StageParty } from '../render/loop';
 
 const props = defineProps<{
   /** Party rows; members who wait on someone get a bubble over their seat. */
@@ -32,6 +34,13 @@ let unmounted = false;
 let cssWidth: number | null = null;
 /** Cues seen so far; those that arrive while the pictures load wait for the loop. */
 let cues = EMPTY_CUE_QUEUE;
+/** When each member last had work (localStorage), for dozing, sleeping and playing (Issue #23). */
+const lastActive = createLastActiveTracker();
+let idleSince: IdleSince = {};
+
+function stageParty(rows: readonly PartyRow[]): StageParty {
+  return { bubbles: bubblesOf(rows), moods: ambientMoodsOf(rows), idleSince };
+}
 
 /**
  * Starts the queued scenes in order, once the loop runs. While the canvas is out of sight they are
@@ -54,10 +63,14 @@ function start(element: HTMLCanvasElement, art: GuildArt): void {
     canvas: element,
     art,
     ...(fixedHour === null ? {} : { localHour: () => fixedHour }),
+    onActive: (ids, at) => {
+      idleSince = lastActive.markActive(ids, at);
+      loop?.setParty(stageParty(props.party));
+    },
   });
   loop = running;
-  running.setBubbles(bubblesOf(props.party));
-  running.setMoods(ambientMoodsOf(props.party));
+  idleSince = lastActive.observe(props.party, Date.now());
+  running.setParty(stageParty(props.party));
   running.resize(cssWidth ?? element.clientWidth, globalThis.devicePixelRatio);
   // Messages may have reached the window while the pictures were loading.
   playCues();
@@ -96,8 +109,8 @@ onBeforeUnmount(() => {
 watch(
   () => props.party,
   (rows) => {
-    loop?.setBubbles(bubblesOf(rows));
-    loop?.setMoods(ambientMoodsOf(rows));
+    idleSince = lastActive.observe(rows, Date.now());
+    loop?.setParty(stageParty(rows));
   },
 );
 
