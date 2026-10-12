@@ -1,10 +1,12 @@
 import type { MemberId } from '../guild.config';
 import { bubbleShown, type BubbleKind, type Bubbles } from './bubbles';
 import type { IdleMark } from './idle';
+import type { LevelTag } from './levelTags';
 import type { SpokenLine } from './lineBook';
 import type { SpokenLines } from './lines';
-import { LINES } from './metrics';
+import { BUBBLE_RISE, DETAIL_SCALE, LINES, OVERHEAD_OFFSET } from './metrics';
 import type { Held } from './motion';
+import type { Point } from './path';
 import type { SpeechLine, Speeches } from './summons';
 
 /**
@@ -39,7 +41,62 @@ export function overheadOf(
   return member.mark === null ? null : { kind: 'mark', mark: member.mark };
 }
 
-/** How far up what is over the head goes: clear of an item held up over it, else not at all. */
-export function overheadLift(pose: { readonly held: Held | null }): number {
-  return pose.held?.hold === 'raise' ? LINES.raisedLiftPx : 0;
+/** What words are over the head, if any: they make the bubble as wide as they are. */
+export function wordsOf(shown: Overhead): string | null {
+  return shown.kind === 'speech' || shown.kind === 'line' ? shown.words : null;
+}
+
+/** A rectangle in logical px. */
+export interface Box {
+  readonly left: number;
+  readonly right: number;
+  readonly top: number;
+  readonly bottom: number;
+}
+
+/**
+ * Where a bubble of `chars` characters is drawn over feet at `feet`, `lift` px up (draw.ts
+ * drawBubble: 3 detail px right of the feet, 9 high with a 2 px tail under it, the text in the 7 px
+ * font, a full-width character 7 px wide, plus 6 px). The tail's height spans the whole width.
+ */
+export function wordsBox(feet: Point, chars: number, lift: number): Box {
+  const left = feet.x + 3 * DETAIL_SCALE;
+  const top = feet.y - OVERHEAD_OFFSET - BUBBLE_RISE * DETAIL_SCALE - lift;
+  return {
+    left,
+    right: left + (chars * 7 + 6) * DETAIL_SCALE,
+    top,
+    bottom: top + 11 * DETAIL_SCALE,
+  };
+}
+
+/** Where a 「Lv N」 tag is drawn (drawLevelTags.ts: bold 10 px, centred, a 1 px outline). */
+export function tagBox(tag: LevelTag): Box {
+  const half = (tag.text.length * 6) / 2 + 2;
+  return { left: tag.x - half, right: tag.x + half, top: tag.y - 7, bottom: tag.y + 7 };
+}
+
+function meet(a: Box, b: Box): boolean {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+}
+
+/**
+ * How far up what is over the head goes: clear of an item held up over it (`raisedLiftPx`), and
+ * for words, clear of the 「Lv N」 tags on the desks (levelTags.ts) too: a long line from a lower
+ * seat reaches the tag on the counter or a desk up the room (ひらめ's to かなめ's, かなめ's to
+ * ひびき's), and then goes up until its bottom is `tagGapPx` over the tag.
+ */
+export function overheadLift(
+  pose: { readonly point: Point; readonly held: Held | null },
+  words: string | null,
+  tags: readonly LevelTag[],
+): number {
+  const raised = pose.held?.hold === 'raise' ? LINES.raisedLiftPx : 0;
+  if (words === null) return raised;
+  const box = wordsBox(pose.point, Array.from(words).length, raised);
+  const tops = tags
+    .map(tagBox)
+    .filter((tag) => meet(box, tag))
+    .map((tag) => tag.top);
+  return tops.length === 0 ? raised : raised + box.bottom - Math.min(...tops) + LINES.tagGapPx;
 }

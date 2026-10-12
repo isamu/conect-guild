@@ -274,8 +274,9 @@ function paint(painter: Painter, scale: number, moment: Moment): void {
   drawAnimatedDecor(ctx, art, moment, BACK_ANIMATED_DECOR);
   drawActors(ctx, moment, art, painter.front);
   drawShade(ctx, painter.scratch, light, lampLights(moment.now));
-  drawLevelTags(ctx, levelTags(moment.levels, DEFAULT_SEATS));
-  drawOverhead(ctx, moment);
+  const tags = levelTags(moment.levels, DEFAULT_SEATS);
+  drawLevelTags(ctx, tags);
+  drawOverhead(ctx, { ...moment, tags });
 }
 
 /** The canvas, the scenery drawn once and an empty canvas for the shade. */

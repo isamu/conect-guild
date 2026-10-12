@@ -248,7 +248,8 @@ export const TOSS = {
  * the head goes `raisedLiftPx` higher, so the whole bubble sits over the item: the item is centred
  * over the head and wider than the gap to the bubble's left edge, so only lifting it past the
  * item's top clears it (the chest showed under the bubble's left end on screenshots; overhead.test.ts
- * checks every member). Times are ms, distances logical px.
+ * checks every member). Words that would meet a 「Lv N」 tag on a desk go up until they are
+ * `tagGapPx` over it (overhead.overheadLift). Times are ms, distances logical px.
  */
 export const LINES = {
   giveMs: 1_500,
@@ -259,4 +260,5 @@ export const LINES = {
   kingMs: 1_600,
   recentLines: 2,
   raisedLiftPx: 36,
+  tagGapPx: 2,
 } as const;

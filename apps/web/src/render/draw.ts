@@ -9,7 +9,8 @@ import { GROUND } from './map';
 import type { IdleMark } from './idle';
 import { BUBBLE_RISE, DETAIL_SCALE, IDLE, OVERHEAD_OFFSET, TILE_SIZE } from './metrics';
 import { heldLook } from './hands';
-import { overheadLift, overheadOf, type Overhead } from './overhead';
+import type { LevelTag } from './levelTags';
+import { overheadLift, overheadOf, wordsOf, type Overhead } from './overhead';
 import type { Point } from './path';
 import type { SpeechLine, Speeches } from './summons';
 import { flyingItemPoint } from './toss';
@@ -228,13 +229,21 @@ function drawOverheadOf(ctx: CanvasRenderingContext2D, shown: Overhead, feet: Po
  */
 export function drawOverhead(
   ctx: CanvasRenderingContext2D,
-  stage: { readonly frame: StageFrame; readonly bubbles: Bubbles; readonly speeches: Speeches },
+  stage: {
+    readonly frame: StageFrame;
+    readonly bubbles: Bubbles;
+    readonly speeches: Speeches;
+    /** The 「Lv N」 tags on the desks, which words go over (overhead.overheadLift). */
+    readonly tags: readonly LevelTag[];
+  },
 ): void {
   const sources = { ...stage, lines: stage.frame.lines };
   for (const member of stage.frame.members) {
     const shown = overheadOf(member, sources);
+    if (shown === null) continue;
     const { x, y } = member.pose.point;
-    if (shown !== null) drawOverheadOf(ctx, shown, { x, y: y - overheadLift(member.pose) });
+    const lift = overheadLift(member.pose, wordsOf(shown), stage.tags);
+    drawOverheadOf(ctx, shown, { x, y: y - lift });
   }
   for (const view of stage.frame.confetti) drawConfetti(ctx, view);
 }
