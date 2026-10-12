@@ -31,6 +31,8 @@ const CUES: readonly SoundCue[] = ['scroll', 'chest', 'clear', 'permission', 'su
 class FakePlayer implements TonePlayer {
   readonly played: { cue: SoundCue | 'unknown'; volume: number }[] = [];
   unlocks = 0;
+  /** As while the AudioContext is suspended: nothing sounds and play() says so. */
+  suspended = false;
 
   unlock(): Promise<void> {
     this.unlocks += 1;
@@ -38,6 +40,7 @@ class FakePlayer implements TonePlayer {
   }
 
   play(score: Score, volume: number): boolean {
+    if (this.suspended) return false;
     const cue = CUES.find((key) => SCORES[key] === score);
     this.played.push({ cue: cue ?? 'unknown', volume });
     return true;
@@ -282,6 +285,16 @@ describe("createSoundController: the king's call", () => {
     clock.now = scoreLengthMs(SCORES.chest);
     controller.callStarted();
     expect(cues(player)).toEqual(['chest', 'summon']);
+  });
+
+  it('does not give way to a sound that did not ring (the audio was suspended)', () => {
+    const { player, controller, show, message, clock } = setup({ enabled: true, volume: 2 });
+    player.suspended = true;
+    show({ message: message('pr-merged') });
+    player.suspended = false;
+    clock.now = 10;
+    controller.callStarted();
+    expect(cues(player)).toEqual(['summon']);
   });
 
   it('does not make other sounds wait (only the call gives way)', () => {

@@ -65,8 +65,9 @@ export function createSoundController(options: SoundControllerOptions): SoundCon
 
   function play(cue: SoundCue): void {
     if (!mayPlay({ enabled: settings.enabled, hidden, halted })) return;
-    player.play(SCORES[cue], VOLUME_GAIN[settings.volume]);
-    if (cue !== 'summon') otherEndsAt = now() + scoreLengthMs(SCORES[cue]);
+    const played = player.play(SCORES[cue], VOLUME_GAIN[settings.volume]);
+    // Only a sound that really rings (not while the audio is suspended) makes the call wait.
+    if (played && cue !== 'summon') otherEndsAt = now() + scoreLengthMs(SCORES[cue]);
   }
 
   function update(next: SoundSettings): void {
