@@ -11,8 +11,16 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['lcov', 'text-summary'],
       reportsDirectory: 'coverage',
-      include: ['apps/web/src/**/*.{ts,vue}', 'packages/*/src/**/*.ts'],
-      exclude: ['**/*.test.ts', '**/*.d.ts'],
+      // Implementation files only; tool configs (vite/vitest/eslint) are left out.
+      include: [
+        'apps/web/src/**/*.{ts,vue}',
+        'apps/web/vite-plugin-snapshot.ts',
+        'packages/*/src/**/*.ts',
+        'packages/collector/collector.config.ts',
+        'guild.settings.ts',
+        'assets/*/*.ts',
+      ],
+      exclude: ['**/*.test.ts', '**/*.test-util.ts', '**/*.d.ts'],
     },
   },
 });
