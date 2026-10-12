@@ -3,7 +3,7 @@ import type { RawIssue, RawPr } from './github.ts';
 import { extractLinkedIssues } from './links.ts';
 
 /** Closed issues and PRs are kept for this long (docs/DESIGN.md 4.1). */
-export const RECENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const RECENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function recentCutoff(now: Date): Date {
   return new Date(now.getTime() - RECENT_WINDOW_MS);

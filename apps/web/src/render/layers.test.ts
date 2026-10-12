@@ -23,8 +23,10 @@ const layerOf = (pos: { col: number; row: number }): FrontLayer | undefined =>
 
 describe('layers: what is in front of the members', () => {
   it('puts the desks and the counter in front, everything else behind', () => {
-    expect(frontObjects.map((o) => o.tile).sort(byName)).toEqual(
-      ['counter-left', 'counter-mid', 'counter-right', 'desk', 'desk', 'desk', 'desk'].sort(byName),
+    expect(frontObjects.map((o) => o.tile).toSorted(byName)).toEqual(
+      ['counter-left', 'counter-mid', 'counter-right', 'desk', 'desk', 'desk', 'desk'].toSorted(
+        byName,
+      ),
     );
     expect([...BACK_OBJECTS, ...frontObjects]).toHaveLength(MAP_OBJECTS.length);
     expect(BACK_OBJECTS.some((o) => frontObjects.includes(o))).toBe(false);
@@ -60,7 +62,7 @@ describe('layers: what is in front of the members', () => {
     }
     // The candle, the abacus and the coins on みのり's desk, the megaphone on ひびき's, the globe
     // and the lamp on ひらめ's and the papers and the hourglass on ささえ's move in front of them.
-    expect(frontAnimated.map((a) => a.placement.name).sort(byName)).toEqual(
+    expect(frontAnimated.map((a) => a.placement.name).toSorted(byName)).toEqual(
       [
         'abacus',
         'candlestick',
@@ -70,14 +72,14 @@ describe('layers: what is in front of the members', () => {
         'hourglass',
         'lantern',
         'megaphone',
-      ].sort(byName),
+      ].toSorted(byName),
     );
     expect(frontStill.map((i) => i.name)).toEqual(expect.arrayContaining(['jar', 'flower-vase']));
   });
 
   it('orders the layers back to front by the bottom of their furniture', () => {
     const depths = FRONT_LAYERS.map((l) => l.depth);
-    expect(depths).toEqual([...new Set(depths)].sort((a, b) => a - b));
+    expect(depths).toEqual([...new Set(depths)].toSorted((a, b) => a - b));
     for (const layer of FRONT_LAYERS) {
       for (const o of layer.objects) expect((o.row + o.h) * TILE_SIZE).toBe(layer.depth);
     }
@@ -161,6 +163,6 @@ describe('stageSteps', () => {
     expect(held).toHaveLength(6);
     expect(Math.min(...held)).toBeGreaterThan(lastLayer);
     const heldDepths = steps.flatMap((s) => (s.kind === 'held' ? [s.member.depth] : []));
-    expect(heldDepths).toEqual([...heldDepths].sort((a, b) => a - b));
+    expect(heldDepths).toEqual(heldDepths.toSorted((a, b) => a - b));
   });
 });

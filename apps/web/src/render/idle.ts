@@ -68,7 +68,7 @@ export type IdleActivity =
   | { readonly kind: 'play'; readonly outing: Outing };
 
 function reversed(path: TilePath): TilePath {
-  const [first, ...rest] = [...path].reverse();
+  const [first, ...rest] = path.toReversed();
   return first === undefined ? path : [first, ...rest];
 }
 

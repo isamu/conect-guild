@@ -56,7 +56,7 @@ describe('director: idle stage', () => {
   it('orders members back to front by the feet on their tile, before sinking', () => {
     const { members } = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS);
     const depths = members.map((m) => m.depth);
-    expect(depths).toEqual([...depths].sort((a, b) => a - b));
+    expect(depths).toEqual(depths.toSorted((a, b) => a - b));
     for (const m of members) expect(m.depth).toBe(tileToPoint(DEFAULT_SEATS[m.id]).y);
   });
 

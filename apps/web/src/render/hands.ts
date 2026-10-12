@@ -19,7 +19,7 @@ import type { Point } from './path';
  */
 
 /** Frames in a sheet that has the holding frames. */
-export const FRAMES_WITH_HOLDS = 7;
+const FRAMES_WITH_HOLDS = 7;
 
 /** True when a sheet `width` px wide has the holding frames. */
 export function hasHoldFrames(width: number): boolean {

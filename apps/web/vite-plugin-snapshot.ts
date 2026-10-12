@@ -3,10 +3,10 @@ import path from 'node:path';
 import type { Plugin } from 'vite';
 
 /** The only URL this plugin answers. */
-export const SNAPSHOT_ROUTE = '/snapshot.json';
+const SNAPSHOT_ROUTE = '/snapshot.json';
 
 /** Where the collector writes the real data, relative to the web app root (docs/DESIGN.md 4.1). */
-export const SNAPSHOT_DATA_DIR = '.data';
+const SNAPSHOT_DATA_DIR = '.data';
 const SNAPSHOT_FILE_NAME = 'snapshot.json';
 
 /** The parts of node's IncomingMessage the middleware reads. */

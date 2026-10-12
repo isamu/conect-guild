@@ -154,7 +154,7 @@ describe('decor drawing lists', () => {
 
   it('draws lower still things last, so they overlap the ones behind them', () => {
     const bottoms = STILL_DECOR.map((item) => item.row + item.h);
-    expect(bottoms).toEqual([...bottoms].sort((a, b) => a - b));
+    expect(bottoms).toEqual(bottoms.toSorted((a, b) => a - b));
   });
 
   it('shifts each moving thing’s phase against the others', () => {

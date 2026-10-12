@@ -7,7 +7,7 @@ import type { SessionsReading } from './sessions.ts';
 
 export const SECRET_TITLE = 'Secret client Ltd invoice';
 export const SECRET_BRANCH = 'accounting/secret-client';
-export const SECRET_BODY = 'Confidential body Closes #1';
+const SECRET_BODY = 'Confidential body Closes #1';
 
 const ISSUE = {
   number: 1,

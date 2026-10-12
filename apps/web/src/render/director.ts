@@ -240,7 +240,7 @@ export function frameAt(
       withPet: false,
     };
   })
-    .sort((a, b) => a.depth - b.depth)
+    .toSorted((a, b) => a.depth - b.depth)
     .map((member) => withAmbient(member, now, ambient));
   // Over the seat, even while the member walks to the counter and back.
   const confetti = director.bursts

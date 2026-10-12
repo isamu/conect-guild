@@ -24,7 +24,7 @@ export interface LoadSnapshotOptions {
   readonly expectedRepo?: string | null;
 }
 
-export const DEFAULT_SNAPSHOT_TIMEOUT_MS = 10_000;
+const DEFAULT_SNAPSHOT_TIMEOUT_MS = 10_000;
 
 /**
  * The dev server serves the real data at /snapshot.json (vite-plugin-snapshot.ts).

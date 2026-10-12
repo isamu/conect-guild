@@ -52,8 +52,8 @@ describe('SCORES', () => {
 
   it('clear runs up twice and ends higher than it started (level up)', () => {
     const p = pitches('clear');
-    expect(p.slice(0, 4)).toEqual([...p.slice(0, 4)].sort((a, b) => a - b));
-    expect(p.slice(4, 8)).toEqual([...p.slice(4, 8)].sort((a, b) => a - b));
+    expect(p.slice(0, 4)).toEqual(p.slice(0, 4).toSorted((a, b) => a - b));
+    expect(p.slice(4, 8)).toEqual(p.slice(4, 8).toSorted((a, b) => a - b));
     expect(p.at(-1)).toBe(Math.max(...p));
   });
 

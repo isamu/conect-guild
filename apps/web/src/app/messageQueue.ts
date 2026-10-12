@@ -63,7 +63,7 @@ const PACING_CONTEXT = { seats: DEFAULT_SEATS, random: () => 0 };
  * moment its message shows (docs/DESIGN.md chapter 6 M2). `director` holds the scenes started so
  * far, on the queue's clock.
  */
-export function nextShowAt(
+function nextShowAt(
   director: Director,
   holdEnd: number,
   next: Pick<GuildMessage, 'event'>,

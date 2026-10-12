@@ -6,8 +6,8 @@ import { tileDraws } from './tileArt';
 
 describe('tile art contract', () => {
   it('has a piece for every tile kind the map uses, at the same tile size', () => {
-    expect(Object.keys(TILES).sort((a, b) => a.localeCompare(b))).toEqual(
-      [...TILE_NAMES].sort((a, b) => a.localeCompare(b)),
+    expect(Object.keys(TILES).toSorted((a, b) => a.localeCompare(b))).toEqual(
+      TILE_NAMES.toSorted((a, b) => a.localeCompare(b)),
     );
   });
 
