@@ -287,6 +287,20 @@ describe("createSoundController: the king's call", () => {
     expect(cues(player)).toEqual(['chest', 'summon']);
   });
 
+  it('waits for the longest of the sounds that started together', () => {
+    const { player, controller, show, message, clock } = setup({ enabled: true, volume: 2 });
+    show({ party: party() });
+    // The permission rings first, then the shorter blips of a notice.
+    show({ party: party('minori'), message: message(null) });
+    const longest = Math.max(scoreLengthMs(SCORES.permission), scoreLengthMs(SCORES.text));
+    clock.now = longest - 1;
+    controller.callStarted();
+    expect(cues(player)).toEqual(['permission', 'text']);
+    clock.now = longest;
+    controller.callStarted();
+    expect(cues(player)).toEqual(['permission', 'text', 'summon']);
+  });
+
   it('does not give way to a sound that did not ring (the audio was suspended)', () => {
     const { player, controller, show, message, clock } = setup({ enabled: true, volume: 2 });
     player.suspended = true;
