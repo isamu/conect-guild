@@ -149,3 +149,43 @@ describe('loadArt with a picture whose decoding never ends', () => {
     expect(closed).toHaveBeenCalledTimes(9);
   });
 });
+
+describe('loadArt with one member sheet missing', () => {
+  it('waits for the other sheets, closes them and draws every member as a placeholder', async () => {
+    const { closed, make } = trackedBitmaps();
+    let finishYukihiro = (): void => undefined;
+    // Each body carries its URL, so the fake decoder knows which picture it has.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<(url: string) => Promise<Response>>((url) =>
+        Promise.resolve(
+          url.includes('hibiki') ? new Response('missing', { status: 404 }) : new Response(url),
+        ),
+      ),
+    );
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn<(blob: Blob) => Promise<ImageBitmap>>(async (blob) => {
+        if (!(await blob.text()).includes('yukihiro')) return make();
+        // ゆきひろ's sheet is decoded only after ひびき's has failed.
+        return new Promise((resolve) => {
+          finishYukihiro = () => {
+            resolve(make());
+          };
+        });
+      }),
+    );
+    let done = false;
+    const loading = loadArt().finally(() => {
+      done = true;
+    });
+    // Long enough for every fetch and the other decodes to settle.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(done).toBe(false);
+    finishYukihiro();
+    const art = await loading;
+    for (const id of IDS) expect(art.sprites.hasHoldFrames(id)).toBe(false);
+    // The five sheets that did arrive are closed; tiles, small things and held items are kept.
+    expect(closed).toHaveBeenCalledTimes(5);
+  });
+});

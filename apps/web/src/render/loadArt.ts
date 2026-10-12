@@ -86,22 +86,32 @@ async function loadTiles(): Promise<TileArt> {
   }
 }
 
+const valueOf = <T>(result: PromiseSettledResult<T>): T | null =>
+  result.status === 'fulfilled' ? result.value : null;
+
+/**
+ * The members are one part: when a sheet is missing they are all placeholders. Every sheet is
+ * waited for, so the ones that did arrive are closed instead of left behind.
+ */
 async function loadSprites(): Promise<SpriteArt> {
   const load = (id: MemberId) => loadImage(SPRITE_URLS[id]);
-  try {
-    const [kaname, minori, hibiki, hirame, sasae, yukihiro] = await Promise.all([
-      load('kaname'),
-      load('minori'),
-      load('hibiki'),
-      load('hirame'),
-      load('sasae'),
-      load('yukihiro'),
-    ]);
-    const sheets = { kaname, minori, hibiki, hirame, sasae, yukihiro };
-    return createSpriteArt(sheets, drawPlaceholderProp);
-  } catch {
-    return placeholderArt.sprites;
+  const settled = await Promise.allSettled([
+    load('kaname'),
+    load('minori'),
+    load('hibiki'),
+    load('hirame'),
+    load('sasae'),
+    load('yukihiro'),
+  ]);
+  const [kaname, minori, hibiki, hirame, sasae, yukihiro] = settled.map(valueOf);
+  if (kaname && minori && hibiki && hirame && sasae && yukihiro) {
+    return createSpriteArt(
+      { kaname, minori, hibiki, hirame, sasae, yukihiro },
+      drawPlaceholderProp,
+    );
   }
+  for (const sheet of settled.map(valueOf)) sheet?.close();
+  return placeholderArt.sprites;
 }
 
 async function loadDecor(): Promise<DecorArt | null> {
