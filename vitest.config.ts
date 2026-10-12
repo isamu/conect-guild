@@ -9,7 +9,8 @@ export default defineConfig({
     // Used only by `npm run test:coverage`; scoria reads coverage/lcov.info.
     coverage: {
       provider: 'v8',
-      reporter: ['lcov', 'text-summary'],
+      // lcovonly: the HTML report's scripts (lcov-report/) make scoria's cycle check (madge) fail.
+      reporter: ['lcovonly', 'text-summary'],
       reportsDirectory: 'coverage',
       // Implementation files only; tool configs (vite/vitest/eslint) are left out.
       include: [
