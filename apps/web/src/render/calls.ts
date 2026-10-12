@@ -41,7 +41,7 @@ export interface Calls {
 
 /**
  * The king's calls (summons.ts, Issue #28) on the stage clock. Nobody's idle time moves while a
- * call plays, so a sleeper's pose stays where it is drawn. Once a call is over the king, who gave
+ * call plays, so a sleeper's pose stays where it is drawn. Once the last call is over the king, who gave
  * the order, is reported active (`onActive`): his doze starts over (idle.ts). The members are not:
  * their own session's work ends their idle spell (and brings them back from play), not the call.
  */
@@ -62,7 +62,9 @@ export function createCalls(options: CallsOptions): Calls {
       }
       const ended = endedSummons(list, t).length > 0;
       list = pruneSummons(list, t);
-      if (ended) options.onActive?.(['yukihiro'], (options.wallNow ?? Date.now)());
+      // After the last call of a row: the king's pose stays put through all of them.
+      if (ended && list.length === 0)
+        options.onActive?.(['yukihiro'], (options.wallNow ?? Date.now)());
       return { frame: applied, speeches, calling: isSummoning(list, t) };
     },
   };

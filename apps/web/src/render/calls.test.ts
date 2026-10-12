@@ -27,6 +27,17 @@ describe('createCalls: idle times', () => {
     expect(onActive).not.toHaveBeenCalled();
   });
 
+  it('waits for the last call of a row before reporting the king (he stays put through all)', () => {
+    const { calls, frame, onActive } = setup();
+    calls.add(['minori'], 0);
+    calls.add(['sasae'], 0);
+    calls.view(frame, END);
+    expect(onActive).not.toHaveBeenCalled();
+    calls.view(frame, 2 * END);
+    expect(onActive).toHaveBeenCalledTimes(1);
+    expect(onActive).toHaveBeenCalledWith(['yukihiro'], WALL);
+  });
+
   it('reports only the king active once the call is over, never the members', () => {
     const { calls, frame, onActive } = setup();
     calls.add(['minori', 'kaname'], 0);
