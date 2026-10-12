@@ -237,7 +237,7 @@ const due = (next: number): Murmurs => ({ ...NO_MURMURS, next });
 describe('stepMurmurs: when', () => {
   it('plans the first murmur a gap after the first frame, and says nothing yet', () => {
     const first = stepMurmurs(NO_MURMURS, moment(1_000));
-    expect(first).toEqual({ next: 41_000, said: null, last: null });
+    expect(first).toEqual({ next: 41_000, said: null, last: null, busy: false });
   });
 
   it('says nothing a ms before the time, and a line from the time on', () => {
@@ -277,7 +277,7 @@ describe('stepMurmurs: when', () => {
 
   it('says nothing when nobody may, and tries again a gap later', () => {
     const none = stepMurmurs(due(5_000), moment(5_000, { candidates: () => [] }));
-    expect(none).toEqual({ next: 45_000, said: null, last: null });
+    expect(none).toEqual({ next: 45_000, said: null, last: null, busy: false });
   });
 
   it('says nothing when the one chosen has nothing to say, nor without a picker', () => {
@@ -310,18 +310,34 @@ describe('stepMurmurs: one at a time, and not the same one twice', () => {
 });
 
 describe('stepMurmurs: put off by a scene, a call or a remark', () => {
-  it('a busy frame puts a due murmur off to LINES.murmurRestMs after it', () => {
+  it('a busy frame keeps a due murmur back; the first quiet frame puts it LINES.murmurRestMs on', () => {
     expect(LINES.murmurRestMs).toBe(2_000);
     const busy = stepMurmurs(due(10_000), moment(10_000, { busy: true }));
-    expect(busy).toEqual({ next: 12_000, said: null, last: null });
-    const later = stepMurmurs(busy, moment(11_000, { busy: true }));
-    expect(later.next).toBe(13_000);
-    expect(stepMurmurs(later, moment(12_999)).said).toBeNull();
-    expect(stepMurmurs(later, moment(13_000)).said?.start).toBe(13_000);
+    expect(busy).toEqual({ next: 10_000, said: null, last: null, busy: true });
+    const still = stepMurmurs(busy, moment(11_000, { busy: true }));
+    expect(still.said).toBeNull();
+    const quiet = stepMurmurs(still, moment(11_140));
+    expect(quiet).toEqual({ next: 13_140, said: null, last: null, busy: false });
+    expect(stepMurmurs(quiet, moment(13_139)).said).toBeNull();
+    expect(stepMurmurs(quiet, moment(13_140)).said?.start).toBe(13_140);
+  });
+
+  it('waits LINES.murmurRestMs from the first quiet frame, however long after the last busy one', () => {
+    // Codex review: the rest was counted from the last busy frame, so a quiet frame long after it
+    // could say a murmur at once.
+    const busy = stepMurmurs(due(10_000), moment(10_000, { busy: true }));
+    const quiet = stepMurmurs(busy, moment(11_900));
+    expect(quiet.said).toBeNull();
+    expect(quiet.next).toBe(13_900);
   });
 
   it('leaves a murmur due later where it is', () => {
-    expect(stepMurmurs(due(60_000), moment(10_000, { busy: true })).next).toBe(60_000);
+    const busy = stepMurmurs(due(60_000), moment(10_000, { busy: true }));
+    expect(stepMurmurs(busy, moment(10_140)).next).toBe(60_000);
+  });
+
+  it('puts nothing off when no frame was busy', () => {
+    expect(stepMurmurs(due(10_000), moment(10_000)).said?.start).toBe(10_000);
   });
 
   it('drops the murmur showing when a scene starts', () => {

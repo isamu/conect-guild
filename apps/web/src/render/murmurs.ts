@@ -135,9 +135,11 @@ export interface Murmurs {
   readonly said: Utterance | null;
   /** Who murmured last: not the next one. */
   readonly last: MemberId | null;
+  /** The last frame was busy: the first quiet one puts the next off by `murmurRestMs`. */
+  readonly busy: boolean;
 }
 
-export const NO_MURMURS: Murmurs = { next: null, said: null, last: null };
+export const NO_MURMURS: Murmurs = { next: null, said: null, last: null, busy: false };
 
 export interface MurmurMoment {
   /** Stage time now. */
@@ -165,21 +167,29 @@ function utter(
 
 /**
  * The murmurs at `moment.t`, called on every frame. The first frame plans the first one; a busy
- * frame drops the one showing and puts the next off to at least `murmurRestMs` after it; once one
- * is due someone says a line, and the next is planned from its end. When nobody may, or has
- * nothing left to say, nothing is said and the next is planned from now.
+ * frame drops the one showing, and the first quiet frame after it puts the next off to at least
+ * `murmurRestMs` from then (however long the frames were apart); once one is due someone says a
+ * line, and the next is planned from its end. When nobody may, or has nothing left to say, nothing
+ * is said and the next is planned from now.
  */
 export function stepMurmurs(murmurs: Murmurs, moment: MurmurMoment): Murmurs {
   const { t, random } = moment;
   if (moment.off) return NO_MURMURS;
-  const next = murmurs.next ?? t + murmurGap(random);
-  if (moment.busy) return { ...murmurs, said: null, next: Math.max(next, t + LINES.murmurRestMs) };
+  const planned = murmurs.next ?? t + murmurGap(random);
+  if (moment.busy) return { ...murmurs, said: null, next: planned, busy: true };
+  const next = murmurs.busy ? Math.max(planned, t + LINES.murmurRestMs) : planned;
   const said = murmurs.said !== null && murmurs.said.end > t ? murmurs.said : null;
-  if (said !== null || t < next) return { ...murmurs, said, next };
-  const speaker = chooseSpeaker(moment.candidates(), murmurs.last, random);
+  if (said !== null || t < next) return { ...murmurs, said, next, busy: false };
+  return murmurNow(murmurs.last, moment);
+}
+
+/** A murmur due now: someone says a line and the next is planned from its end, or from now. */
+function murmurNow(last: MemberId | null, moment: MurmurMoment): Murmurs {
+  const { t, random } = moment;
+  const speaker = chooseSpeaker(moment.candidates(), last, random);
   const spoken = speaker === null ? null : utter(speaker, t, moment.pick);
-  if (spoken === null) return { ...murmurs, said: null, next: t + murmurGap(random) };
-  return { said: spoken, last: spoken.actor, next: spoken.end + murmurGap(random) };
+  if (spoken === null) return { said: null, last, next: t + murmurGap(random), busy: false };
+  return { said: spoken, last: spoken.actor, next: spoken.end + murmurGap(random), busy: false };
 }
 
 /** A frame as the murmurs see it (render/loop.ts). */
