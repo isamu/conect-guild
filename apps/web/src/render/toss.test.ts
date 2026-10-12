@@ -127,6 +127,19 @@ describe('planScene: issue-opened, tossed', () => {
     expect(heldAt(minori, CAUGHT + HOLD_UP_MS - 1)).toEqual(raise('scroll'));
     expect(minori.segments.at(-1)?.end).toBe(CAUGHT + HOLD_UP_MS);
   });
+});
+
+describe('planScene: issue-opened, tossed or walked', () => {
+  it.each(NEAR)(
+    'ends no later than the walk to %s for both (the message queue paces with the walk)',
+    (department) => {
+      const tossed = scheduleEvent(EMPTY_DIRECTOR, event('issue-opened', department), 0, TOSSING);
+      const walked = scheduleEvent(EMPTY_DIRECTOR, event('issue-opened', department), 0, WALKING);
+      for (const id of castOf(event('issue-opened', department))) {
+        expect(tossed.busyUntil[id]).toBeLessThanOrEqual(walked.busyUntil[id] ?? 0);
+      }
+    },
+  );
 
   it('walks the scroll over when the draw is TOSS.share or more', () => {
     const scene = planScene(event('issue-opened', '経理'), 0, WALKING);
