@@ -45,6 +45,7 @@ export function defaultExpectedRepo(): string | null {
 }
 
 const versionProbeSchema = z.looseObject({ schemaVersion: z.number() });
+const repoProbeSchema = z.looseObject({ repo: z.string() });
 
 function parseJson(text: string): { ok: true; value: unknown } | { ok: false } {
   try {
@@ -67,12 +68,14 @@ export function validateSnapshot(
   if (probe.success && probe.data.schemaVersion !== SNAPSHOT_SCHEMA_VERSION) {
     return { ok: false, reason: 'schema-version' };
   }
-  const parsed = snapshotSchema.safeParse(value);
-  if (!parsed.success) return { ok: false, reason: 'invalid' };
-  if (expectedRepo !== null && parsed.data.repo !== expectedRepo) {
+  // The repository first: a snapshot of the previous team may no longer fit the new settings'
+  // departments, and the screen should still say why it stopped.
+  const repo = repoProbeSchema.safeParse(value);
+  if (expectedRepo !== null && repo.success && repo.data.repo !== expectedRepo) {
     return { ok: false, reason: 'repo-mismatch' };
   }
-  return { ok: true, snapshot: parsed.data };
+  const parsed = snapshotSchema.safeParse(value);
+  return parsed.success ? { ok: true, snapshot: parsed.data } : { ok: false, reason: 'invalid' };
 }
 
 async function fetchText(

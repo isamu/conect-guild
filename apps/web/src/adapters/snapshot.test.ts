@@ -218,13 +218,50 @@ describe('repository check', () => {
     expect(validateSnapshot(validSnapshot, null).ok).toBe(true);
   });
 
-  it('still reports schema-version and invalid first', () => {
+  it('still reports schema-version first', () => {
     const old = { ...validSnapshot, schemaVersion: 1 };
     expect(validateSnapshot(old, 'new-team/company')).toEqual({
       ok: false,
       reason: 'schema-version',
     });
+  });
+
+  it('reports repo-mismatch before checking the rest', () => {
     expect(validateSnapshot({ ...validSnapshot, issues: 1 }, 'new-team/company')).toEqual({
+      ok: false,
+      reason: 'repo-mismatch',
+    });
+  });
+});
+
+describe('repository check: order and loading', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('reports repo-mismatch for an old snapshot whose departments no longer validate', () => {
+    // The settings changed both the repository and the department labels.
+    const old = {
+      ...validSnapshot,
+      repo: 'old-team/company',
+      issues: [],
+      sessions: {
+        ...validSnapshot.sessions,
+        members: validSnapshot.sessions.members.map((m) => ({
+          ...m,
+          department: m.department === null ? null : `旧${m.department}`,
+        })),
+      },
+    };
+    expect(validateSnapshot(old, null)).toEqual({ ok: false, reason: 'invalid' });
+    expect(validateSnapshot(old, 'example/guild')).toEqual({
+      ok: false,
+      reason: 'repo-mismatch',
+    });
+  });
+
+  it('reports invalid, not repo-mismatch, when the repository is missing', () => {
+    expect(validateSnapshot({ ...validSnapshot, repo: undefined }, 'example/guild')).toEqual({
       ok: false,
       reason: 'invalid',
     });
