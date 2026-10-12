@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, rm, rmdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { snapshotSchema, type Snapshot } from '@conect-guild/snapshot';
+import { snapshotSchema, type Snapshot, type SnapshotIssue } from '@conect-guild/snapshot';
 import { GUILD_SETTINGS } from '../../../guild.settings.ts';
 
 /**
@@ -54,16 +54,17 @@ export async function sampleSnapshot(at: number = NOW): Promise<Snapshot> {
 }
 
 /** Closes the given Issues at `at` (what the collector would see after they were closed). */
-export function withClosedIssues(snapshot: Snapshot, numbers: readonly number[], at: number) {
+export function withClosedIssues(
+  snapshot: Snapshot,
+  numbers: readonly number[],
+  at: number,
+): Snapshot {
   const iso = new Date(at).toISOString();
-  return {
-    ...snapshot,
-    issues: snapshot.issues.map((issue) =>
-      numbers.includes(issue.number)
-        ? { ...issue, state: 'closed' as const, updatedAt: iso, closedAt: iso }
-        : issue,
-    ),
-  } satisfies Snapshot;
+  const close = (issue: SnapshotIssue): SnapshotIssue =>
+    numbers.includes(issue.number)
+      ? { ...issue, state: 'closed', updatedAt: iso, closedAt: iso }
+      : issue;
+  return { ...snapshot, issues: snapshot.issues.map(close) };
 }
 
 /** Writes the snapshot like the collector: 0600, to a temporary file, then renamed into place. */

@@ -81,15 +81,22 @@ test('「基準を消す」 removes the baseline and the next fetch stores a new
 }) => {
   await page.goto('/');
   await waitForBaseline(page);
-  // Hold the refreshes, so none stores a new baseline before the check below.
+  // Hold the next refresh in flight (the app fetches one at a time), so no fetch can store a new
+  // baseline before the check below.
   let release: () => void = () => undefined;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
+  let held: () => void = () => undefined;
+  const holding = new Promise<void>((resolve) => {
+    held = resolve;
+  });
   await page.route('/snapshot.json', async (route) => {
+    held();
     await gate;
     await route.continue();
   });
+  await holding;
   await page.getByRole('button', { name: '基準を消す' }).click();
   await expect(page.getByText('基準を消しました')).toBeVisible();
   expect(await page.evaluate((key) => localStorage.getItem(key), BASELINE_KEY)).toBeNull();
