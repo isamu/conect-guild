@@ -6,7 +6,9 @@ AI だけで動く小さな会社を、レトロ RPG のギルド画面として
 
 [conect-management](https://github.com/yukihiroyamaguchi569/conect-management) では、司令塔の AI（かなめ）が社長の依頼を GitHub Issue に分解し、部門ごとの Claude Code セッション（経理・広報・企画・総務）に渡して、PR で成果を受け取ります。conect-guild はその様子を、クエスト掲示板・パーティ・玉座の王様として描きます。
 
-![コンセプト画](assets/concept/rpg-company-ui.png)
+![デモモードの画面（架空のデータ）](assets/screenshots/demo-overview.png)
+
+デモモード（架空のデータ）の画面。最初に描いたコンセプト画は [assets/concept/rpg-company-ui.png](assets/concept/rpg-company-ui.png)。
 
 | 会社 | ゲーム |
 |---|---|

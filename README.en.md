@@ -6,7 +6,9 @@ An app for watching a small company run entirely by AI, drawn as a retro RPG gui
 
 At [conect-management](https://github.com/yukihiroyamaguchi569/conect-management), a commander AI, Kaname (かなめ), breaks the president's requests down into GitHub Issues, hands them to one Claude Code session per department (accounting, PR, planning, general affairs), and receives the results as pull requests. conect-guild shows all of this as a quest board, a party, and a king on his throne. The on-screen text is in Japanese.
 
-![Concept art](assets/concept/rpg-company-ui.png)
+![The demo mode (made-up data)](assets/screenshots/demo-overview.png)
+
+The demo mode with made-up data. The original concept art is [assets/concept/rpg-company-ui.png](assets/concept/rpg-company-ui.png).
 
 | Company | Game |
 |---|---|
