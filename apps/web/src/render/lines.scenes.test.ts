@@ -14,7 +14,7 @@ import {
 } from './director';
 import { linesOf, type LineScene } from './lineBook';
 import { createLinePicker, type PickLine, type Utterance } from './lines';
-import { scenesShown } from './loop';
+import { sceneContext, scenesShown } from './loop';
 import { LINES, TOSS } from './metrics';
 import {
   DEFAULT_SEATS,
@@ -255,5 +255,60 @@ describe('lines on the stage', () => {
   it('drops the lines with the scenes while the canvas is out of sight', () => {
     expect(scenesShown(closed, 0).lines).toEqual([]);
     expect(scenesShown(closed, 300).lines).toEqual(closed.lines);
+  });
+});
+
+/** A random source that notes each number it gives. */
+function noted(seed: number): { random: () => number; given: number[] } {
+  const given: number[] = [];
+  let a = seed;
+  return {
+    given,
+    random: () => {
+      a = (a * 9301 + 49297) % 233280;
+      const value = a / 233280;
+      given.push(value);
+      return value;
+    },
+  };
+}
+
+describe('the render loop’s sources of randomness (sceneContext)', () => {
+  const events = [
+    event('issue-opened', '経理'),
+    event('issue-closed', '広報'),
+    event('issue-opened', '広報'),
+    event('pr-merged', '企画'),
+    event('issue-closed', null),
+    event('issue-opened', '経理'),
+  ];
+
+  /** Plays the events one after another (each once the last is over) and keeps the director. */
+  function playAll(ctx: SceneContext): Director {
+    return events.reduce(
+      (director, e, i) => scheduleEvent(director, e, i * 30_000, ctx),
+      EMPTY_DIRECTOR,
+    );
+  }
+
+  it('picks the lines from lineRandom only: the confetti and the tosses draw what they drew without lines', () => {
+    const quiet = { confetti: noted(1), toss: noted(2) };
+    const withoutLines = playAll({
+      seats: DEFAULT_SEATS,
+      random: quiet.confetti.random,
+      tossRandom: quiet.toss.random,
+    });
+    const talking = { confetti: noted(1), toss: noted(2), lines: noted(3) };
+    const withLines = playAll(
+      sceneContext(
+        { tossRandom: talking.toss.random, lineRandom: talking.lines.random },
+        talking.confetti.random,
+      ),
+    );
+    expect(talking.confetti.given).toEqual(quiet.confetti.given);
+    expect(talking.toss.given).toEqual(quiet.toss.given);
+    expect(talking.lines.given.length).toBeGreaterThan(0);
+    expect(withLines.lines.length).toBeGreaterThan(0);
+    expect({ ...withLines, lines: [] }).toEqual(withoutLines);
   });
 });

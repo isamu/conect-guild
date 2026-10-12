@@ -333,7 +333,10 @@ function stageAt(
  * injected `random`: an injected (reproducible) sequence keeps its confetti. All default to
  * Math.random, which has no sequence anyone could reproduce, so sharing it is harmless.
  */
-function sceneContext(options: RenderLoopOptions, random: Random): SceneContext {
+export function sceneContext(
+  options: Pick<RenderLoopOptions, 'tossRandom' | 'lineRandom'>,
+  random: Random,
+): SceneContext {
   return {
     seats: DEFAULT_SEATS,
     random,
