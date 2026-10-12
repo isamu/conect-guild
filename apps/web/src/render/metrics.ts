@@ -99,6 +99,21 @@ export const IDLE = {
 } as const;
 
 /**
+ * The king calls a member the president gave an order to (summons.ts, Issue #28): "！" with the
+ * king rising `kingRisePx` for `callMs`, then "ゴニョゴニョ" for `murmurMs`; then the members turn
+ * to the throne and answer "はっ！" for `replyMs` (one facing the throne head-on hops `hopPx` for
+ * `hopMs` instead). Times are ms, distances logical px.
+ */
+export const SUMMONS = {
+  callMs: 700,
+  kingRisePx: 4,
+  murmurMs: 1_400,
+  replyMs: 1_600,
+  hopMs: 280,
+  hopPx: 4,
+} as const;
+
+/**
  * How far a member at a seat is drawn below the feet of their tile (logical px), so the furniture
  * in front hides the lower body (seating.ts). Measured on the tiles: a desk's back edge is 12 px
  * below its top, the counter's 3 px, the throne's seat cushion 62 px.
