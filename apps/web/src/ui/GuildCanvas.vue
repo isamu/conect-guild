@@ -63,6 +63,8 @@ function stageParty(rows: readonly PartyRow[]): StageParty {
     moods: ambientMoodsOf(rows),
     idleSince,
     halted: props.halted,
+    // Before the first snapshot the party is empty: not one to compare with (render/remarks.ts).
+    known: rows.length > 0,
     levels: levelsOf(rows),
   };
 }
