@@ -81,7 +81,7 @@ describe('drawLevelUpBanners with the king calling', () => {
     const minori = view.frame.members.find((m) => m.id === 'minori');
     if (minori === undefined) throw new Error('no minori');
     const { written, ctx } = recordingContext();
-    drawLevelUpBanners(ctx, view);
+    drawLevelUpBanners(ctx, { ...view, tags: [] });
     expect(written.map((w) => w.text)).toEqual(['LEVEL UP']);
     // The bottom of the words is over the top of the bubble.
     expect(written[0]?.y).toBeLessThan(minori.pose.point.y - OVERHEAD_TOP);
@@ -90,7 +90,7 @@ describe('drawLevelUpBanners with the king calling', () => {
   it('writes it in its usual place without a call', () => {
     const view = stageAt(T, null);
     const { written, ctx } = recordingContext();
-    drawLevelUpBanners(ctx, view);
+    drawLevelUpBanners(ctx, { ...view, tags: [] });
     const [confetti] = view.frame.confetti;
     const banner = bannerAt(T);
     if (confetti === undefined || banner === null) throw new Error('no level-up');
