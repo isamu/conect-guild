@@ -26,7 +26,7 @@ export const LEVEL_UP = {
   bannerFadeMs: 600,
   /** Room left between the words and a speech bubble under them, logical px. */
   bannerGapPx: 2,
-} as const;
+};
 
 /** The hops at the seat, one stay segment each (motion.poseOnSegment lifts the feet). */
 export function hopSegments(seat: TilePos, start: number): Segment[] {
