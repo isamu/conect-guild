@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, rmdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { snapshotSchema, type Snapshot } from '@conect-guild/snapshot';
 import { GUILD_SETTINGS } from '../../../guild.settings.ts';
@@ -11,6 +11,7 @@ const WEB_ROOT = path.resolve(import.meta.dirname, '..');
 const SAMPLE_FILE = path.join(WEB_ROOT, 'public', 'snapshot.sample.json');
 export const DATA_DIR = path.join(WEB_ROOT, '.data');
 const SNAPSHOT_FILE = path.join(DATA_DIR, 'snapshot.json');
+const TEMPORARY_FILE = `${SNAPSHOT_FILE}.tmp`;
 
 /** The fixed "now" of every test (12:00 in Tokyo). */
 export const NOW = Date.parse('2026-10-12T03:00:00.000Z');
@@ -18,7 +19,8 @@ export const NOW = Date.parse('2026-10-12T03:00:00.000Z');
 /**
  * Creates .data for this run and returns how to remove it. Refuses when it already exists: it may
  * hold the collector's real data (or be left by a run that was killed; then delete it by hand).
- * Do not run the collector in the same checkout while the tests run.
+ * Do not run the collector in the same checkout while the tests run (its snapshot.json would be
+ * replaced by the sample; it is only a cache the collector writes again within seconds).
  */
 export async function claimDataDir(): Promise<() => Promise<void>> {
   try {
@@ -30,7 +32,12 @@ export async function claimDataDir(): Promise<() => Promise<void>> {
       { cause: error },
     );
   }
-  return () => rm(DATA_DIR, { recursive: true, force: true });
+  return async () => {
+    // Only what the tests write; a directory someone else wrote into is left (rmdir fails).
+    await rm(SNAPSHOT_FILE, { force: true });
+    await rm(TEMPORARY_FILE, { force: true });
+    await rmdir(DATA_DIR).catch(() => undefined);
+  };
 }
 
 /** The sample, pointed at guild.settings.ts's repo and fetched at `at`. */
@@ -61,7 +68,6 @@ export function withClosedIssues(snapshot: Snapshot, numbers: readonly number[],
 
 /** Writes the snapshot like the collector: 0600, to a temporary file, then renamed into place. */
 export async function writeSnapshot(snapshot: Snapshot): Promise<void> {
-  const temporary = `${SNAPSHOT_FILE}.tmp`;
-  await writeFile(temporary, JSON.stringify(snapshot), { mode: 0o600 });
-  await rename(temporary, SNAPSHOT_FILE);
+  await writeFile(TEMPORARY_FILE, JSON.stringify(snapshot), { mode: 0o600 });
+  await rename(TEMPORARY_FILE, SNAPSHOT_FILE);
 }
