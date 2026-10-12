@@ -15,6 +15,7 @@ import { createMessageQueue, type GuildMessage } from './messageQueue';
 import { globalScheduler } from './scheduler';
 
 const HOLD_MS = 8_000;
+const LAST_HOLD_MS = 30_000;
 const context = { seats: DEFAULT_SEATS, random: () => 0.5 };
 
 function event(
@@ -36,6 +37,7 @@ function setup() {
     scheduler: globalScheduler,
     now: Date.now,
     holdMs: HOLD_MS,
+    lastHoldMs: LAST_HOLD_MS,
     publish: (messages) => {
       const head = messages[0];
       if (head !== undefined && shown.at(-1)?.message.id !== head.id) {
@@ -203,6 +205,7 @@ describe('messageQueue: the ▼ button', () => {
       scheduler: globalScheduler,
       now: Date.now,
       holdMs: HOLD_MS,
+      lastHoldMs: LAST_HOLD_MS,
       publish: (messages) => published.push(messages),
     });
     queue.push([entry(handovers[0] ?? null)]);
@@ -288,6 +291,93 @@ describe('messageQueue: halted screen', () => {
     // The hold starts over at 1 s; かなめ is back at sceneMs (the scene did not stop).
     await vi.advanceTimersByTimeAsync(60_000);
     expect(shown.map((s) => s.at - T0)).toEqual([0, Math.max(1_000 + HOLD_MS, sceneMs)]);
+    queue.dispose();
+  });
+});
+
+/** A queue that records every change (an empty window too) with its time. */
+function recorder() {
+  const changes: { texts: string[]; at: number }[] = [];
+  const queue = createMessageQueue({
+    scheduler: globalScheduler,
+    now: Date.now,
+    holdMs: HOLD_MS,
+    lastHoldMs: LAST_HOLD_MS,
+    publish: (messages) => changes.push({ texts: messages.map((m) => m.text), at: Date.now() }),
+  });
+  const closedAt = () => changes.find((c) => c.texts.length === 0)?.at;
+  return { queue, changes, closedAt };
+}
+
+describe('messageQueue: the last message closes by itself', () => {
+  it('closes a lone message after its own hold (30 s), not the 8 s one', async () => {
+    const { queue, closedAt } = recorder();
+    queue.push([entry(event('issue-closed', '経理', 1))]);
+    await vi.advanceTimersByTimeAsync(LAST_HOLD_MS - 1);
+    expect(closedAt()).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(closedAt()).toBe(T0 + LAST_HOLD_MS);
+    queue.dispose();
+  });
+
+  it('counts the last one from when it showed, after the others went on every 8 s', async () => {
+    const { queue, changes, closedAt } = recorder();
+    queue.push([entry(null, 'a'), entry(null, 'b')]);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(changes.map((c) => [c.texts, c.at - T0])).toEqual([
+      [['a', 'b'], 0],
+      [['b'], HOLD_MS],
+      [[], HOLD_MS + LAST_HOLD_MS],
+    ]);
+    expect(closedAt()).toBe(T0 + HOLD_MS + LAST_HOLD_MS);
+    queue.dispose();
+  });
+
+  it('lets a message that arrives meanwhile come after the 8 s hold', async () => {
+    const { queue, changes } = recorder();
+    queue.push([entry(null, 'a')]);
+    await vi.advanceTimersByTimeAsync(3_000);
+    queue.push([entry(null, 'b')]);
+    await vi.advanceTimersByTimeAsync(HOLD_MS);
+    expect(changes.at(-1)).toEqual({ texts: ['b'], at: T0 + HOLD_MS });
+    queue.dispose();
+  });
+});
+
+describe('messageQueue: the last message closes by itself (hidden, halted, ▼)', () => {
+  it('keeps the rest of the time while the page is hidden', async () => {
+    const { queue, closedAt } = recorder();
+    queue.push([entry(null, 'a')]);
+    await vi.advanceTimersByTimeAsync(10_000);
+    queue.setHidden(true);
+    await vi.advanceTimersByTimeAsync(100_000);
+    expect(closedAt()).toBeUndefined();
+    queue.setHidden(false);
+    await vi.advanceTimersByTimeAsync(LAST_HOLD_MS - 10_000 - 1);
+    expect(closedAt()).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(closedAt()).toBe(T0 + 110_000 + LAST_HOLD_MS - 10_000);
+    queue.dispose();
+  });
+
+  it('does not close while halted, and gives the whole time again after', async () => {
+    const { queue, closedAt } = recorder();
+    queue.push([entry(null, 'a')]);
+    await vi.advanceTimersByTimeAsync(20_000);
+    queue.pause();
+    await vi.advanceTimersByTimeAsync(100_000);
+    expect(closedAt()).toBeUndefined();
+    queue.resume();
+    await vi.advanceTimersByTimeAsync(LAST_HOLD_MS);
+    expect(closedAt()).toBe(T0 + 120_000 + LAST_HOLD_MS);
+    queue.dispose();
+  });
+
+  it('still closes at once on ▼', () => {
+    const { queue, closedAt } = recorder();
+    queue.push([entry(null, 'a')]);
+    queue.next();
+    expect(closedAt()).toBe(T0);
     queue.dispose();
   });
 });
