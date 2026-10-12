@@ -76,3 +76,20 @@ export async function waitForBaseline(page: Page, timeout?: number): Promise<voi
     .poll(() => page.evaluate((key) => localStorage.getItem(key), BASELINE_KEY), { timeout })
     .not.toBeNull();
 }
+
+/** The ▼ of the message window while it tells the narration (no event message is shown). */
+const NARRATION_BUTTON = 'つぎの ようす';
+/** Shown only before the first snapshot; afterwards the narration takes its place. */
+const NOTHING_YET = 'あたらしい できごとは まだ ない。';
+
+/**
+ * Checks that the message window tells the narration, not an event message. The narration's
+ * words depend on chance and the time, so only the window's state and a non-empty line are checked.
+ */
+export async function expectNarration(page: Page, timeout?: number): Promise<void> {
+  const window = page.getByRole('region', { name: 'メッセージ' });
+  await expect(window.getByRole('button', { name: NARRATION_BUTTON })).toBeVisible({ timeout });
+  await expect(window).not.toContainText(NOTHING_YET);
+  await expect(window).not.toContainText('クリアした！');
+  await expect(window).toHaveText(/\S/);
+}

@@ -1,4 +1,4 @@
-import { expect, test, waitForBaseline } from './fixtures.ts';
+import { expect, expectNarration, test, waitForBaseline } from './fixtures.ts';
 import { NOW, sampleSnapshot, withClosedIssues, writeSnapshot } from './snapshotFile.ts';
 
 /** The collector's next write, a minute after the first (newer than the baseline). */
@@ -10,7 +10,7 @@ test('closing an Issue shows 「クリアした！」', async ({ page }) => {
   await page.goto('/');
   await waitForBaseline(page);
   const message = page.getByRole('region', { name: 'メッセージ' });
-  await expect(message).toContainText('あたらしい できごとは まだ ない。');
+  await expectNarration(page);
 
   await writeSnapshot(withClosedIssues(await sampleSnapshot(LATER), [101], LATER));
   await expect(message).toContainText(
@@ -35,5 +35,7 @@ test('a click on the message window goes to the next message, then closes it', a
     },
   );
   await page.getByRole('button', { name: 'とじる' }).click();
-  await expect(message).toContainText('あたらしい できごとは まだ ない。');
+  // Closed: the event message is gone and the window goes back to the narration.
+  await expect(message).not.toContainText('クエスト#102');
+  await expectNarration(page);
 });

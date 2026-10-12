@@ -1,5 +1,12 @@
 import { installFakeAudio } from './fakeAudio.ts';
-import { BASELINE_KEY, expect, test, waitForBaseline, waitForRoom } from './fixtures.ts';
+import {
+  BASELINE_KEY,
+  expect,
+  expectNarration,
+  test,
+  waitForBaseline,
+  waitForRoom,
+} from './fixtures.ts';
 import { sampleSnapshot, writeSnapshot } from './snapshotFile.ts';
 
 /** Longer than one refresh (5 s), for waits on the next fetch. */
@@ -27,8 +34,8 @@ test('the board, the party and the message window show the snapshot', async ({ p
   for (const name of ['かなめ', 'みのり', 'ひびき', 'ひらめ', 'ささえ', 'ゆきひろ'])
     await expect(party).toContainText(name);
 
-  const message = page.getByRole('region', { name: 'メッセージ' });
-  await expect(message).toContainText('あたらしい できごとは まだ ない。');
+  // No events on the first load: the window tells the narration.
+  await expectNarration(page);
 
   const fetch = page.getByRole('region', { name: '取得のようす' });
   await expect(fetch).toContainText('最終取得 12:00');
@@ -103,9 +110,7 @@ test('「基準を消す」 removes the baseline and the next fetch stores a new
   // The next refresh counts as the first load: a new baseline, no events.
   release();
   await waitForBaseline(page, REFRESH_TIMEOUT);
-  await expect(page.getByRole('region', { name: 'メッセージ' })).toContainText(
-    'あたらしい できごとは まだ ない。',
-  );
+  await expectNarration(page);
 });
 
 test('below 760px the windows stack and the canvas is hidden', async ({ page }) => {
