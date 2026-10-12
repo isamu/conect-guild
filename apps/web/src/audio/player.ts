@@ -49,7 +49,7 @@ export interface TonePlayer {
 /** Starts slightly ahead so the first note is not cut by the scheduling delay. */
 const LEAD_SEC = 0.01;
 
-export function defaultCreateAudioContext(): AudioContextLike | null {
+function defaultCreateAudioContext(): AudioContextLike | null {
   if (typeof globalThis.AudioContext !== 'function') return null;
   try {
     return new globalThis.AudioContext();

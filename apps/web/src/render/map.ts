@@ -9,7 +9,6 @@ import { SPRITE_SIZE, TILE_SIZE } from './metrics';
  * at the bottom right. Nothing that matters is placed under the HTML windows (WINDOW_EXTENTS).
  */
 
-export { TILE_SIZE } from './metrics';
 export const MAP_COLS = 32;
 export const MAP_ROWS = 18;
 export const LOGICAL_WIDTH = MAP_COLS * TILE_SIZE;
@@ -100,7 +99,7 @@ export const WINDOW_EXTENTS: Readonly<Record<'board' | 'party' | 'message', PxRe
  * baseline clear) on top of a failure line, measured 372.5 px. Seats and their bubbles keep clear
  * of it; a member walking past may be covered for a moment in that rare state.
  */
-export const PARTY_TALLEST_BOTTOM = 373;
+const PARTY_TALLEST_BOTTOM = 373;
 
 /** The windows at their tallest: what seats and bubbles must stay clear of. */
 export const TALLEST_WINDOW_EXTENTS: Readonly<Record<'board' | 'party' | 'message', PxRect>> = {
@@ -136,7 +135,7 @@ interface GroundFill extends TileRect {
   readonly tile: TileName;
 }
 
-export const rect = (col: number, row: number, w: number, h: number): TileRect => ({
+const rect = (col: number, row: number, w: number, h: number): TileRect => ({
   col,
   row,
   w,
@@ -224,7 +223,7 @@ export function isInsideMap(pos: TilePos): boolean {
 }
 
 /** Ground tile of every cell, row by row. */
-export function buildGround(): TileName[][] {
+function buildGround(): TileName[][] {
   const ground = Array.from({ length: MAP_ROWS }, () =>
     Array.from({ length: MAP_COLS }, (): TileName => 'floor'),
   );

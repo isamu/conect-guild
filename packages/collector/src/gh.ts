@@ -5,7 +5,7 @@ import { CollectorError } from './errors.ts';
 /** Runs `gh` with an argument array and resolves with its stdout. */
 export type GhRunner = (args: readonly string[]) => Promise<string>;
 
-export const GH_MAX_BUFFER = 64 * 1024 * 1024;
+const GH_MAX_BUFFER = 64 * 1024 * 1024;
 
 /**
  * Real runner: execFile with an argument array (never a shell string), using the

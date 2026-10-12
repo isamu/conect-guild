@@ -26,7 +26,7 @@ export function repoFingerprint(repo: string): string {
  * branch names, because Issue titles can carry client names. The repository is kept as its
  * fingerprint only.
  */
-export const baselineSchema = z.strictObject({
+const baselineSchema = z.strictObject({
   schemaVersion: z.literal(BASELINE_SCHEMA_VERSION),
   fetchedAt: isoDateTime,
   repo: z.string().regex(/^[0-9a-f]{8}$/),
