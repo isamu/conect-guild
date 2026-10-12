@@ -1,10 +1,10 @@
-"""Normalize the codex-generated decor sheets (decor_raw_a/b.png) into decor.png.
+"""Normalize the codex-generated decor sheets (decor_raw_a/b/poodle.png) into decor.png.
 
-Usage: python build_decor.py <decor_raw_a.png> <decor_raw_b.png> <decor.png>
+Usage: python build_decor.py <decor_raw_a.png> <decor_raw_b.png> <decor_raw_poodle.png> <decor.png>
 Ran with Python 3.14.7 and Pillow 12.3.0 (installed in a throwaway venv,
 not a project dependency).
 
-The raw images follow prompt.txt (128px cells on a #FF00FF background), but
+The raw images follow prompt.txt and prompt-poodle.txt (128px cells on a #FF00FF background), but
 the generator drifts off its grid, so every piece is found by a hand-measured
 search region instead of its grid cell: the piece is made of the opaque
 components whose center lies in the region (only their pixels, so a
@@ -42,6 +42,7 @@ OUTLINE = (44, 26, 20)
 RAW = {
     "a": ((1024, 512), "9673ecba0fd0b78f92677afd9c4717d759621a58787ce28e5bd8096e97ad393e"),
     "b": ((1024, 1024), "97b2046314d540e58399ef7154750d458e171fb6e48852f47467dc5158ccf62e"),
+    "poodle": ((1024, 512), "f534f72914c6036cd2ed0f8485eb02e1a853d09383e4550d85393d8428569261"),
 }
 
 # name: (raw sheet, search region (left, top, right, bottom) in raw pixels,
@@ -96,6 +97,8 @@ LAYOUT = {
     "sleeping-cat": ("b", (752, 690, 900, 792), 3, 9, 1, 1),
     "jar": ("b", (906, 646, 1018, 796), 4, 9, 1, 1),
     "chest": ("b", (380, 790, 544, 924), 5, 9, 1, 1),
+    "sleeping-poodle": ("poodle", (250, 280, 390, 390), 6, 9, 1, 1),
+    "awake-poodle": ("poodle", (650, 260, 760, 390), 7, 9, 1, 1),
 }
 
 
@@ -291,12 +294,12 @@ def same_file(a, b):
     return os.path.realpath(a) == os.path.realpath(b) or (os.path.exists(b) and os.path.samefile(a, b))
 
 
-def main(src_a, src_b, dst):
-    if same_file(src_a, dst) or same_file(src_b, dst):
+def main(src_a, src_b, src_poodle, dst):
+    if same_file(src_a, dst) or same_file(src_b, dst) or same_file(src_poodle, dst):
         raise SystemExit("output path must differ from the source images")
     check_slots()
     check_decor_ts()
-    raws = {"a": load_raw("a", src_a), "b": load_raw("b", src_b)}
+    raws = {"a": load_raw("a", src_a), "b": load_raw("b", src_b), "poodle": load_raw("poodle", src_poodle)}
     sheet = Image.new("RGBA", (SHEET_COLS * TILE, SHEET_ROWS * TILE), (0, 0, 0, 0))
     placed = set()
     for sheet_id, raw in raws.items():
@@ -310,6 +313,6 @@ def main(src_a, src_b, dst):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
-        raise SystemExit("usage: python build_decor.py <decor_raw_a.png> <decor_raw_b.png> <decor.png>")
-    main(sys.argv[1], sys.argv[2], sys.argv[3])
+    if len(sys.argv) != 5:
+        raise SystemExit("usage: python build_decor.py <decor_raw_a.png> <decor_raw_b.png> <decor_raw_poodle.png> <decor.png>")
+    main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
