@@ -99,6 +99,7 @@ conect-guild/
 ├── docs/DESIGN.md            この文書
 ├── LICENSE                   MIT
 ├── scoria.config.json        scoria（コードの健康状態の計測）の設定。.scoria/baseline.json が基準の記録
+├── .madgerc                 scoria の循環 import の検査（madge）に渡す設定。.vue の import を TypeScript の解決で読ませる（9 章）
 └── .github/workflows/ci.yml  npm ci → lint / typecheck / test / build（サンプルデータのみ）。scoria.yml は scoria の計測（9 章）
 ```
 
@@ -348,6 +349,9 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 - ESLint（sonarjs の複雑度・ネスト・引数）をエラー、`max-lines` 400 / `max-lines-per-function` 60 を warning で入れる
 - `npm run verify` = lint + typecheck + test。CI は push と PR で `npm ci --ignore-scripts` → verify → build（サンプルデータのみ）
 - scoria でコードの健康状態を測る（Issue #33）。`.github/workflows/scoria.yml` が PR と main への push で `npm run test:coverage`（`coverage/lcov.info` を出す。遅いので verify には入れない）→ `npx -y scoria@0.3.0` を動かし、`.scoria/baseline.json` からの変化をジョブのサマリーに、指摘を SARIF で code scanning に出す。`mode: report` なので CI は落とさない。scoria は package.json に入れない（scoria 自身の依存の npm audit の警告がこのリポジトリのものに見えるため）
+  - 循環 import の検査は、scoria が動かす madge が受け持つ。scoria は madge に tsconfig を渡さないので、リポジトリ直下の `.madgerc` で `apps/web/tsconfig.app.json` を渡す（Issue #44）。これが無いと madge は `.vue` の import を JavaScript として解こうとし、直前に読んだ `.js` の構文木を流用するか、`.vue` を JavaScript として読んで SyntaxError で止まる。止まると scoria は circular を測らないまま `complete: false` になる。どのファイルを先に読むかで結果が変わり、`coverage/` の HTML レポートがあると止まり、`apps/web/dist/` があると通っていた。通ったときも、`.vue` から拡張子なしで読む `.ts` の import（18 本）が依存のグラフから抜け、`.vue` を通る循環は見えていなかった
+  - `.madgerc` は JSON で書く（コメント可）。先頭が `{` でないと INI として読まれるので、コメントは括弧の中に書く
+  - scoria の実行結果で `complete: true` と「probes not scored」に circular が無いことを確かめる。原因は madge の依存（filing-cabinet・precinct）にあり、上流で直れば `.madgerc` は要らなくなる
 - 画面の E2E は Playwright（Issue #34）。`npm run test:e2e` で動かし、遅いので verify には入れない。CI は verify と並行の別ジョブ e2e で、ブラウザを Playwright の版ごとにキャッシュして `npx playwright install --with-deps chromium` で入れ、失敗時はレポートを artifact に残す
   - 設定は `apps/web/playwright.config.ts`、テストは `apps/web/e2e/`。開発サーバーは 5196 番（`--strictPort`、host は vite.config.ts の 127.0.0.1）で立て、既に動いているサーバーは使わない。chromium だけ、headless、retries は CI だけ 1。テストは 1 本ずつ順に動かす（アプリの 5 秒ごとの再取得を実時間で待つので、負荷で遅れないように）
   - データはダミーだけで、`apps/web/.data` には一切触れない（collector の実データを上書きしたり消したりしないため）。`/snapshot.json` は Playwright の `context.route` が全部横取りし、`public/snapshot.sample.json` を guild.settings.ts の repo と固定した時刻に合わせたものを返す。テスト中の中身の差し替え（Issue を閉じる、別のリポジトリ）は route が返す値を変えて行う。横取りの印のヘッダーが無い `/snapshot.json` の応答（開発サーバーから来たもの）がページに 1 件でも届いたら、そのテストを落とす。これで `.data` に実データがあっても画面やレポートには出ない
@@ -384,6 +388,7 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 
 ## 変更履歴
 
+- **Issue #44（2026-10-12）** CI の scoria で循環 import の検査が毎回飛ばされていた（「madge produced no readable report」で `complete: false`）のを直した。リポジトリ直下に `.madgerc` を置き、madge に `apps/web/tsconfig.app.json` を渡して `.vue` の import を TypeScript の解決で読ませる。ファイルの並びに関係なく測れ、`.vue` を通る循環も数えるようになった（9 章）。依存は足していない
 - **Issue #12 の一部（2026-10-12）** Issue が開いたとき、近い部門の机へはときどき巻物を投げて渡すようにした（1 章、3 章、4.4、8 章）
   - 社長の判断「近い部門だけ投げる、またはランダムで時々投げる」を、両方を合わせた「近い部門だけ、注入した乱数でときどき投げる」にした。遠い部門は今までどおり手渡し
   - 作業の動きをツールの種類に結び付ける部分は対象外のまま。M3 は MulmoTerminal のファイルを読む方式で、ツールの種類が取れないため
