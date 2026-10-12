@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { SessionState, SnapshotSession } from '@conect-guild/snapshot';
 import { z } from 'zod';
 import type { CompanySeat } from '../collector.config.ts';
@@ -23,6 +24,46 @@ function parseCwdLine(line: string): { id: string; cwd: string } | null {
   const id = text.slice(0, at);
   const cwd = text.slice(at + 1).trim();
   return SESSION_ID.test(id) && cwd !== '' ? { id, cwd } : null;
+}
+
+/**
+ * The last line of the log when no newline follows it, kept between reads as a hash of its text
+ * and where it ends (chars from the start). The text itself is not kept: it may be another
+ * directory's line.
+ */
+export interface TailMark {
+  readonly hash: string;
+  readonly end: number;
+}
+
+function sameTail(a: TailMark | null, b: TailMark | null): boolean {
+  return a !== null && b !== null && a.hash === b.hash && a.end === b.end;
+}
+
+/**
+ * The lines of the log from its text chunks, for {@link latestCompanySessionIds}. MulmoTerminal
+ * appends each record as `\n<id> <path>`, so the last line has no newline after it and may be half
+ * written (a department's path cut at the company root would read as かなめ's). It is passed on
+ * only when the previous read ended with the same tail at the same place (`previous`): the file has
+ * not moved since, so the line is whole. A new session thus shows up one read later. `onTail` gets
+ * this read's tail (null when the text ends with a newline) for the next read.
+ */
+export async function* settledLines(
+  chunks: AsyncIterable<string> | Iterable<string>,
+  previous: TailMark | null,
+  onTail: (tail: TailMark | null) => void,
+): AsyncGenerator<string> {
+  let rest = '';
+  let end = 0;
+  for await (const chunk of chunks) {
+    end += chunk.length;
+    const lines = (rest + chunk).split('\n');
+    rest = lines.pop() ?? '';
+    yield* lines;
+  }
+  const tail = rest === '' ? null : { hash: createHash('sha256').update(rest).digest('hex'), end };
+  onTail(tail);
+  if (sameTail(tail, previous)) yield rest;
 }
 
 /**

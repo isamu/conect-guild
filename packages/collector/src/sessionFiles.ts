@@ -1,11 +1,12 @@
 import { createReadStream, type ReadStream } from 'node:fs';
-import { createInterface } from 'node:readline';
 import type { CompanySeat } from '../collector.config.ts';
 import {
   latestCompanySessionIds,
   readSeatStates,
+  settledLines,
   type SessionsFailureKind,
   type SessionsReading,
+  type TailMark,
 } from './sessions.ts';
 
 /**
@@ -43,43 +44,54 @@ function failureKindOf(error: unknown): SessionsFailureKind {
     : 'read-failed';
 }
 
+async function* textChunks(stream: ReadStream): AsyncGenerator<string> {
+  for await (const chunk of stream) yield String(chunk);
+}
+
 /**
  * The company session ids from the cwd log, streamed: each line is handed over and dropped, so the
- * lines of other directories are never held together.
+ * lines of other directories are never held together. The unterminated last line counts only when
+ * it is the same as at the previous read (settledLines).
  */
 async function readCwdLog(
   paths: SessionFilePaths,
   signal: AbortSignal | undefined,
+  tail: { last: TailMark | null },
 ): Promise<ReadonlyMap<string, string>> {
   const stream = cappedStream(paths.cwdLogPath, MAX_CWD_LOG_BYTES, signal);
-  const lines = createInterface({ input: stream, crlfDelay: Infinity });
+  const lines = settledLines(textChunks(stream), tail.last, (next) => {
+    tail.last = next;
+  });
   const ids = await latestCompanySessionIds(lines, paths.seats);
   assertWithin(stream, MAX_CWD_LOG_BYTES);
   return ids;
 }
 
 async function readActivityState(path: string, signal: AbortSignal | undefined): Promise<string> {
-  const stream = cappedStream(path, MAX_ACTIVITY_STATE_BYTES, signal);
   let text = '';
-  for await (const chunk of stream) text += String(chunk);
+  const stream = cappedStream(path, MAX_ACTIVITY_STATE_BYTES, signal);
+  for await (const chunk of textChunks(stream)) text += chunk;
   assertWithin(stream, MAX_ACTIVITY_STATE_BYTES);
   return text;
 }
 
+export type CompanySessionsReader = (signal?: AbortSignal) => Promise<SessionsReading>;
+
 /**
- * Reads MulmoTerminal's two files and returns the company seats' states. Never throws; an abort
- * of `signal` ends the reading (read-failed). Both are
- * opened read-only; MulmoTerminal's files are never written or locked.
+ * A reader of MulmoTerminal's two files that returns the company seats' states. It remembers only
+ * the cwd log's last line as a hash and an end (settledLines), so its first read never takes an
+ * unterminated last line. Never throws; an abort of `signal` ends the reading (read-failed). Both
+ * files are opened read-only; MulmoTerminal's files are never written or locked.
  */
-export async function readCompanySessions(
-  paths: SessionFilePaths,
-  signal?: AbortSignal,
-): Promise<SessionsReading> {
-  try {
-    const ids = await readCwdLog(paths, signal);
-    const activity = await readActivityState(paths.activityStatePath, signal);
-    return readSeatStates(activity, paths.seats, ids);
-  } catch (error) {
-    return { ok: false, kind: failureKindOf(error) };
-  }
+export function createCompanySessionsReader(paths: SessionFilePaths): CompanySessionsReader {
+  const tail: { last: TailMark | null } = { last: null };
+  return async (signal) => {
+    try {
+      const ids = await readCwdLog(paths, signal, tail);
+      const activity = await readActivityState(paths.activityStatePath, signal);
+      return readSeatStates(activity, paths.seats, ids);
+    } catch (error) {
+      return { ok: false, kind: failureKindOf(error) };
+    }
+  };
 }

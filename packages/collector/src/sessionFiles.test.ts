@@ -6,7 +6,7 @@ import type { CompanySeat } from '../collector.config.ts';
 import {
   MAX_ACTIVITY_STATE_BYTES,
   MAX_CWD_LOG_BYTES,
-  readCompanySessions,
+  createCompanySessionsReader,
   type SessionFilePaths,
 } from './sessionFiles.ts';
 
@@ -35,6 +35,11 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
+/** The first read of a new reader (an unterminated last line does not count yet). */
+function readCompanySessions(target: SessionFilePaths, signal?: AbortSignal) {
+  return createCompanySessionsReader(target)(signal);
+}
+
 async function writeCwdLog(...lines: string[]): Promise<void> {
   // MulmoTerminal appends each record with the newline in front.
   await writeFile(paths.cwdLogPath, lines.map((line) => `\n${line}`).join(''));
@@ -51,7 +56,9 @@ describe('readCompanySessions', () => {
         [KANAME]: { working: false, waiting: true, event: 'Notification' },
       }),
     );
-    const result = await readCompanySessions(paths);
+    const read = createCompanySessionsReader(paths);
+    await read();
+    const result = await read();
     expect(result).toEqual({
       ok: true,
       found: 1,
@@ -82,6 +89,32 @@ describe('readCompanySessions', () => {
       members: [{ department: null, state: 'working' }, expect.anything()],
     });
     expect(performance.now() - started).toBeLessThan(3_000);
+  });
+});
+
+describe('readCompanySessions: a half-written last line', () => {
+  const MINORI = 'aaaaaaaa-0000-4000-8000-000000000003';
+
+  it('waits for the last line to stay the same before taking it', async () => {
+    const root = paths.seats[0]?.cwd ?? '';
+    await writeFile(
+      paths.activityStatePath,
+      JSON.stringify({
+        [KANAME]: { working: false, waiting: true, event: 'Notification' },
+        [MINORI]: { working: true, waiting: false, event: 'PreToolUse' },
+      }),
+    );
+    const read = createCompanySessionsReader(paths);
+    const states = async () => {
+      const result = await read();
+      return result.ok ? result.members.map((m) => m.state) : result.kind;
+    };
+    // 経理's record caught while it was written: cut right after the company root.
+    await writeFile(paths.cwdLogPath, `\n${KANAME} ${root}\n${MINORI} ${root}`);
+    expect(await states()).toEqual(['awaiting-permission', 'idle']);
+    await writeFile(paths.cwdLogPath, `\n${KANAME} ${root}\n${MINORI} ${root}/accounting`);
+    expect(await states()).toEqual(['awaiting-permission', 'idle']);
+    expect(await states()).toEqual(['awaiting-permission', 'working']);
   });
 });
 

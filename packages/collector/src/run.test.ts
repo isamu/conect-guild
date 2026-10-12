@@ -14,7 +14,7 @@ import {
   SESSION_MEMBERS,
   SESSIONS_OK,
 } from './run.fixtures.test-util.ts';
-import { readCompanySessions } from './sessionFiles.ts';
+import { createCompanySessionsReader } from './sessionFiles.ts';
 
 /** The five company seats under `root`, as collector.config.ts fixes them under the home. */
 function seatsUnder(root: string): CompanySeat[] {
@@ -184,12 +184,11 @@ describe('runCollector --once: sessions', () => {
         }),
       );
       const deps = harness(fakeGh(), {
-        readSessions: () =>
-          readCompanySessions({
-            seats: seatsUnder(root),
-            cwdLogPath,
-            activityStatePath,
-          }),
+        readSessions: createCompanySessionsReader({
+          seats: seatsUnder(root),
+          cwdLogPath,
+          activityStatePath,
+        }),
       });
       await expect(runCollector(['--once'], deps)).resolves.toBe(0);
       expect(deps.writes).toHaveLength(1);

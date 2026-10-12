@@ -4,7 +4,9 @@ import {
   latestCompanySessionIds,
   readSeatStates,
   sessionStateOf,
+  settledLines,
   type ActivityEntry,
+  type TailMark,
 } from './sessions.ts';
 
 const ROOT = '/home/u/conect-management';
@@ -127,6 +129,76 @@ describe('latestCompanySessionIds', () => {
 
   it('returns an empty map for an empty log', async () => {
     expect((await latestCompanySessionIds([], SEATS)).size).toBe(0);
+  });
+});
+
+/** One read of a log text (in `chunks`), as the collector does it: the ids and this read's tail. */
+async function readLog(chunks: readonly string[], previous: TailMark | null) {
+  let tail: TailMark | null = null;
+  const ids = await latestCompanySessionIds(
+    settledLines(chunks, previous, (next) => {
+      tail = next;
+    }),
+    SEATS,
+  );
+  return { ids, tail };
+}
+
+describe('settledLines: the unterminated last line', () => {
+  // MulmoTerminal appends `\n<id> <path>`: the last record has no newline after it.
+  const before = `\n${KANAME} ${ROOT}`;
+  const cutAtRoot = `\n${MINORI} ${ROOT}`;
+  const whole = `\n${MINORI} ${ROOT}/accounting`;
+
+  it('does not take a department line cut at the company root for かなめ', async () => {
+    const { ids, tail } = await readLog([before, cutAtRoot], null);
+    expect([...ids]).toEqual([[ROOT, KANAME]]);
+    expect(tail).not.toBeNull();
+  });
+
+  it('takes the last line at the next read when it has not moved', async () => {
+    const first = await readLog([before + whole], null);
+    expect(first.ids.has(`${ROOT}/accounting`)).toBe(false);
+    const second = await readLog([before + whole], first.tail);
+    expect(second.ids.get(`${ROOT}/accounting`)).toBe(MINORI);
+    expect(second.tail).toEqual(first.tail);
+  });
+
+  it('waits again when the last line grew since the previous read', async () => {
+    const first = await readLog([before + cutAtRoot], null);
+    const second = await readLog([before + whole], first.tail);
+    expect([...second.ids]).toEqual([[ROOT, KANAME]]);
+    const third = await readLog([before + whole], second.tail);
+    expect(third.ids.get(`${ROOT}/accounting`)).toBe(MINORI);
+  });
+
+  it('does not take a same text that now ends elsewhere', async () => {
+    const first = await readLog([`\n${MINORI} ${ROOT}/accounting`], null);
+    const moved = await readLog([before + whole], first.tail);
+    expect(moved.ids.has(`${ROOT}/accounting`)).toBe(false);
+  });
+
+  it('takes every line as before when the text ends with a newline', async () => {
+    const { ids, tail } = await readLog([`${before}${whole}\n`], null);
+    expect(ids.get(ROOT)).toBe(KANAME);
+    expect(ids.get(`${ROOT}/accounting`)).toBe(MINORI);
+    expect(tail).toBeNull();
+  });
+
+  it('joins lines split across chunks and keeps the earlier lines of the log', async () => {
+    const text = `\n${KANAME_OLD} ${ROOT}${whole}${before}`;
+    const chunks = [text.slice(0, 20), text.slice(20, 61), text.slice(61)];
+    const { ids } = await readLog(chunks, null);
+    // The last line (かなめ's new session) waits; the lines before it count as ever.
+    expect([...ids]).toEqual([
+      [ROOT, KANAME_OLD],
+      [`${ROOT}/accounting`, MINORI],
+    ]);
+  });
+
+  it('keeps no text of the last line in its mark', async () => {
+    const { tail } = await readLog([`\n${OTHER} ${OTHER_PATH}`], null);
+    expect(JSON.stringify(tail)).not.toMatch(new RegExp(`${OTHER}|${OTHER_PATH}`));
   });
 });
 

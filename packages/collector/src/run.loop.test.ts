@@ -216,7 +216,7 @@ describe('runCollector loop: interrupts', () => {
     const controller = new AbortController();
     const deps = harness(fakeGh(), {
       signal: controller.signal,
-      // Like readCompanySessions: a pending read ends when the signal aborts.
+      // Like createCompanySessionsReader: a pending read ends when the signal aborts.
       readSessions: () =>
         new Promise((resolve) => {
           controller.signal.addEventListener('abort', () => {
