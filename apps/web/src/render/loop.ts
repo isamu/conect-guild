@@ -15,7 +15,7 @@ import {
   type StageFrame,
 } from './director';
 import { daylightAt, hourOf, lampLights } from './daylight';
-import { ANIMATED_DECOR } from './decor';
+import { ANIMATED_DECOR } from './animatedDecor';
 import {
   drawActors,
   drawFrontLayer,

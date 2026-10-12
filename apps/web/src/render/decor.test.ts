@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { DECOR, type DecorName } from '../../../../assets/decor/decor';
 import { MEMBERS, type MemberId } from '../guild.config';
 import { DECOR_MOTION } from './ambient';
-import { ANIMATED_DECOR, DECOR_PLACEMENTS, FLOOR_PATCH_DECOR, STILL_DECOR } from './decor';
+import { ANIMATED_DECOR, STILL_DECOR } from './animatedDecor';
+import { DECOR_PLACEMENTS, FLOOR_PATCH_DECOR } from './decor';
 import { contains, groundAt, isInsideMap, MAP_OBJECTS, PLACES, type TileRect } from './map';
 import { AMBIENT } from './metrics';
 
