@@ -26,14 +26,14 @@ function party(bubbles: Bubbles, known = true): RemarkParty {
 
 const NOTHING_SEEN: Remarks = { previous: {}, said: [] };
 
-describe('receiveParty: a wait that ends or changes before its remark is over', () => {
-  /** かなめ then みのり, both new: みのり's remark waits until 3_000. */
-  const queued = receiveParty(
-    NOTHING_SEEN,
-    party({ kaname: 'awaiting-permission', minori: 'awaiting-kaname' }),
-    moment(),
-  );
+/** かなめ then みのり, both new: みのり's remark waits until 3_000. */
+const queued = receiveParty(
+  NOTHING_SEEN,
+  party({ kaname: 'awaiting-permission', minori: 'awaiting-kaname' }),
+  moment(),
+);
 
+describe('receiveParty: a wait that ends or changes before its remark is over', () => {
   it('queues the second remark after the first', () => {
     expect(queued.said.map(({ actor, start }) => ({ actor, start }))).toEqual([
       { actor: 'kaname', start: 1_000 },
@@ -51,9 +51,10 @@ describe('receiveParty: a wait that ends or changes before its remark is over', 
     expect(remarksAt(next, 3_500)).toEqual({});
   });
 
-  it('drops a remark showing when its wait ends', () => {
+  it('drops かなめ’s remark while it shows (1_000 to 3_000) when her wait ends', () => {
     const next = receiveParty(queued, party({ minori: 'awaiting-kaname' }), moment({ t: 1_500 }));
     expect(remarksAt(next, 1_500)).toEqual({});
+    expect(remarksAt(queued, 1_500)).toEqual({ kaname: 'よろしいですか' });
     // みのり's still comes at its time: her wait goes on.
     expect(remarksAt(next, 3_000)).toEqual({ minori: 'みてください' });
   });
@@ -68,7 +69,9 @@ describe('receiveParty: a wait that ends or changes before its remark is over', 
     expect(minori.map((said) => said.line)).toEqual(['ごしょうにんを']);
     expect(minori[0]?.start).toBe(3_000);
   });
+});
 
+describe('receiveParty: the remarks kept, quiet, unknown and halted', () => {
   it('keeps every remark while the waits stay the same', () => {
     const same = party({ kaname: 'awaiting-permission', minori: 'awaiting-kaname' });
     expect(receiveParty(queued, same, moment({ t: 1_500 })).said).toEqual(queued.said);
@@ -88,6 +91,27 @@ describe('receiveParty: a wait that ends or changes before its remark is over', 
 
   it('drops them, and forgets the waits seen, for a party with no snapshot behind it', () => {
     const next = receiveParty(queued, party({}, false), moment({ t: 1_500 }));
+    expect(next).toEqual({ previous: null, said: [] });
+  });
+
+  it('queues a new wait after the remarks kept, not after those dropped', () => {
+    const next = receiveParty(
+      queued,
+      party({ minori: 'awaiting-kaname', hibiki: 'awaiting-permission' }),
+      moment({ t: 1_500 }),
+    );
+    expect(next.said.map(({ actor, start, end }) => ({ actor, start, end }))).toEqual([
+      { actor: 'minori', start: 3_000, end: 5_000 },
+      { actor: 'hibiki', start: 5_000, end: 7_000 },
+    ]);
+  });
+
+  it('drops everything when halted', () => {
+    const next = receiveParty(
+      queued,
+      { bubbles: { kaname: 'awaiting-permission' }, known: true, halted: true },
+      moment({ t: 1_500 }),
+    );
     expect(next).toEqual({ previous: null, said: [] });
   });
 });
