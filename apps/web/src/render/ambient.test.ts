@@ -110,6 +110,47 @@ describe('ambientPose: desk work', () => {
     expect(ys).toEqual(new Set([0, -AMBIENT.typingBobPx]));
     for (const p of poses) expect(p).toMatchObject({ frame: 0, offset: { x: 0 }, hand: null });
   });
+
+  it('stays on the front frame with the bob when the sheet has no holding frames', () => {
+    for (let t = 0; t < 2 * SEED.intervalMs; t += 20) {
+      expect(ambientPose('desk-work', SEED, t, false)).toEqual(ambientPose('desk-work', SEED, t));
+    }
+  });
+});
+
+describe('ambientPose: typing with the holding frames', () => {
+  const at = (t: number) => ambientPose('desk-work', SEED, t, true);
+
+  it('switches the front frame and the arms-in-front frame every typingMs', () => {
+    const start = AMBIENT.pageTurnMs;
+    expect(at(start).frame).toBe(0);
+    expect(at(start + AMBIENT.typingMs - 1).frame).toBe(0);
+    expect(at(start + AMBIENT.typingMs).frame).toBe(5);
+    expect(at(start + 2 * AMBIENT.typingMs - 1).frame).toBe(5);
+    expect(at(start + 2 * AMBIENT.typingMs).frame).toBe(0);
+  });
+
+  it('uses only frames 0 and 5 while typing, facing front, holding nothing, without a bob', () => {
+    const poses = [];
+    for (let t = AMBIENT.pageTurnMs; t < SEED.intervalMs; t += 20) poses.push(at(t));
+    expect(new Set(poses.map((p) => p.frame))).toEqual(new Set([0, 5]));
+    for (const p of poses)
+      expect(p).toMatchObject({ flip: false, offset: { x: 0, y: 0 }, hand: null });
+  });
+
+  it('still turns aside for papers at the start of a cycle', () => {
+    expect(at(0)).toMatchObject({ frame: 1, flip: false });
+    expect(at(SEED.intervalMs)).toMatchObject({ frame: 1, flip: true });
+  });
+
+  it('changes no other mood', () => {
+    const others: readonly AmbientMood[] = ['idle', 'tidy-scroll', 'fan', 'fidget'];
+    for (const mood of others) {
+      for (let t = 0; t < 2 * SEED.intervalMs; t += 70) {
+        expect(ambientPose(mood, SEED, t, true)).toEqual(ambientPose(mood, SEED, t, false));
+      }
+    }
+  });
 });
 
 describe('ambientPose: idle', () => {
