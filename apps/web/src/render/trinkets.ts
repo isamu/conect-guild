@@ -7,8 +7,9 @@ import type { Point } from './path';
 /**
  * The small things that move with the members (Issue #11), without new pictures: a glint on 経理's
  * abacus and coins, notes and "!" from 広報's megaphone, a band of light turning 企画's globe and
- * 総務's keys swinging while that department works; the hourglass running while the king has PRs
- * to approve; a banner fluttering when a quest of its side of the room is cleared; the cat waking
+ * the papers sorted on ささえ's file stack (総務) while that department works; the hourglass
+ * running while the king has PRs to approve (it stands on ささえ's desk, but it is the king's
+ * sign); a banner fluttering when a quest of its side of the room is cleared; the cat waking
  * to stretch now and then, and the light patches drifting with the sun. Pure: the time, each
  * thing's phase and what the members do are passed in. Distances are px of the decor pictures
  * (logical px), from the picture's top-left.
@@ -68,7 +69,7 @@ const DEPARTMENT_THINGS: Readonly<Partial<Record<DecorName, MemberId>>> = {
   'coin-pile': 'minori',
   megaphone: 'hibiki',
   globe: 'hirame',
-  'key-board': 'sasae',
+  'file-stack': 'sasae',
 };
 
 /** The trigger of a thing that moves only sometimes; null for one that always moves. */
@@ -185,11 +186,42 @@ export function spinBandAt(phaseMs: number, now: number): number {
   return GLOBE_BODY.left + Math.floor((t / TRINKETS.spinMs) * (span + 1));
 }
 
-/** How far the bottom of the keys is pushed sideways at `now`: -swingPx, 0, +swingPx, 0, ... */
-export function swingAt(phaseMs: number, now: number): number {
-  const quarter = Math.floor(((now + phaseMs) / TRINKETS.swingMs) * 4) % 4;
-  const steps = [0, TRINKETS.swingPx, 0, -TRINKETS.swingPx] as const;
-  return steps[quarter] ?? 0;
+/** The top sheet of the file stack, px of its picture. */
+export const FILE_TOP = { x: 6, y: 11, w: 15, h: 4 } as const;
+
+export interface PapersLook {
+  /** Added to the top sheet's left, logical px. */
+  readonly slide: number;
+  /** True while its right corner is lifted. */
+  readonly curl: boolean;
+  /** Where a sheet floating up off the stack is, from FILE_TOP's top-left; null when none is. */
+  readonly float: Point | null;
+}
+
+/**
+ * The papers on ささえ's file stack at `now`: each turn the top sheet lies flat, slides, lifts its
+ * corner and lies flat again, in quarters; on some turns (fixed per turn) a sheet floats up and
+ * aside from the start of the turn for TRINKETS.floatMs.
+ */
+export function papersAt(phaseMs: number, now: number): PapersLook {
+  const t = now + phaseMs;
+  const turn = Math.floor(t / TRINKETS.shuffleMs);
+  const elapsed = t - turn * TRINKETS.shuffleMs;
+  const quarter = Math.floor((elapsed / TRINKETS.shuffleMs) * 4);
+  const slid = quarter === 1 || quarter === 2;
+  const floats = hashStep(turn) < TRINKETS.floatShare && elapsed < TRINKETS.floatMs;
+  const age = elapsed / TRINKETS.floatMs;
+  return {
+    slide: slid ? TRINKETS.shuffleSlidePx : 0,
+    curl: quarter === 2,
+    float: floats
+      ? {
+          x: Math.round(age * TRINKETS.floatDriftPx),
+          // + 0 turns -0 into 0.
+          y: -Math.round(age * TRINKETS.floatRisePx) + 0,
+        }
+      : null,
+  };
 }
 
 /** The hourglass's neck and lower bulb: the stream runs from `top` to `bottom` at `x`. */
