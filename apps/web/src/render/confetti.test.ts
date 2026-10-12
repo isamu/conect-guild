@@ -7,7 +7,7 @@ import {
   createConfetti,
   type Random,
 } from './confetti';
-import { DETAIL_SCALE, OVERHEAD_OFFSET } from './metrics';
+import { CONFETTI, DETAIL_SCALE, OVERHEAD_OFFSET } from './metrics';
 
 /** Deterministic random numbers in [0, 1). */
 function seeded(seed: number): Random {
@@ -36,10 +36,25 @@ describe('createConfetti', () => {
       expect(p).toBeDefined();
       if (p === undefined) continue;
       expect(p.vy).toBeLessThan(0);
-      expect(Math.abs(p.vx)).toBeLessThanOrEqual(60 * DETAIL_SCALE);
+      expect(Math.abs(p.vx)).toBeLessThanOrEqual(CONFETTI.spreadPx / 2);
+      expect(-p.vy).toBeGreaterThanOrEqual(CONFETTI.riseMinPx);
+      expect(-p.vy).toBeLessThanOrEqual(CONFETTI.riseMaxPx);
       expect(p.color).toMatch(/^#[0-9a-f]{6}$/);
-      expect([DETAIL_SCALE, 2 * DETAIL_SCALE]).toContain(p.size);
+      expect([CONFETTI.smallPx, CONFETTI.largePx]).toContain(p.size);
     }
+  });
+
+  it('makes the squares at least 2 detail px, about 40 % of them 3', () => {
+    const sizes = createConfetti(seeded(3), 1_000).map((p) => p.size);
+    expect(Math.min(...sizes)).toBe(2 * DETAIL_SCALE);
+    const large = sizes.filter((size) => size === 3 * DETAIL_SCALE).length;
+    expect(large).toBeGreaterThan(300);
+    expect(large).toBeLessThan(500);
+  });
+
+  it('throws more and lasts longer than the first version (24 squares, 1.8 s)', () => {
+    expect(CONFETTI_COUNT).toBeGreaterThan(24);
+    expect(CONFETTI_MS).toBeGreaterThan(1_800);
   });
 });
 

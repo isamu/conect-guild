@@ -86,3 +86,22 @@ export const HOLD = {
   /** Half the height of a raised item's picture (chest 31 px, scroll bundle 32 px): it sits on the hands. */
   raisedItemHalfPx: 16,
 } as const;
+
+/**
+ * Confetti over a member when a quest is cleared (confetti.ts): squares of `smallPx` or `largePx`,
+ * thrown up and out, falling for `durationMs`. Velocities are logical px / s.
+ */
+export const CONFETTI = {
+  durationMs: 2_600,
+  count: 48,
+  smallPx: 2 * DETAIL_SCALE,
+  largePx: 3 * DETAIL_SCALE,
+  /** Share of the large squares. */
+  largeShare: 0.4,
+  /** Sideways speed, -spread/2 to +spread/2. */
+  spreadPx: 150 * DETAIL_SCALE,
+  riseMinPx: 70 * DETAIL_SCALE,
+  riseMaxPx: 170 * DETAIL_SCALE,
+  gravityPx: 180 * DETAIL_SCALE,
+} as const;
+
