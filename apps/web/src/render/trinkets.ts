@@ -26,6 +26,7 @@ export type DecorTrigger =
 
 /** What the triggers look at, taken from the members' moods and the confetti now flying. */
 export interface DecorCues {
+  /** Members of a department at work and at their seat (Issue #29). */
   readonly working: ReadonlySet<MemberId>;
   readonly awaitingPresident: boolean;
   /** When the confetti now flying over each member started (the latest one). */
@@ -37,16 +38,22 @@ export const NO_CUES: DecorCues = { working: new Set(), awaitingPresident: false
 /**
  * The members of a department at work have the desk-work mood (ambient.ambientMoodOf: working or
  * busy), and the king fidgets exactly while PRs wait for him. かなめ's desk work (PRs to review)
- * moves no thing: she has none of her own.
+ * moves no thing: she has none of her own. A department's things move only while its member is at
+ * the seat (`members`, director.isAtSeat): not while they walk in a scene or are out playing
+ * (Issue #29). The hourglass and the banners do not look at anyone's seat: the hourglass is the
+ * king's sign (he never leaves the throne), and a banner hangs on the wall of its side of the room
+ * for a cleared quest, whose confetti flies over the seat wherever its member is.
  */
 export function decorCuesOf(
   moods: AmbientMoods,
   bursts: readonly { readonly actor: MemberId; readonly start: number }[],
   now: number,
+  members: readonly { readonly id: MemberId; readonly atSeat: boolean }[],
 ): DecorCues {
+  const seated = new Set(members.filter((m) => m.atSeat).map((m) => m.id));
   const working = new Set<MemberId>();
   for (const id of ['minori', 'hibiki', 'hirame', 'sasae'] as const) {
-    if (moods[id] === 'desk-work') working.add(id);
+    if (moods[id] === 'desk-work' && seated.has(id)) working.add(id);
   }
   // Only the confetti flying now: one still to come must not stop a banner already fluttering.
   const clearedAt: Partial<Record<MemberId, number>> = {};

@@ -8,7 +8,7 @@
       "vue",
       "ts"
     ],
-    "complete": false,
+    "complete": true,
     "size": {
       "files": 158,
       "sloc": 8255,
@@ -18,8 +18,8 @@
       {
         "dimension": "architecture",
         "status": "experimental",
-        "score": 75.94,
-        "coverage": 0.75,
+        "score": 69.455,
+        "coverage": 1,
         "metrics": [
           {
             "metric": "knip.unused_export_ratio",
@@ -30,7 +30,7 @@
               "bad": 0.2
             },
             "weight": 0.3,
-            "points": 15.94
+            "points": 11.955
           },
           {
             "metric": "knip.unused_file_ratio",
@@ -41,7 +41,7 @@
               "bad": 0.3
             },
             "weight": 0.25,
-            "points": 33.3333
+            "points": 25
           },
           {
             "metric": "knip.unused_dependencies",
@@ -52,18 +52,18 @@
               "bad": 10
             },
             "weight": 0.2,
-            "points": 26.6667
+            "points": 20
           },
           {
             "metric": "circular.cycle_count",
-            "value": 0,
-            "state": "skipped",
+            "value": 4,
+            "state": "ok",
             "scale": {
               "good": 0,
               "bad": 8
             },
             "weight": 0.25,
-            "points": 0
+            "points": 12.5
           }
         ],
         "confidence": "high",
@@ -112,11 +112,11 @@
                 "value": 5
               },
               {
-                "file": "apps/web/src/render/trinkets.test.ts",
+                "file": "apps/web/src/audio/scores.test.ts",
                 "value": 4
               },
               {
-                "file": "apps/web/src/audio/scores.test.ts",
+                "file": "apps/web/src/render/trinkets.test.ts",
                 "value": 4
               }
             ]
@@ -372,11 +372,11 @@
                 "value": 5
               },
               {
-                "file": "apps/web/src/render/trinkets.test.ts",
+                "file": "apps/web/src/audio/scores.test.ts",
                 "value": 4
               },
               {
-                "file": "apps/web/src/audio/scores.test.ts",
+                "file": "apps/web/src/render/trinkets.test.ts",
                 "value": 4
               }
             ]
@@ -431,7 +431,7 @@
       {
         "dimension": "test-coverage",
         "status": "experimental",
-        "score": 88.578,
+        "score": 88.3666,
         "coverage": 1,
         "metrics": [
           {
@@ -447,36 +447,36 @@
           },
           {
             "metric": "coverage.line_pct",
-            "value": 76.64,
+            "value": 76.26,
             "state": "ok",
             "scale": {
               "good": 90,
               "bad": 40
             },
             "weight": 0.3,
-            "points": 21.984
+            "points": 21.756
           },
           {
             "metric": "coverage.branch_pct",
-            "value": 84.45,
+            "value": 84.81,
             "state": "ok",
             "scale": {
               "good": 85,
               "bad": 30
             },
             "weight": 0.25,
-            "points": 24.75
+            "points": 24.9136
           },
           {
             "metric": "coverage.function_pct",
-            "value": 79.48,
+            "value": 78.99,
             "state": "ok",
             "scale": {
               "good": 90,
               "bad": 40
             },
             "weight": 0.15,
-            "points": 11.844
+            "points": 11.697
           }
         ],
         "confidence": "high",
@@ -666,9 +666,10 @@
       "test-presence.test_to_source_ratio": 1.1545,
       "test-presence.test_sloc": 9530,
       "test-presence.test_file_count": 69,
-      "coverage.line_pct": 76.64,
-      "coverage.branch_pct": 84.45,
-      "coverage.function_pct": 79.48,
+      "coverage.line_pct": 76.26,
+      "coverage.branch_pct": 84.81,
+      "coverage.function_pct": 78.99,
+      "circular.cycle_count": 4,
       "readme-contract.has_readme": 1,
       "readme-contract.readme_words": 359,
       "comment-quality.marker_per_kloc": 0,
@@ -714,7 +715,7 @@
       {
         "rule": "oxlint/no-await-in-loop",
         "severity": "warning",
-        "file": "packages/collector/src/run.test.ts",
+        "file": "packages/collector/src/run.ts",
         "line": 1,
         "message": "Unexpected `await` inside a loop.",
         "probe": "oxlint",
@@ -724,7 +725,7 @@
       {
         "rule": "oxlint/no-await-in-loop",
         "severity": "warning",
-        "file": "packages/collector/src/collect.test.ts",
+        "file": "packages/collector/src/run.ts",
         "line": 1,
         "message": "Unexpected `await` inside a loop.",
         "probe": "oxlint",
@@ -732,11 +733,11 @@
         "tier": 0
       },
       {
-        "rule": "oxlint/consistent-function-scoping",
+        "rule": "oxlint/no-await-in-loop",
         "severity": "warning",
-        "file": "apps/web/src/app/guildView.test.ts",
+        "file": "packages/collector/src/run.test.ts",
         "line": 1,
-        "message": "Function `live` does not capture any variables from its parent scope",
+        "message": "Unexpected `await` inside a loop.",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -762,11 +763,41 @@
         "tier": 0
       },
       {
-        "rule": "oxlint/consistent-function-scoping",
+        "rule": "oxlint/no-array-sort",
         "severity": "warning",
-        "file": "packages/collector/src/sessions.test.ts",
+        "file": "apps/web/src/audio/scores.test.ts",
         "line": 1,
-        "message": "Function `entry` does not capture any variables from its parent scope",
+        "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-useless-spread",
+        "severity": "error",
+        "file": "apps/web/src/audio/scores.test.ts",
+        "line": 1,
+        "message": "Using a spread operator here creates a new array unnecessarily.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-array-sort",
+        "severity": "warning",
+        "file": "apps/web/src/audio/scores.test.ts",
+        "line": 1,
+        "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-useless-spread",
+        "severity": "error",
+        "file": "apps/web/src/audio/scores.test.ts",
+        "line": 1,
+        "message": "Using a spread operator here creates a new array unnecessarily.",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -774,49 +805,9 @@
       {
         "rule": "oxlint/consistent-function-scoping",
         "severity": "warning",
-        "file": "packages/collector/src/sessions.test.ts",
+        "file": "apps/web/src/app/guildView.test.ts",
         "line": 1,
-        "message": "Function `watchedFile` does not capture any variables from its parent scope",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-await-in-loop",
-        "severity": "warning",
-        "file": "packages/collector/src/sessions.test.ts",
-        "line": 1,
-        "message": "Unexpected `await` inside a loop.",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-await-in-loop",
-        "severity": "warning",
-        "file": "packages/collector/src/limit.test.ts",
-        "line": 1,
-        "message": "Unexpected `await` inside a loop.",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-await-in-loop",
-        "severity": "warning",
-        "file": "packages/collector/src/limit.test.ts",
-        "line": 1,
-        "message": "Unexpected `await` inside a loop.",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-await-in-loop",
-        "severity": "warning",
-        "file": "packages/collector/src/limit.test.ts",
-        "line": 1,
-        "message": "Unexpected `await` inside a loop.",
+        "message": "Function `live` does not capture any variables from its parent scope",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -842,11 +833,41 @@
         "tier": 0
       },
       {
-        "rule": "oxlint/no-array-sort",
+        "rule": "oxlint/consistent-function-scoping",
         "severity": "warning",
-        "file": "apps/web/src/render/trinkets.test.ts",
+        "file": "apps/web/src/render/director.test.ts",
         "line": 1,
-        "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
+        "message": "Function `drawnAt` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/director.test.ts",
+        "line": 1,
+        "message": "Function `member` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/director.test.ts",
+        "line": 1,
+        "message": "Function `member` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/director.test.ts",
+        "line": 1,
+        "message": "Function `member` does not capture any variables from its parent scope",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -854,27 +875,7 @@
       {
         "rule": "oxlint/no-array-sort",
         "severity": "warning",
-        "file": "apps/web/src/render/trinkets.test.ts",
-        "line": 1,
-        "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-array-sort",
-        "severity": "warning",
-        "file": "apps/web/src/render/trinkets.test.ts",
-        "line": 1,
-        "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-array-sort",
-        "severity": "warning",
-        "file": "apps/web/src/render/trinkets.test.ts",
+        "file": "apps/web/src/render/director.test.ts",
         "line": 1,
         "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
         "probe": "oxlint",
@@ -894,9 +895,9 @@
       {
         "rule": "oxlint/consistent-function-scoping",
         "severity": "warning",
-        "file": "apps/web/src/render/layers.test.ts",
+        "file": "apps/web/src/render/trinkets.papers.test.ts",
         "line": 1,
-        "message": "Function `layer` does not capture any variables from its parent scope",
+        "message": "Function `look` does not capture any variables from its parent scope",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -904,9 +905,9 @@
       {
         "rule": "oxlint/consistent-function-scoping",
         "severity": "warning",
-        "file": "apps/web/src/render/layers.test.ts",
+        "file": "apps/web/src/domain/party.test.ts",
         "line": 1,
-        "message": "Function `member` does not capture any variables from its parent scope",
+        "message": "Function `input` does not capture any variables from its parent scope",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -914,79 +915,9 @@
       {
         "rule": "oxlint/consistent-function-scoping",
         "severity": "warning",
-        "file": "apps/web/src/render/layers.test.ts",
+        "file": "apps/web/src/domain/party.test.ts",
         "line": 1,
-        "message": "Function `names` does not capture any variables from its parent scope",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-array-sort",
-        "severity": "warning",
-        "file": "apps/web/src/render/layers.test.ts",
-        "line": 1,
-        "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-array-sort",
-        "severity": "warning",
-        "file": "apps/web/src/render/layers.test.ts",
-        "line": 1,
-        "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-array-sort",
-        "severity": "warning",
-        "file": "apps/web/src/render/layers.test.ts",
-        "line": 1,
-        "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-array-sort",
-        "severity": "warning",
-        "file": "apps/web/src/render/layers.test.ts",
-        "line": 1,
-        "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-array-sort",
-        "severity": "warning",
-        "file": "apps/web/src/render/layers.test.ts",
-        "line": 1,
-        "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/no-array-sort",
-        "severity": "warning",
-        "file": "apps/web/src/render/layers.test.ts",
-        "line": 1,
-        "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/prefer-set-has",
-        "severity": "warning",
-        "file": "apps/web/src/render/bubbles.test.ts",
-        "line": 1,
-        "message": "should be a `Set`, and use `.has()` to check existence or non-existence.",
+        "message": "Function `minori` does not capture any variables from its parent scope",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -994,19 +925,9 @@
       {
         "rule": "oxlint/consistent-function-scoping",
         "severity": "warning",
-        "file": "apps/web/src/render/decor.test.ts",
+        "file": "apps/web/src/render/map.test.ts",
         "line": 1,
-        "message": "Function `working` does not capture any variables from its parent scope",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/prefer-set-has",
-        "severity": "warning",
-        "file": "apps/web/src/render/decor.test.ts",
-        "line": 1,
-        "message": "should be a `Set`, and use `.has()` to check existence or non-existence.",
+        "message": "Function `byName` does not capture any variables from its parent scope",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -1014,9 +935,29 @@
       {
         "rule": "oxlint/no-array-sort",
         "severity": "warning",
-        "file": "apps/web/src/render/decor.test.ts",
+        "file": "apps/web/src/render/map.test.ts",
         "line": 1,
         "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-array-sort",
+        "severity": "warning",
+        "file": "apps/web/src/render/map.test.ts",
+        "line": 1,
+        "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/app/lastActive.test.ts",
+        "line": 1,
+        "message": "Function `setup` does not capture any variables from its parent scope",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -1024,7 +965,7 @@
       {
         "rule": "oxlint/no-await-in-loop",
         "severity": "warning",
-        "file": "packages/collector/src/run.ts",
+        "file": "packages/collector/src/limit.test.ts",
         "line": 1,
         "message": "Unexpected `await` inside a loop.",
         "probe": "oxlint",
@@ -1034,7 +975,7 @@
       {
         "rule": "oxlint/no-await-in-loop",
         "severity": "warning",
-        "file": "packages/collector/src/run.ts",
+        "file": "packages/collector/src/limit.test.ts",
         "line": 1,
         "message": "Unexpected `await` inside a loop.",
         "probe": "oxlint",
@@ -1042,9 +983,39 @@
         "tier": 0
       },
       {
+        "rule": "oxlint/no-await-in-loop",
+        "severity": "warning",
+        "file": "packages/collector/src/limit.test.ts",
+        "line": 1,
+        "message": "Unexpected `await` inside a loop.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "packages/collector/src/sessionFiles.test.ts",
+        "line": 1,
+        "message": "Function `id` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/app/guildStore.events.test.ts",
+        "line": 1,
+        "message": "Function `heads` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
         "rule": "oxlint/no-array-sort",
         "severity": "warning",
-        "file": "apps/web/src/render/idleSpots.ts",
+        "file": "packages/collector/src/links.ts",
         "line": 1,
         "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
         "probe": "oxlint",
@@ -1054,39 +1025,19 @@
       {
         "rule": "oxlint/consistent-function-scoping",
         "severity": "warning",
-        "file": "apps/web/src/render/path.test.ts",
+        "file": "apps/web/src/render/idle.ts",
         "line": 1,
-        "message": "Function `walkable` does not capture any variables from its parent scope",
+        "message": "Function `same` does not capture any variables from its parent scope",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
       },
       {
-        "rule": "oxlint/consistent-function-scoping",
+        "rule": "oxlint/no-array-reverse",
         "severity": "warning",
-        "file": "apps/web/src/render/path.test.ts",
+        "file": "apps/web/src/render/idle.ts",
         "line": 1,
-        "message": "Function `walkable` does not capture any variables from its parent scope",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/consistent-function-scoping",
-        "severity": "warning",
-        "file": "packages/snapshot/src/settings.test.ts",
-        "line": 1,
-        "message": "Function `twice` does not capture any variables from its parent scope",
-        "probe": "oxlint",
-        "dimension": "correctness",
-        "tier": 0
-      },
-      {
-        "rule": "oxlint/consistent-function-scoping",
-        "severity": "warning",
-        "file": "packages/snapshot/src/settings.test.ts",
-        "line": 1,
-        "message": "Function `paths` does not capture any variables from its parent scope",
+        "message": "Use `Array#toReversed()` instead of `Array#reverse()`.",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -1094,7 +1045,7 @@
       {
         "rule": "oxlint/no-map-spread",
         "severity": "warning",
-        "file": "packages/snapshot/src/settings.test.ts",
+        "file": "apps/web/src/audio/judge.test.ts",
         "line": 1,
         "message": "Spreading to modify object properties in `map` calls is inefficient",
         "probe": "oxlint",
@@ -1102,11 +1053,61 @@
         "tier": 0
       },
       {
-        "rule": "oxlint/no-map-spread",
+        "rule": "oxlint/no-shadow",
         "severity": "warning",
-        "file": "packages/snapshot/src/settings.test.ts",
+        "file": "apps/web/src/render/ambient.ts",
         "line": 1,
-        "message": "Spreading to modify object properties in `map` calls is inefficient",
+        "message": "'seed' is already declared in the upper scope.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-shadow",
+        "severity": "warning",
+        "file": "apps/web/src/render/ambient.ts",
+        "line": 1,
+        "message": "'seed' is already declared in the upper scope.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-await-in-loop",
+        "severity": "warning",
+        "file": "packages/collector/src/limit.ts",
+        "line": 1,
+        "message": "Unexpected `await` inside a loop.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-await-in-loop",
+        "severity": "warning",
+        "file": "packages/collector/src/collect.test.ts",
+        "line": 1,
+        "message": "Unexpected `await` inside a loop.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/ambient.test.ts",
+        "line": 1,
+        "message": "Function `at` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-array-reverse",
+        "severity": "warning",
+        "file": "packages/snapshot/src/index.test.ts",
+        "line": 1,
+        "message": "Use `Array#toReversed()` instead of `Array#reverse()`.",
         "probe": "oxlint",
         "dimension": "correctness",
         "tier": 0
@@ -1324,16 +1325,6 @@
       {
         "rule": "unused-export",
         "severity": "warning",
-        "file": "apps/web/src/app/messageQueue.ts",
-        "line": 1,
-        "message": "`nextShowAt` is exported but never imported",
-        "probe": "knip",
-        "dimension": "architecture",
-        "tier": 1
-      },
-      {
-        "rule": "unused-export",
-        "severity": "warning",
         "file": "apps/web/src/audio/judge.ts",
         "line": 1,
         "message": "`EVENT_CUES` is exported but never imported",
@@ -1357,6 +1348,16 @@
         "file": "apps/web/src/domain/baseline.ts",
         "line": 1,
         "message": "`baselineSchema` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "apps/web/src/app/messageQueue.ts",
+        "line": 1,
+        "message": "`nextShowAt` is exported but never imported",
         "probe": "knip",
         "dimension": "architecture",
         "tier": 1
@@ -1408,6 +1409,46 @@
         "line": 1,
         "message": "`FRAMES_WITH_HOLDS` is exported but never imported",
         "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "circular-dependency",
+        "severity": "warning",
+        "file": "apps/web/src/render/ambient.ts",
+        "line": 1,
+        "message": "import cycle: apps/web/src/render/ambient.ts → apps/web/src/render/confetti.ts → apps/web/src/render/path.ts → apps/web/src/render/map.ts → apps/web/src/render/decor.ts → apps/web/src/render/ambient.ts",
+        "probe": "circular",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "circular-dependency",
+        "severity": "warning",
+        "file": "apps/web/src/render/map.ts",
+        "line": 1,
+        "message": "import cycle: apps/web/src/render/map.ts → apps/web/src/render/decor.ts → apps/web/src/render/map.ts",
+        "probe": "circular",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "circular-dependency",
+        "severity": "warning",
+        "file": "apps/web/src/render/ambient.ts",
+        "line": 1,
+        "message": "import cycle: apps/web/src/render/ambient.ts → apps/web/src/render/confetti.ts → apps/web/src/render/path.ts → apps/web/src/render/map.ts → apps/web/src/render/decor.ts → apps/web/src/render/trinkets.ts → apps/web/src/render/ambient.ts",
+        "probe": "circular",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "circular-dependency",
+        "severity": "warning",
+        "file": "apps/web/src/render/path.ts",
+        "line": 1,
+        "message": "import cycle: apps/web/src/render/path.ts → apps/web/src/render/map.ts → apps/web/src/render/decor.ts → apps/web/src/render/trinkets.ts → apps/web/src/render/path.ts",
+        "probe": "circular",
         "dimension": "architecture",
         "tier": 1
       },
@@ -1590,10 +1631,11 @@
       {
         "probe": "circular",
         "status": {
-          "kind": "skipped",
-          "reason": "madge produced no readable report"
+          "kind": "ok"
         },
-        "tools": []
+        "tools": [
+          "madge"
+        ]
       },
       {
         "probe": "readme-contract",
@@ -1622,13 +1664,14 @@
       "jscpd": "4.3.0",
       "typescript": "6.0.3",
       "knip": "6.41.0",
-      "npm": "11.19.1"
+      "npm": "11.19.1",
+      "madge": "8.0.0"
     },
     "overall": {
-      "score": 81.4751,
+      "score": 80.7311,
       "scoredDimensions": 9,
       "comparable": false
     }
   },
-  "createdAt": "2026-10-12T03:44:30.236Z"
+  "createdAt": "2026-10-12T05:07:24.948Z"
 }
