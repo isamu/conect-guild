@@ -71,7 +71,7 @@ function stayLines(name: string, spot: PlaySpot): LineGroup {
     case 'tea':
       return [`${name}は おちゃを のんで ひといき ついている。`];
     case 'pet':
-      return [`${name}は ${PET_NAME}を なでている。`];
+      return [`${name}は ${PET_NAME}と あそんでいる。`];
     case 'window':
       return [`${name}は まどの そとを ながめている。`];
     case 'chat': {
