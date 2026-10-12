@@ -16,6 +16,7 @@ import { DEMO_LANES, DEMO_RECEPTION_TITLES, DEMO_SCRIPT, DEMO_TITLES } from './d
 import { diffSnapshot, type GuildEvent } from './events';
 import { isRuleChangePath } from './party';
 import { readSessions, summonedMembers } from './summons';
+import { countXp, levelOf } from './xp';
 
 const NOW = Date.parse('2026-10-12T03:00:00.000Z');
 const STEP_MS = 1_000;
@@ -217,5 +218,25 @@ describe('ruleChangeFile', () => {
 
   it('every lane is a known one', () => {
     for (const beat of DEMO_SCRIPT) expect(DEMO_LANES).toContain(beat.lane);
+  });
+});
+
+describe('the levels of the demo (Issue #19)', () => {
+  it('starts everybody above level 1 from the made-up past', () => {
+    const xp = countXp(at(0));
+    expect(levelOf(xp.kaname.xp).level).toBeGreaterThan(1);
+    for (const tally of xp.departments.values()) expect(levelOf(tally.xp).level).toBeGreaterThan(1);
+  });
+
+  it('adds a clear and a merge to each department that carried a quest in the loop', () => {
+    const before = countXp(at(0));
+    const after = countXp(at(DEMO_LOOP_MS - 1));
+    const carried = [laneDepartments(0).quest1, laneDepartments(0).quest2];
+    for (const [label, tally] of after.departments) {
+      const gain = tally.xp - (before.departments.get(label)?.xp ?? 0);
+      expect(gain, label).toBe(carried.includes(label) ? 15 : 0);
+    }
+    // かなめ: 3 for each scroll handed out.
+    expect(after.kaname.xp - before.kaname.xp).toBe(6);
   });
 });

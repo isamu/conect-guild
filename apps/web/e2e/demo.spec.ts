@@ -44,6 +44,13 @@ test('?demo=1 plays the fictional script with sound, never reading /snapshot.jso
   // The click let the browser play: the scroll's sound rang.
   await expect.poll(() => page.evaluate(() => window.e2eStartedTones)).toBeGreaterThan(0);
 
+  // The levels (Issue #19) come from the demo's made-up history: everybody but the king has one.
+  const party = page.getByRole('region', { name: 'パーティのようす' });
+  const rows = party.getByRole('listitem');
+  await expect(rows).toHaveCount(6);
+  for (const i of [0, 1, 2, 3, 4]) await expect(rows.nth(i)).toContainText(/Lv \d+/);
+  await expect(rows.nth(5)).toContainText('おうさま');
+
   // Nothing of the demo is kept in localStorage.
   const keys = await page.evaluate(() => Object.keys(localStorage));
   expect(keys.filter((key) => key.startsWith('conect-guild:'))).toEqual([]);
