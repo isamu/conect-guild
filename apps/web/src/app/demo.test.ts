@@ -6,6 +6,13 @@ import { createGuildStore } from './guildStore';
 
 const START = Date.parse('2026-10-12T03:00:00.000Z');
 
+/** The level-ups of the demo's first loop (domain/demo.ts's made-up past, Issue #19). */
+const FIRST_LOOP_LEVEL_UPS = [
+  'かなめは レベル 6 に あがった！',
+  'みのりは レベル 7 に あがった！',
+  'ひらめは レベル 6 に あがった！',
+];
+
 describe('isDemoQuery', () => {
   it('is on for demo=1 only', () => {
     expect(isDemoQuery('?demo=1')).toBe(true);
@@ -92,11 +99,13 @@ describe('the demo session', () => {
     demo.setStageShown(true);
     demo.start();
     await run(2 * DEMO_LOOP_MS);
-    // Two loops: six messages each, all from the fictional script.
-    expect(heads).toHaveLength(12);
+    // Two loops: six messages each, all from the fictional script, and three level-ups in the
+    // first (Issue #19). They hold the window longer, so the last clear still waits its turn.
+    expect(heads).toHaveLength(14);
     expect(heads[0]).toContain('「10 月分の請求書を作る」');
     expect(heads.some((text) => text.includes('クリアした！'))).toBe(true);
-    expect(heads[6]).toContain('「秋の講座の告知文を書く」');
+    expect(heads.filter((text) => text.includes('あがった！'))).toEqual(FIRST_LOOP_LEVEL_UPS);
+    expect(heads[9]).toContain('「秋の講座の告知文を書く」');
     expect(store.state.halted).toBe(false);
     expect(store.state.effectsAvailable).toBe(true);
     expect(store.state.summons?.members).toBeDefined();

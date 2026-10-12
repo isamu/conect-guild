@@ -151,10 +151,13 @@ describe('what the screen makes of the demo', () => {
     expect(events.map((e) => `${e.kind} ${String(e.department)}`)).toEqual([
       'issue-opened 経理',
       'issue-opened 企画',
+      'level-up null',
       'pr-merged 経理',
+      'level-up 経理',
       'issue-closed 経理',
       'pr-merged 企画',
       'issue-closed 企画',
+      'level-up 企画',
     ]);
     const next = eventsBetween(DEMO_LOOP_MS - 1, 2 * DEMO_LOOP_MS - 1);
     expect(next.map((e) => `${e.kind} ${String(e.department)}`)).toEqual([
@@ -238,5 +241,36 @@ describe('the levels of the demo (Issue #19)', () => {
     }
     // かなめ: 3 for each scroll handed out.
     expect(after.kaname.xp - before.kaname.xp).toBe(6);
+  });
+});
+
+/** Each level-up of the demo in its first `loops` loops: when (s from はじめる), who, which level. */
+function levelUpsOver(loops: number): string[] {
+  let baseline = toBaseline(at(0));
+  const found: string[] = [];
+  // Half the step of the other tests: the script's beats are on half seconds.
+  for (let t = STEP_MS / 2; t <= loops * DEMO_LOOP_MS; t += STEP_MS / 2) {
+    const diff = diffSnapshot(baseline, at(t));
+    for (const e of diff.events.filter((event) => event.kind === 'level-up'))
+      found.push(`${String(t / 1000)}s ${String(e.department)} Lv ${String(e.number)}`);
+    if (diff.baselineUpdate.action === 'replace') baseline = diff.baselineUpdate.baseline;
+  }
+  return found;
+}
+
+describe('level-ups in the demo (Issue #19)', () => {
+  it('shows three in the first loop, one by one: a scroll, a chest, a clear', () => {
+    expect(levelUpsOver(1)).toEqual(['13.5s null Lv 6', '27s 経理 Lv 7', '57.5s 企画 Lv 6']);
+  });
+
+  it('then only now and then: in the 4th, 6th, 9th (two), 11th and 12th loops of twelve', () => {
+    expect(levelUpsOver(12).slice(3)).toEqual([
+      '207s 広報 Lv 6',
+      '357.5s 総務 Lv 7',
+      '520s 経理 Lv 8',
+      '537.5s 企画 Lv 7',
+      '613.5s null Lv 7',
+      '687s 広報 Lv 7',
+    ]);
   });
 });
