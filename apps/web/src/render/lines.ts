@@ -1,6 +1,6 @@
 import type { MemberId } from '../guild.config';
 import type { Random } from './confetti';
-import { linesOf, sceneOfLine, type LineScene, type SpokenLine } from './lineBook';
+import { hasOwnLines, linesOf, sceneOfLine, type LineScene, type SpokenLine } from './lineBook';
 import { LINES } from './metrics';
 
 /**
@@ -53,6 +53,17 @@ const SHOW_MS: Readonly<Record<LineScene, number>> = {
   awaitPresident: LINES.remarkMs,
   awaitKaname: LINES.remarkMs,
   awaitPermission: LINES.remarkMs,
+  work: LINES.murmurMs,
+  idle: LINES.murmurMs,
+  doze: LINES.murmurMs,
+  sleepTalk: LINES.murmurMs,
+  tea: LINES.murmurMs,
+  pet: LINES.murmurMs,
+  chat: LINES.murmurMs,
+  windowMorning: LINES.murmurMs,
+  windowDay: LINES.murmurMs,
+  windowEvening: LINES.murmurMs,
+  windowNight: LINES.murmurMs,
 };
 
 /** How long a line of `scene` shows. */
@@ -101,6 +112,15 @@ export interface LinePicker {
   saw(lines: readonly Utterance[], now: number): void;
 }
 
+/**
+ * Where the last lines seen of `actor` at `scene` are kept: per member and moment, but the shared
+ * lines (lineBook.SHARED_LINES) for everyone at once, so one member does not say again what another
+ * has just said there.
+ */
+function memoryKey(actor: MemberId, scene: LineScene): string {
+  return hasOwnLines(actor, scene) ? `${actor}:${scene}` : `shared:${scene}`;
+}
+
 /** Picks from the line book, remembering the last lines seen of each member at each moment. */
 export function createLinePicker(random: Random): LinePicker {
   const memory = new Map<string, readonly SpokenLine[]>();
@@ -108,14 +128,14 @@ export function createLinePicker(random: Random): LinePicker {
   const seen = new Map<string, number>();
   return {
     pick: (actor, scene, pending) =>
-      pickLine(linesOf(actor, scene), memory.get(`${actor}:${scene}`) ?? [], random, pending),
+      pickLine(linesOf(actor, scene), memory.get(memoryKey(actor, scene)) ?? [], random, pending),
     saw(lines, now) {
       for (const said of lines) {
         const id = `${said.actor}@${String(said.start)}`;
         const scene = sceneOfLine(said.actor, said.line);
         if (seen.has(id) || scene === null) continue;
         seen.set(id, said.end);
-        const key = `${said.actor}:${scene}`;
+        const key = memoryKey(said.actor, scene);
         memory.set(key, remember(memory.get(key) ?? [], said.line));
       }
       for (const [id, end] of seen) if (end <= now) seen.delete(id);

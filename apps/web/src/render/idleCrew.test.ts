@@ -191,3 +191,19 @@ describe('createIdleCrew: poses (Issue #47)', () => {
     expect(active).not.toEqual([]);
   });
 });
+
+describe('createIdleCrew: activities (murmurs)', () => {
+  it('tells what each member in a long idle spell does now, with the wall time', () => {
+    const { crew, clock, outing } = playing('minori');
+    const now = crew.activities();
+    expect(now.wall).toBe(clock.wall);
+    expect(now.activities.minori).toEqual({ kind: 'play', outing });
+    expect(now.activities.hibiki).toBeUndefined();
+  });
+
+  it('notes nobody active', () => {
+    const { crew, active } = playing('minori');
+    crew.activities();
+    expect(active).toEqual([]);
+  });
+});

@@ -246,7 +246,8 @@ function drawOverheadOf(
 /**
  * Over everything, after the shade of the night (drawDaylight.ts), so they read the same at any
  * hour: one thing over each head (overhead.ts: the words of the king's summons, a line of a scene,
- * a line on starting to wait, the waiting bubble or the sign of a long idle spell), and confetti.
+ * a line on starting to wait, the waiting bubble, a murmur or the sign of a long idle spell), and
+ * confetti.
  */
 export function drawOverhead(
   ctx: CanvasRenderingContext2D,
@@ -256,6 +257,8 @@ export function drawOverhead(
     readonly speeches: Speeches;
     /** Lines on starting to wait (remarks.ts). */
     readonly remarks: SpokenLines;
+    /** Murmurs while nothing happens (murmurs.ts). */
+    readonly murmurs: SpokenLines;
     /** The 「Lv N」 tags on the desks, which words go over (overhead.overheadLift). */
     readonly tags: readonly LevelTag[];
   },

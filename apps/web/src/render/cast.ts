@@ -8,6 +8,15 @@ import type { IdleSeeds, IdleSince } from './idle';
 import { createIdleCrew, type IdleCrew } from './idleCrew';
 import type { LinePicker, PickLine, SpokenLines } from './lines';
 import {
+  murmurMoment,
+  murmursAt,
+  NO_MURMURS,
+  seenMurmurs,
+  stepMurmurs,
+  type MurmurFrame,
+  type Murmurs,
+} from './murmurs';
+import {
   isFree,
   isRemarking,
   NO_REMARKS,
@@ -24,12 +33,14 @@ import { decorCuesOf, type DecorCues } from './trinkets';
 
 /**
  * The render loop's cast (render/loop.ts): the members' small moves and long idle spells over the
- * director's scenes, the king's calls, and the lines on starting to wait (remarks.ts, Issue #47).
+ * director's scenes, the king's calls, the lines on starting to wait (remarks.ts) and the murmurs
+ * (murmurs.ts, Issue #47).
  */
 
 /** What the cast takes of a party (loop.StageParty). */
 export interface CastParty extends RemarkParty {
   readonly idleSince: IdleSince;
+  readonly moods: AmbientMoods;
 }
 
 export interface Cast {
@@ -49,7 +60,12 @@ export interface Cast {
     t: number,
     view: Pick<CallView, 'frame' | 'speeches'>,
   ): { readonly remarks: SpokenLines; readonly remarking: boolean };
-  /** Drops the remarks said and to come (the canvas is out of sight). */
+  /**
+   * The murmur of a frame (murmurs.ts), which a busy stage puts off, noting it if seen over the
+   * head in `view` (murmurs.seenMurmurs).
+   */
+  murmursAt(frame: MurmurFrame, view: Pick<CallView, 'frame' | 'speeches'>): SpokenLines;
+  /** Drops the remarks said and to come, and the murmurs start over (the canvas is out of sight). */
   silence(): void;
 }
 
@@ -77,6 +93,7 @@ export function createCast(
   });
   const calls = createCalls(options);
   let remarks: Remarks = NO_REMARKS;
+  let murmurs: Murmurs = NO_MURMURS;
   return {
     crew,
     calls,
@@ -93,8 +110,17 @@ export function createCast(
       remarks = pruneRemarks(remarks, t);
       return { remarks: remarksAt(remarks, t), remarking: isRemarking(remarks, t) };
     },
+    murmursAt: (frame, view) => {
+      murmurs = stepMurmurs(
+        murmurs,
+        murmurMoment(frame, () => crew.activities(), talk),
+      );
+      talk.saw(seenMurmurs(murmurs, frame, view), frame.t);
+      return murmursAt(murmurs, frame.t);
+    },
     silence: () => {
       remarks = silenced(remarks);
+      murmurs = NO_MURMURS;
     },
     frame: (director, t, moods) =>
       frameAt(director, t, DEFAULT_SEATS, {
@@ -107,24 +133,29 @@ export function createCast(
 }
 
 /**
- * What the stage shows at `t`: the members with the king's call, its words, the remarks, the small
- * things, and whether anything still moves or is to come.
+ * What the stage shows at `t` and `hour`: the members with the king's call, its words, the remarks,
+ * the murmurs, the small things, and whether anything still moves or is to come.
  */
 export function stageAt(
   cast: Cast,
   director: Director,
-  t: number,
-  moods: AmbientMoods,
+  at: { readonly t: number; readonly hour: number; readonly party: CastParty },
 ): CallView & {
+  readonly hour: number;
   readonly remarks: SpokenLines;
+  readonly murmurs: SpokenLines;
   readonly animating: boolean;
   readonly cues: DecorCues;
 } {
+  const { t, party } = at;
   // The king woken by the end of a call (onActive) never leaves the throne: `director` stays good.
-  const view = cast.calls.view(() => cast.frame(director, t, moods), t);
-  const cues = decorCuesOf(moods, director.bursts, t, view.frame.members);
+  const view = cast.calls.view(() => cast.frame(director, t, party.moods), t);
+  const cues = decorCuesOf(party.moods, director.bursts, t, view.frame.members);
   const { remarks, remarking } = cast.remarksAt(t, view);
-  return { ...view, remarks, animating: isAnimating(director, t) || remarking, cues };
+  const animating = isAnimating(director, t) || remarking;
+  const frame = { ...at, members: view.frame.members, busy: animating || view.calling };
+  const murmurs = cast.murmursAt(frame, view);
+  return { ...view, hour: at.hour, remarks, murmurs, animating, cues };
 }
 
 /**

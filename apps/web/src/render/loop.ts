@@ -64,7 +64,10 @@ export interface RenderLoopOptions {
   readonly random?: Random;
   /** Whether かなめ tosses a scroll (scenes.SceneContext.tossRandom); apart from `random`. */
   readonly tossRandom?: Random;
-  /** Which line a member says in a scene (lines.ts, Issue #47); apart from the other two. */
+  /**
+   * Which line a member says in a scene (lines.ts, Issue #47), whether they say one on starting
+   * to wait (remarks.ts), and who murmurs what when (murmurs.ts); apart from the other two.
+   */
   readonly lineRandom?: Random;
   readonly visibility?: PageVisibility;
   /** Epoch ms, for the long idle spells (idle.ts); they go on while the page is hidden. */
@@ -83,10 +86,13 @@ export interface StageParty {
   readonly idleSince: IdleSince;
   /**
    * The screen is halted (not live): the king's calls are dropped, to come or playing, and so are
-   * the lines of the scenes (lines.ts) and on starting to wait (remarks.ts).
+   * the lines of the scenes (lines.ts), on starting to wait (remarks.ts) and the murmurs (murmurs.ts).
    */
   readonly halted: boolean;
-  /** False before the first snapshot: nobody has started waiting by its empty party (remarks.ts). */
+  /**
+   * False before the first snapshot: nobody has started waiting by its empty party (remarks.ts),
+   * and nobody murmurs (murmurs.ts).
+   */
   readonly known: boolean;
   /** The members' levels, shown small under their seats (levelTags.ts). */
   readonly levels: Levels;
@@ -262,6 +268,7 @@ interface Moment {
   readonly bubbles: Bubbles;
   readonly speeches: Speeches;
   readonly remarks: SpokenLines;
+  readonly murmurs: SpokenLines;
   readonly cues: DecorCues;
   readonly levels: Levels;
 }
@@ -381,8 +388,8 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
 
   function draw(): void {
     const t = stageNow();
-    const { calling, ...stage } = stageAt(cast, director, t, party.moods);
-    paint(painter, scale, { ...party, ...stage, now: t, hour: localHour() });
+    const { calling, ...stage } = stageAt(cast, director, { t, hour: localHour(), party });
+    paint(painter, scale, { ...party, ...stage, now: t });
     director = seenAndPruned(context, director, { t, speeches: stage.speeches });
     // A call needs no more than the ambient pace: its words and turns change every few hundred ms.
     const ambient = Object.keys(party.moods).length > 0 || ANIMATED_DECOR.length > 0 || calling;

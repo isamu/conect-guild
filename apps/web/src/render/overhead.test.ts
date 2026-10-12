@@ -25,9 +25,12 @@ const ALL: OverheadSources = {
   lines: { minori: 'おまかせを' },
   remarks: { minori: 'ごしょうにんを' },
   bubbles: { minori: 'awaiting-president' },
+  murmurs: { minori: 'ぱちぱち…' },
 };
 
-function drop(...keys: ('speeches' | 'lines' | 'remarks' | 'bubbles')[]): OverheadSources {
+type Source = 'speeches' | 'lines' | 'remarks' | 'bubbles' | 'murmurs';
+
+function drop(...keys: Source[]): OverheadSources {
   return { ...ALL, ...Object.fromEntries(keys.map((key) => [key, {}])) };
 }
 
@@ -48,8 +51,13 @@ describe('overheadOf: one thing over a head, the first that is there', () => {
       { kind: 'bubble', bubble: 'awaiting-president' },
     ],
     [
-      'then the sign of an idle spell',
+      'then a murmur',
       drop('speeches', 'lines', 'remarks', 'bubbles'),
+      { kind: 'line', words: 'ぱちぱち…' },
+    ],
+    [
+      'then the sign of an idle spell',
+      drop('speeches', 'lines', 'remarks', 'bubbles', 'murmurs'),
       { kind: 'mark', mark: MARK },
     ],
   ])('%s', (_name, sources, expected) => {
@@ -58,7 +66,10 @@ describe('overheadOf: one thing over a head, the first that is there', () => {
 
   it('shows nothing when there is nothing', () => {
     expect(
-      overheadOf({ ...seated, mark: null }, drop('speeches', 'lines', 'remarks', 'bubbles')),
+      overheadOf(
+        { ...seated, mark: null },
+        drop('speeches', 'lines', 'remarks', 'bubbles', 'murmurs'),
+      ),
     ).toBeNull();
   });
 
@@ -82,8 +93,16 @@ describe('overheadOf: one thing over a head, the first that is there', () => {
       lines: { kaname: 'それっ！' },
       remarks: { sasae: 'おねがいね' },
       bubbles: { hibiki: 'awaiting-permission' },
+      murmurs: { hirame: 'メモメモ' },
     };
     expect(overheadOf({ ...seated, mark: null }, others)).toBeNull();
+  });
+});
+
+describe('overheadOf: murmurs (murmurs.ts)', () => {
+  it('hides a murmur in a scene: it is said out of scenes only', () => {
+    const inScene = { id: 'minori', inScene: true, mark: null } as const;
+    expect(overheadOf(inScene, drop('speeches', 'lines', 'remarks', 'bubbles'))).toBeNull();
   });
 });
 

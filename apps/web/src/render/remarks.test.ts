@@ -442,6 +442,7 @@ describe('remarks and the level-up (Issue #19)', () => {
         lines: frame.lines,
         remarks: remarksAt(talking, t),
         bubbles: {},
+        murmurs: {},
       };
       expect({ t, shown: overheadOf(member, sources) }).toEqual({ t, shown: null });
       expect(seenRemarks(talking, t, { frame, speeches: {} })).toEqual([]);

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { MemberId } from '../guild.config';
-import { LINE_BOOK, linesOf, sceneOfLine, type LineScene, type SpokenLine } from './lineBook';
+import {
+  hasOwnLines,
+  LINE_BOOK,
+  linesOf,
+  sceneOfLine,
+  SHARED_LINES,
+  type LineScene,
+  type SpokenLine,
+} from './lineBook';
 
 const MEMBERS: readonly MemberId[] = ['kaname', 'minori', 'hibiki', 'hirame', 'sasae', 'yukihiro'];
 const SCENES: readonly LineScene[] = [
@@ -14,6 +22,17 @@ const SCENES: readonly LineScene[] = [
   'awaitPresident',
   'awaitKaname',
   'awaitPermission',
+  'work',
+  'idle',
+  'doze',
+  'sleepTalk',
+  'tea',
+  'pet',
+  'chat',
+  'windowMorning',
+  'windowDay',
+  'windowEvening',
+  'windowNight',
 ];
 
 /** Every (member, moment, lines) in the book. */
@@ -70,6 +89,8 @@ describe('line book: each moment', () => {
         'toss',
         'awaitKaname',
         'awaitPermission',
+        'work',
+        'idle',
       ]),
     );
   });
@@ -85,6 +106,8 @@ describe('line book: each moment', () => {
           'awaitPresident',
           'awaitKaname',
           'awaitPermission',
+          'work',
+          'idle',
         ]),
       );
     },
@@ -98,8 +121,8 @@ describe('line book: each moment', () => {
     }
   });
 
-  it('lets the king react only to a clear', () => {
-    expect(Object.keys(LINE_BOOK.yukihiro)).toEqual(['seeClear']);
+  it('lets the king react only to a clear, and murmur on the throne and in his sleep', () => {
+    expect(Object.keys(LINE_BOOK.yukihiro)).toEqual(['seeClear', 'idle', 'sleepTalk']);
   });
 
   it('has nothing for a member at a moment they never speak at', () => {
@@ -109,6 +132,36 @@ describe('line book: each moment', () => {
     // かなめ never waits for the president's approval, and the king has no waiting bubble here.
     expect(linesOf('kaname', 'awaitPresident')).toEqual([]);
     expect(linesOf('yukihiro', 'awaitPermission')).toEqual([]);
+  });
+});
+
+describe('line book: murmurs', () => {
+  it('shares the play spots, dozing and sleeping, but the king talks in his sleep his own way', () => {
+    expect(new Set(Object.keys(SHARED_LINES))).toEqual(
+      new Set([
+        'tea',
+        'pet',
+        'chat',
+        'windowMorning',
+        'windowDay',
+        'windowEvening',
+        'windowNight',
+        'doze',
+        'sleepTalk',
+      ]),
+    );
+    expect(linesOf('minori', 'tea')).toEqual(SHARED_LINES.tea);
+    expect(hasOwnLines('minori', 'tea')).toBe(false);
+    expect(linesOf('yukihiro', 'sleepTalk')).toEqual(LINE_BOOK.yukihiro.sleepTalk);
+    expect(hasOwnLines('yukihiro', 'sleepTalk')).toBe(true);
+    expect(linesOf('sasae', 'sleepTalk')).toEqual(SHARED_LINES.sleepTalk);
+    expect(hasOwnLines('kaname', 'work')).toBe(true);
+  });
+
+  it('keeps every member’s name out of every line, even as a word (ひらめく)', () => {
+    for (const name of ['かなめ', 'みのり', 'ひびき', 'ひらめ', 'ささえ', 'ゆきひろ']) {
+      expect(ALL_LINES.filter((line) => line.includes(name))).toEqual([]);
+    }
   });
 });
 

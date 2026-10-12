@@ -133,6 +133,21 @@ describe('createLinePicker', () => {
     expect(sayNow(picker, 'minori', 'clear')).toBe(linesOf('minori', 'clear')[1]);
   });
 
+  it('remembers the shared lines for everyone: one member does not say what another just did', () => {
+    const picker = createLinePicker(() => 0);
+    const [first, second, third] = linesOf('minori', 'tea');
+    expect(sayNow(picker, 'minori', 'tea')).toBe(first);
+    expect(sayNow(picker, 'hibiki', 'tea')).toBe(second);
+    expect(sayNow(picker, 'kaname', 'tea')).toBe(third);
+  });
+
+  it('remembers the king’s own sleep talk apart from the shared one', () => {
+    const picker = createLinePicker(() => 0);
+    expect(sayNow(picker, 'sasae', 'sleepTalk')).toBe(linesOf('sasae', 'sleepTalk')[0]);
+    expect(sayNow(picker, 'yukihiro', 'sleepTalk')).toBe(linesOf('yukihiro', 'sleepTalk')[0]);
+    expect(sayNow(picker, 'minori', 'sleepTalk')).toBe(linesOf('minori', 'sleepTalk')[1]);
+  });
+
   it('says nothing (and draws no number) at a moment the member has no lines for', () => {
     let draws = 0;
     const picker = createLinePicker(() => {

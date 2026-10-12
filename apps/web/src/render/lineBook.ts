@@ -8,6 +8,9 @@ import type { MemberId } from '../guild.config';
  * katakana with a few signs, at most 7 characters (lines.test.ts checks every one); no names, so
  * renaming a member in guild.settings.ts never puts a wrong name in someone's mouth. Nothing that
  * reads as a fact about the company (its accounts, its posts).
+ *
+ * The murmurs (murmurs.ts) at the play spots, dozing and asleep are the same for everyone
+ * (SHARED_LINES), unless a member has lines of their own there (the king's sleep talk).
  */
 
 /** The moments of a scene someone speaks at. */
@@ -31,7 +34,24 @@ export type LineScene =
   /** Now waiting for かなめ's review; for かなめ, now with pull requests to review. */
   | 'awaitKaname'
   /** Now waiting for a permission in the session. */
-  | 'awaitPermission';
+  | 'awaitPermission'
+  /** A murmur at the desk with work to do (murmurs.ts). */
+  | 'work'
+  /** A murmur at the seat with nothing to do, awake; the king's, on the throne with nothing to approve. */
+  | 'idle'
+  /** A murmur dozing at the seat. */
+  | 'doze'
+  /** Talking in their sleep at the seat. */
+  | 'sleepTalk'
+  /** A murmur at a play spot (idleSpots.ts): beside the mugs, beside the pet, with a neighbour. */
+  | 'tea'
+  | 'pet'
+  | 'chat'
+  /** A murmur under the window, by the part of the day (daylight.dayPhaseOf). */
+  | 'windowMorning'
+  | 'windowDay'
+  | 'windowEvening'
+  | 'windowNight';
 
 /** At least one line for each moment a member has. */
 type Choices = readonly [string, ...string[]];
@@ -45,6 +65,8 @@ export const LINE_BOOK = {
     clear: ['かんりょうです', 'やりましたね', 'クリアです！'],
     awaitKaname: ['かくにんします', 'みておきますね', 'チェックします'],
     awaitPermission: ['よろしいですか', 'ごかくにんを！', 'きょかを…'],
+    work: ['てきぱきと！', 'じゅんばんに', 'ととのえて…', 'よし、つぎ'],
+    idle: ['ひまですね', 'つぎはまだかな', 'うけつけ、ヨシ', 'のんびりです'],
   },
   minori: {
     takeScroll: ['うけたまわり！', 'けいさんします', 'はい、きっちり', 'おまかせを'],
@@ -53,6 +75,8 @@ export const LINE_BOOK = {
     awaitPresident: ['ごしょうにんを', 'はんこください', 'おねがいします'],
     awaitKaname: ['みてください', 'かくにんを…', 'どうでしょう？'],
     awaitPermission: ['よいですか？', 'きょか、まだ？', 'おうかがいを'],
+    work: ['ぱちぱち…', 'あうかな…', 'よし、あった', 'きっちりと'],
+    idle: ['ふう…', 'のんびり…', 'せいとん、よし'],
   },
   hibiki: {
     takeScroll: ['まかせて！', 'きたきた！', 'いくよー！', 'よっしゃ！'],
@@ -61,6 +85,8 @@ export const LINE_BOOK = {
     awaitPresident: ['おうさま〜！', 'みてほしいな', 'しょうにん！'],
     awaitKaname: ['みてみて〜', 'どうかな？', 'おねがい！'],
     awaitPermission: ['いい？いい？', 'まだかな〜', 'ゴーサイン？'],
+    work: ['いいかんじ！', 'ノッてきた！', 'よし、いける', 'ラララ♪'],
+    idle: ['ひまだ〜', 'ふんふ〜ん♪', 'なにしよっか'],
   },
   hirame: {
     takeScroll: ['おもしろそう', 'かんがえます', 'ふむ、なるほど', 'いいですね'],
@@ -69,6 +95,8 @@ export const LINE_BOOK = {
     awaitPresident: ['おうさま、ぜひ', 'ごはんだんを', 'どうでしょう'],
     awaitKaname: ['みてもらお', 'どきどき…', 'いかがかな'],
     awaitPermission: ['いいのかな…', 'すすめても？', 'うーん、まつ'],
+    work: ['うーん…', 'もしかして…', 'メモメモ', 'ピンときた！'],
+    idle: ['ぼんやり…', 'ふと、おもう', 'くもみたい…'],
   },
   sasae: {
     takeScroll: ['まかせてね', 'しょうちです', 'やっておくね', 'はーい'],
@@ -77,23 +105,43 @@ export const LINE_BOOK = {
     awaitPresident: ['ごさいけつを', 'おねがいね', 'みてくださいね'],
     awaitKaname: ['みておいてね', 'たしかめてね', 'おねがいします'],
     awaitPermission: ['いいかしら？', 'まってますね', 'どうかしら？'],
+    work: ['せいり、せいり', 'こつこつと', 'ファイル、よし'],
+    idle: ['おそうじ、よし', 'へいわだね', 'おちゃにする？'],
   },
   yukihiro: {
     seeClear: ['みごとじゃ！', 'あっぱれ！', 'ほめてつかわす'],
+    idle: ['うむ', 'よきかな', 'へいわじゃのう', 'ふむふむ'],
+    sleepTalk: ['むにゃ…', 'もうたべられぬ', 'うむ…うむ…'],
   },
 } as const satisfies Readonly<Record<MemberId, Readonly<Partial<Record<LineScene, Choices>>>>>;
+
+/** The murmurs anyone says at a play spot, dozing or asleep (murmurs.ts). */
+export const SHARED_LINES = {
+  tea: ['ほっ…', 'おいしい', 'ずずっ'],
+  pet: ['かわいいね', 'よしよし', 'おすわり！'],
+  chat: ['それでね…', 'へえ〜！', 'ほんとに？', 'わかる〜'],
+  windowMorning: ['いいあさ', 'まぶしいな', 'あさだね〜'],
+  windowDay: ['いいてんき', 'ことりだ', 'ぽかぽか'],
+  windowEvening: ['ゆうやけだ', 'きれいだな', 'あかいそら'],
+  windowNight: ['ほしがきれい', 'しずかだね', 'つきだ…'],
+  doze: ['ねむ…', 'ふぁ〜', 'うと…うと…'],
+  sleepTalk: ['むにゃ…', 'すぴー…', 'あとすこし…'],
+} as const satisfies Readonly<Partial<Record<LineScene, Choices>>>;
 
 type Book = typeof LINE_BOOK;
 type LinesOf<M extends MemberId> = {
   [S in keyof Book[M]]: Book[M][S] extends readonly (infer L)[] ? L : never;
 }[keyof Book[M]];
+type Shared = typeof SHARED_LINES;
+type SharedLine = { [S in keyof Shared]: Shared[S][number] }[keyof Shared];
 
 /** Any line in the book: the only strings a member's line bubble takes. */
-export type SpokenLine = { [M in MemberId]: LinesOf<M> }[MemberId];
+export type SpokenLine = { [M in MemberId]: LinesOf<M> }[MemberId] | SharedLine;
 
-const BOOK: Readonly<
-  Record<MemberId, Readonly<Partial<Record<LineScene, readonly SpokenLine[]>>>>
-> = LINE_BOOK;
+type Lines = Readonly<Partial<Record<LineScene, readonly SpokenLine[]>>>;
+
+const BOOK: Readonly<Record<MemberId, Lines>> = LINE_BOOK;
+const SHARED: Lines = SHARED_LINES;
 
 const SCENES: readonly LineScene[] = [
   'handOver',
@@ -106,6 +154,17 @@ const SCENES: readonly LineScene[] = [
   'awaitPresident',
   'awaitKaname',
   'awaitPermission',
+  'work',
+  'idle',
+  'doze',
+  'sleepTalk',
+  'tea',
+  'pet',
+  'chat',
+  'windowMorning',
+  'windowDay',
+  'windowEvening',
+  'windowNight',
 ];
 
 /** The moment a member says `line` at (a member never has one line at two moments: lineBook.test.ts). */
@@ -113,7 +172,15 @@ export function sceneOfLine(id: MemberId, line: SpokenLine): LineScene | null {
   return SCENES.find((scene) => linesOf(id, scene).includes(line)) ?? null;
 }
 
-/** The lines a member may say at a moment; none when they say nothing there. */
+/** True when `id` has lines of their own at `scene`, not the shared ones (SHARED_LINES). */
+export function hasOwnLines(id: MemberId, scene: LineScene): boolean {
+  return BOOK[id][scene] !== undefined;
+}
+
+/**
+ * The lines a member may say at a moment: their own, else the shared ones; none when they say
+ * nothing there.
+ */
 export function linesOf(id: MemberId, scene: LineScene): readonly SpokenLine[] {
-  return BOOK[id][scene] ?? [];
+  return BOOK[id][scene] ?? SHARED[scene] ?? [];
 }
