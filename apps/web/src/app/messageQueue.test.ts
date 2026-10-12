@@ -139,7 +139,7 @@ describe('messageQueue: a scroll tossed or walked to a near desk (render/toss.ts
     queue.push(run.map((e) => entry(e)));
     await vi.advanceTimersByTimeAsync(60_000);
     queue.dispose();
-    const canvas = { seats: DEFAULT_SEATS, random: () => draw };
+    const canvas = { seats: DEFAULT_SEATS, random: () => 0.5, tossRandom: () => draw };
     let director: Director = EMPTY_DIRECTOR;
     for (const { message, at } of shown) {
       if (message.event === null) throw new Error('every message here has a scene');

@@ -55,12 +55,11 @@ export interface MessageQueueOptions {
 }
 
 /**
- * Only the timing of the scenes matters here. The random numbers shape confetti (not its time) and
- * decide whether かなめ tosses the scroll to a near desk (render/toss.ts). A toss ends sooner than
- * the walk, so the queue always counts the walk (a draw this high never tosses): whichever the
- * canvas plays, its cast is free by then and the next scene still starts with its message.
+ * Only the timing of the scenes matters here; the random numbers shape confetti, not its time.
+ * With no source for tosses (render/toss.ts) the queue always counts the walk: a toss ends sooner,
+ * so whichever the canvas plays, its cast is free by then and the next scene starts with its message.
  */
-const PACING_CONTEXT = { seats: DEFAULT_SEATS, random: () => 0.999_999 };
+const PACING_CONTEXT = { seats: DEFAULT_SEATS, random: () => 0 };
 
 /**
  * When the message after the head may take its place: once the head has stayed its hold (until

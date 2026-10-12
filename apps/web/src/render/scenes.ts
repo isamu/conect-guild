@@ -67,6 +67,11 @@ export interface Scene {
 export interface SceneContext {
   readonly seats: Readonly<Record<MemberId, TilePos>>;
   readonly random: Random;
+  /**
+   * Whether かなめ tosses the scroll to a near desk (toss.ts): a source of its own, so the confetti
+   * draws the same numbers as without tosses. Without one she always walks the scroll over.
+   */
+  readonly tossRandom?: Random;
 }
 
 /** The member who acts for an event; かなめ for the reception. */
@@ -240,11 +245,12 @@ export function planScene(event: GuildEvent, start: number, context: SceneContex
       flights: [],
     };
   }
-  const { seats, random } = context;
+  const { seats, tossRandom } = context;
   if (
     event.kind === 'issue-opened' &&
     actor !== 'kaname' &&
-    shouldToss(seats.kaname, seats[actor], random)
+    tossRandom !== undefined &&
+    shouldToss(seats.kaname, seats[actor], tossRandom)
   ) {
     return tossScene(actor, start, seats);
   }

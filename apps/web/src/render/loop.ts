@@ -63,6 +63,8 @@ export interface RenderLoopOptions {
   /** The local time of day in hours, 0 to 24 (daylight.hourOf of the browser's clock). */
   readonly localHour?: () => number;
   readonly random?: Random;
+  /** Whether かなめ tosses a scroll (scenes.SceneContext.tossRandom); apart from `random`. */
+  readonly tossRandom?: Random;
   readonly visibility?: PageVisibility;
   /** Epoch ms, for the long idle spells (idle.ts); they go on while the page is hidden. */
   readonly wallNow?: () => number;
@@ -285,6 +287,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   const now = options.now ?? (() => performance.now());
   const localHour = options.localHour ?? (() => hourOf(new Date()));
   const random = options.random ?? Math.random;
+  const tossRandom = options.tossRandom ?? Math.random;
   const painter = createPainter(context2d(canvas), art);
   const cast = createCast(art, random, options);
   const visibility = options.visibility ?? documentVisibility;
@@ -325,7 +328,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   return {
     play(event) {
       // Members out playing come back first; the scene waits for them (idleCrew.playEvent).
-      const context = { seats: DEFAULT_SEATS, random };
+      const context = { seats: DEFAULT_SEATS, random, tossRandom };
       director = playEvent(cast.crew, director, event, { t: stageNow(), context });
       refresh();
     },
