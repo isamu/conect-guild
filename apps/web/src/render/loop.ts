@@ -15,22 +15,27 @@ import {
   type Director,
   type StageFrame,
 } from './director';
+import { daylightAt, hourOf, lampLights } from './daylight';
 import { ANIMATED_DECOR } from './decor';
 import {
   drawActors,
-  drawAnimatedDecor,
   drawFrontLayer,
+  drawOverhead,
   drawStatic,
   type CachedFrontLayer,
 } from './draw';
-import { FRONT_LAYERS } from './layers';
+import { drawAnimatedDecor } from './drawDecor';
+import { drawLightPatches, drawShade, drawWindowSun, type ShadeScratch } from './drawDaylight';
+import { BACK_ANIMATED_DECOR, FRONT_LAYERS } from './layers';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './map';
 import { AMBIENT } from './metrics';
 import { DEFAULT_SEATS } from './scenes';
+import { decorCuesOf, type DecorCues } from './trinkets';
 
 /**
  * The requestAnimationFrame loop. It runs every frame while a scene plays; between scenes it
- * redraws only every AMBIENT.frameMs for the small moves (members, lamps, the cat), and sleeps
+ * redraws only every AMBIENT.frameMs for the small moves (members, lamps, the cat, the other small
+ * things, and the light of the time of day, read from the local clock on each draw), and sleeps
  * when there are none until the bubbles change, a scene starts or the canvas is resized. While the
  * page is hidden or
  * the canvas has no width (narrow screens hide it) it does not run at all, and the stage clock
@@ -54,6 +59,8 @@ export interface RenderLoopOptions {
   readonly canvas: HTMLCanvasElement;
   readonly art: GuildArt;
   readonly now?: () => number;
+  /** The local time of day in hours, 0 to 24 (daylight.hourOf of the browser's clock). */
+  readonly localHour?: () => number;
   readonly random?: Random;
   readonly visibility?: PageVisibility;
 }
@@ -188,34 +195,55 @@ function fitCanvas(canvas: HTMLCanvasElement, cssWidth: number, pixelRatio: numb
   return width / LOGICAL_WIDTH;
 }
 
+interface Painter {
+  readonly ctx: CanvasRenderingContext2D;
+  /** A logical-size canvas for the shade of the night. */
+  readonly scratch: ShadeScratch;
+  readonly background: HTMLCanvasElement;
+  readonly front: readonly CachedFrontLayer[];
+  readonly art: GuildArt;
+}
+
+interface Moment {
+  readonly now: number;
+  readonly hour: number;
+  readonly frame: StageFrame;
+  readonly bubbles: Bubbles;
+  readonly cues: DecorCues;
+}
+
 /**
- * One frame: the cached background, the lamps and the cat, then the members between the cached
- * front layers (desks, the counter, the throne's arms).
+ * One frame: the cached background with the sun in the windows and the light patches, the moving
+ * things, the members between the cached front layers (desks, the counter, the throne's arms),
+ * the shade of the time of day with the lamps' light, and the bubbles and confetti on top.
  */
-function paint(
-  ctx: CanvasRenderingContext2D,
-  layer: {
-    background: HTMLCanvasElement;
-    front: readonly CachedFrontLayer[];
-    art: GuildArt;
-    scale: number;
-  },
-  t: number,
-  actors: { frame: StageFrame; bubbles: Bubbles },
-): void {
-  ctx.setTransform(layer.scale, 0, 0, layer.scale, 0, 0);
+function paint(painter: Painter, scale: number, moment: Moment): void {
+  const { ctx, art } = painter;
+  const light = daylightAt(moment.hour);
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(layer.background, 0, 0);
-  drawAnimatedDecor(ctx, layer.art, t);
-  drawActors(ctx, { ...actors, now: t }, layer.art, layer.front);
+  ctx.drawImage(painter.background, 0, 0);
+  drawWindowSun(ctx, art, light);
+  drawLightPatches(ctx, art, moment, light);
+  drawAnimatedDecor(ctx, art, moment, BACK_ANIMATED_DECOR);
+  drawActors(ctx, moment, art, painter.front);
+  drawShade(ctx, painter.scratch, light, lampLights(moment.now));
+  drawOverhead(ctx, moment);
+}
+
+/** The canvas, the scenery drawn once and an empty canvas for the shade. */
+function createPainter(ctx: CanvasRenderingContext2D, art: GuildArt): Painter {
+  const { background, front } = cachedScenery(art);
+  const image = cachedLayer(() => undefined);
+  return { ctx, scratch: { ctx: context2d(image), image }, background, front, art };
 }
 
 export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   const { canvas, art } = options;
   const now = options.now ?? (() => performance.now());
+  const localHour = options.localHour ?? (() => hourOf(new Date()));
   const random = options.random ?? Math.random;
-  const ctx = context2d(canvas);
-  const { background, front } = cachedScenery(art);
+  const painter = createPainter(context2d(canvas), art);
   const seeds = createAmbientSeeds(random);
   const hasHoldFrames = (id: MemberId): boolean => art.sprites.hasHoldFrames(id);
   const visibility = options.visibility ?? documentVisibility;
@@ -231,7 +259,8 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   function draw(): void {
     const t = stageNow();
     const frame = frameAt(director, t, DEFAULT_SEATS, { moods, seeds, hasHoldFrames });
-    paint(ctx, { background, front, art, scale }, t, { frame, bubbles });
+    const cues = decorCuesOf(moods, director.bursts, t);
+    paint(painter, scale, { now: t, hour: localHour(), frame, bubbles, cues });
     director = prune(director, t);
     const ambient = Object.keys(moods).length > 0 || ANIMATED_DECOR.length > 0;
     const next = nextDraw({ hidden: paused(), animating: isAnimating(director, t), ambient });
