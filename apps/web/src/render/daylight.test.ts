@@ -8,7 +8,7 @@ import {
   lampLights,
   type Daylight,
 } from './daylight';
-import { ANIMATED_DECOR } from './decor';
+import { ANIMATED_DECOR } from './animatedDecor';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './map';
 import { AMBIENT, DAYLIGHT } from './metrics';
 
