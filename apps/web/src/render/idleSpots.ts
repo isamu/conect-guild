@@ -13,7 +13,7 @@ import { DEFAULT_SEATS } from './scenes';
  */
 
 /** The pet by the throne. Its picture may change; the play spot follows this one name. */
-export const PET_DECOR: DecorName = 'sleeping-cat';
+export const PET_DECOR: DecorName = 'sleeping-poodle';
 /** The things that mark the tea spot. */
 export const TEA_DECOR: DecorName = 'mugs';
 

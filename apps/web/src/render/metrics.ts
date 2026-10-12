@@ -54,10 +54,10 @@ export const AMBIENT = {
   /** Lamps and candles: the flame brightens by up to this much (added light), changing every step. */
   flameGlow: 0.22,
   flameStepMs: 280,
-  /** The sleeping cat rises 1 px for half of each breath. */
+  /** The sleeping pet rises 1 px for half of each breath. */
   breathMs: 2_520,
   breathPx: 1,
-  /** Shifts each lamp's flicker and each cat's breath against the others. */
+  /** Shifts each lamp's flicker and the pet's breath against the others. */
   decorPhaseStepMs: 377,
 } as const;
 
@@ -179,13 +179,9 @@ export const TRINKETS = {
   /** A banner flutters while the confetti flies, `wavePx` at the bottom, one wave every `waveMs`. */
   waveMs: 560,
   wavePx: 4,
-  /** The cat wakes once every `catIntervalMs`: it rises, then stretches out. */
-  catIntervalMs: 21_000,
-  catRiseMs: 420,
-  catStretchMs: 1_260,
-  catRiseY: 1.1,
-  catStretchX: 1.15,
-  catStretchY: 0.88,
+  /** The pet wakes once every `petIntervalMs` and sits up for `petSitMs`. */
+  petIntervalMs: 21_000,
+  petSitMs: 1_680,
   /** The light patches drift with the sun (from morning to evening) and sway a little. */
   patchDriftPx: 16,
   patchSwayPx: 2,

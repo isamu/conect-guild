@@ -1,6 +1,6 @@
 import type { DecorName } from '../../../../assets/decor/decor';
 import type { MemberId } from '../guild.config';
-import type { AmbientMoods } from './ambient';
+import { decorPose, type AmbientMoods } from './ambient';
 import { CONFETTI, TRINKETS } from './metrics';
 import type { Point } from './path';
 
@@ -259,24 +259,25 @@ export function waveAt(fromTop: number, elapsed: number): number {
   return Math.round(TRINKETS.wavePx * fade * fromTop * Math.sin(angle)) + 0;
 }
 
-export interface CatStretch {
-  readonly scaleX: number;
-  readonly scaleY: number;
+/** The pet's picture while it is up and sitting. */
+export const PET_AWAKE_DECOR: DecorName = 'awake-poodle';
+
+/** The pet wakes and sits up at the start of every TRINKETS.petIntervalMs, for TRINKETS.petSitMs. */
+export function petAwakeAt(phaseMs: number, now: number): boolean {
+  return (now + phaseMs) % TRINKETS.petIntervalMs < TRINKETS.petSitMs;
 }
 
-export const CAT_ASLEEP: CatStretch = { scaleX: 1, scaleY: 1 };
+export interface PetPose {
+  /** The picture to draw: `asleep` or PET_AWAKE_DECOR. */
+  readonly name: DecorName;
+  /** Added to the picture's top, logical px. */
+  readonly dy: number;
+}
 
-/**
- * The cat once every TRINKETS.catIntervalMs: it lifts its head (taller), then stretches out
- * (longer and lower), then sleeps again. The scale is around the bottom centre of the picture.
- */
-export function catStretchAt(phaseMs: number, now: number): CatStretch {
-  const elapsed = (now + phaseMs) % TRINKETS.catIntervalMs;
-  if (elapsed < TRINKETS.catRiseMs) return { scaleX: 1, scaleY: TRINKETS.catRiseY };
-  if (elapsed < TRINKETS.catRiseMs + TRINKETS.catStretchMs) {
-    return { scaleX: TRINKETS.catStretchX, scaleY: TRINKETS.catStretchY };
-  }
-  return CAT_ASLEEP;
+/** The pet (`asleep`, its sleeping picture) breathes while it sleeps and sits still while it is up. */
+export function petPoseAt(asleep: DecorName, phaseMs: number, now: number): PetPose {
+  if (petAwakeAt(phaseMs, now)) return { name: PET_AWAKE_DECOR, dy: 0 };
+  return { name: asleep, dy: decorPose('breath', phaseMs, now).dy };
 }
 
 export interface PatchLook {
