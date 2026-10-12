@@ -18,7 +18,7 @@ export function createGhRunner(signal?: AbortSignal): GhRunner {
       execFile(
         // gh is looked up on PATH on purpose: the user's own installed and
         // authenticated CLI is the only credential source (docs/DESIGN.md 4.1).
-        // eslint-disable-next-line sonarjs/no-os-command-from-path
+        // eslint-disable-next-line sonarjs/no-os-command-from-path -- PATH lookup is intended, see above
         'gh',
         [...args],
         { encoding: 'utf8', maxBuffer: GH_MAX_BUFFER, signal },
