@@ -35,7 +35,7 @@ describe('fetchIssues', () => {
   it('projects issues without their body', async () => {
     const gh = recordingGh('');
     await fetchIssues(gh, 'o/r');
-    expect(gh.filters).toHaveLength(2);
+    expect(gh.filters).toHaveLength(1);
     for (const filter of gh.filters) {
       expect(filter).not.toMatch(/body/);
       expect(filter).toContain('has("pull_request")');
@@ -43,12 +43,11 @@ describe('fetchIssues', () => {
     }
   });
 
-  it('asks for every closed issue, without since, for the history', async () => {
+  it('asks for every issue in one list sorted by creation, without since, for the history', async () => {
     const gh = recordingGh('');
     await fetchIssues(gh, 'o/r');
     expect(gh.args.map((a) => a.at(-1))).toEqual([
-      'repos/o/r/issues?state=open&per_page=100',
-      'repos/o/r/issues?state=closed&per_page=100',
+      'repos/o/r/issues?state=all&sort=created&direction=desc&per_page=100',
     ]);
     expect(gh.args.every((a) => a.includes('--paginate'))).toBe(true);
   });

@@ -69,15 +69,14 @@ describe('toSnapshotIssues', () => {
     expect(toSnapshotIssues(items, CUTOFF).map((i) => i.number)).toEqual([1, 4]);
   });
 
-  it('keeps the closed copy when an issue closed while the lists were fetched', () => {
+  it('keeps the copy read last when an issue was read twice (the pages shifted)', () => {
+    const open = issue({ number: 5 });
     const closed = issue({ number: 5, state: 'closed', closed_at: '2026-10-11T00:00:00Z' });
-    for (const items of [
-      [issue({ number: 5 }), closed],
-      [closed, issue({ number: 5 })],
-    ]) {
-      const result = toSnapshotIssues(items, CUTOFF);
-      expect(result.map((i) => [i.number, i.state])).toEqual([[5, 'closed']]);
-    }
+    const states = (items: RawIssue[]) =>
+      toSnapshotIssues(items, CUTOFF).map((i) => [i.number, i.state]);
+    // Closed while the pages were read, then reopened while the pages were read.
+    expect(states([open, closed])).toEqual([[5, 'closed']]);
+    expect(states([closed, open])).toEqual([[5, 'open']]);
   });
 });
 

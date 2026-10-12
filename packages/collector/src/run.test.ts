@@ -56,12 +56,12 @@ describe('collectOnce', () => {
     });
   });
 
-  it('asks for every closed issue (no since, for the history) and files only for open PRs', async () => {
+  it('asks for every issue in one list (no since, for the history) and files only for open PRs', async () => {
     const gh = fakeGh();
     await collectOnce(harness(gh));
-    expect(gh.calls).toContain(
-      'repos/yukihiroyamaguchi569/conect-management/issues?state=closed&per_page=100',
-    );
+    expect(gh.calls.filter((c) => c.includes('/issues'))).toEqual([
+      'repos/yukihiroyamaguchi569/conect-management/issues?state=all&sort=created&direction=desc&per_page=100',
+    ]);
     expect(gh.calls.some((c) => c.includes('since='))).toBe(false);
     expect(gh.calls.filter((c) => c.includes('/files'))).toEqual([
       'repos/yukihiroyamaguchi569/conect-management/pulls/2/files?per_page=100',
@@ -76,7 +76,7 @@ describe('collectOnce: nothing is written', () => {
       { 'pulls/2/files': new CollectorError('gh-failed') },
       'gh-failed',
     ],
-    ['gh prints broken JSON', { 'issues?state=open': '{"number":\n' }, 'validation-failed'],
+    ['gh prints broken JSON', { 'issues?state=all': '{"number":\n' }, 'validation-failed'],
     [
       'an item has the wrong shape',
       { 'pulls?state=open': '{"number":"x"}\n' },
@@ -84,14 +84,14 @@ describe('collectOnce: nothing is written', () => {
     ],
     ['a file entry is not a path', { 'pulls/2/files': '{"filename":"a"}\n' }, 'validation-failed'],
     [
-      'gh fails for the closed issues (the history)',
-      { 'issues?state=closed': new CollectorError('gh-failed') },
+      'gh fails for the issues (the history)',
+      { 'issues?state=all': new CollectorError('gh-failed') },
       'gh-failed',
     ],
     [
       'a closed issue has no state_reason',
       {
-        'issues?state=closed': `${JSON.stringify({
+        'issues?state=all': `${JSON.stringify({
           number: 3,
           title: 't',
           state: 'closed',
@@ -160,7 +160,7 @@ describe('runCollector --once', () => {
 
   it('exits 1 on failure and logs only the error kind', async () => {
     const error = new Error(`gh: ${SECRET_TITLE} ${SECRET_BRANCH}`);
-    const deps = harness(fakeGh({ 'issues?state=open': error }));
+    const deps = harness(fakeGh({ 'issues?state=all': error }));
     await expect(runCollector(['--once'], deps)).resolves.toBe(1);
     expect(deps.errors).toEqual(['[collector] 2026-10-12T00:00:00.000Z failed: unexpected']);
     expect(deps.writes).toEqual([]);
@@ -239,5 +239,36 @@ describe('runCollector --once: sessions', () => {
     await expect(runCollector(['--repo', 'other/repo'], deps)).resolves.toBe(2);
     expect(deps.errors.join('\n')).not.toContain('other/repo');
     expect(gh.calls).toEqual([]);
+  });
+});
+
+describe('collectOnce: an issue that changes while the pages are read', () => {
+  const base = {
+    number: 7,
+    title: SECRET_TITLE,
+    labels: ['広報'],
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    is_pull_request: false,
+  };
+  const open = { ...base, state: 'open', state_reason: null, closed_at: null };
+  const done = {
+    ...base,
+    state: 'closed',
+    state_reason: 'completed',
+    closed_at: '2026-10-11T00:00:00Z',
+  };
+  const lines = (...items: object[]) => items.map((i) => `${JSON.stringify(i)}\n`).join('');
+
+  it.each([
+    ['closes', lines(open, done), [{ number: 7, departments: ['広報'] }]],
+    ['reopens', lines(done, { ...open, state_reason: 'reopened' }), []],
+  ])('counts it once when it %s (read twice as the pages shifted)', async (_l, out, completed) => {
+    const deps = harness(fakeGh({ 'issues?state=all': out }));
+    await collectOnce(deps);
+    const snapshot = snapshotSchema.parse(JSON.parse(deps.writes[0] ?? ''));
+    expect(snapshot.history.openedIssueCount).toBe(1);
+    expect(snapshot.history.completedIssues).toEqual(completed);
+    expect(snapshot.issues.map((i) => i.number)).toEqual([7]);
   });
 });

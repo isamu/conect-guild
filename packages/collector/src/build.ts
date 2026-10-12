@@ -29,6 +29,14 @@ function isOpenOrRecentlyClosed(
 }
 
 /**
+ * One issue per number. Issues come from one list read page by page (github.ts fetchIssues), so
+ * an issue read twice (the pages shifted) is newest in the copy read last.
+ */
+function uniqueReadLast(issues: readonly RawIssue[]): RawIssue[] {
+  return [...new Map(issues.map((issue) => [issue.number, issue])).values()];
+}
+
+/**
  * One item per number. An item fetched from both the open and the closed list
  * was closed while we were fetching, so the closed copy wins.
  */
@@ -48,7 +56,7 @@ function isoOrNull(value: string | null): string | null {
 
 /** Issues without PRs: all open ones and those closed since `cutoff`. */
 export function toSnapshotIssues(raw: readonly RawIssue[], cutoff: Date): SnapshotIssue[] {
-  const issues = uniquePreferClosed(raw.filter((issue) => !issue.is_pull_request)).filter((issue) =>
+  const issues = uniqueReadLast(raw.filter((issue) => !issue.is_pull_request)).filter((issue) =>
     isOpenOrRecentlyClosed(issue, cutoff),
   );
   return issues.map((issue) => ({
@@ -115,7 +123,7 @@ export function toHistory(
   repo: string,
   branchPrefixes: readonly BranchPrefixRule[],
 ): SnapshotHistory {
-  const issues = uniquePreferClosed(rawIssues.filter((issue) => !issue.is_pull_request));
+  const issues = uniqueReadLast(rawIssues.filter((issue) => !issue.is_pull_request));
   const completed = issues.filter(
     (issue) => issue.state === 'closed' && issue.state_reason === 'completed',
   );

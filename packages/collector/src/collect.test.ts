@@ -52,7 +52,7 @@ describe('collectSnapshot', () => {
       const path = args.at(-1) ?? '';
       inFlight += 1;
       try {
-        if (path.includes('issues?state=open')) throw new Error('gh failed');
+        if (path.includes('issues?state=all')) throw new Error('gh failed');
         for (let i = 0; i < 5; i += 1) await new Promise((resolve) => setImmediate(resolve));
         return '';
       } finally {

@@ -96,16 +96,19 @@ describe('toHistory: Issues', () => {
     });
   });
 
-  it('counts an Issue seen in both lists once, as closed', () => {
-    for (const items of [
-      [issue(5), completed(5)],
-      [completed(5), issue(5)],
-    ]) {
-      expect(historyOf(items)).toMatchObject({
-        openedIssueCount: 1,
-        completedIssues: [{ number: 5, departments: [] }],
-      });
-    }
+  it('counts an Issue read twice (the pages shifted) once, in the state read last', () => {
+    // Closed as completed while the pages were read.
+    expect(historyOf([issue(5), completed(5)])).toEqual({
+      openedIssueCount: 1,
+      completedIssues: [{ number: 5, departments: [] }],
+      mergedPrs: [],
+    });
+    // Reopened while the pages were read: no longer completed.
+    expect(historyOf([completed(5), issue(5, { state_reason: 'reopened' })])).toEqual({
+      openedIssueCount: 1,
+      completedIssues: [],
+      mergedPrs: [],
+    });
   });
 });
 

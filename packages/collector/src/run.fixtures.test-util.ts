@@ -47,10 +47,9 @@ const MERGED_PR = {
   closed_at: '2026-10-11T00:00:00Z',
 };
 
-/** Projected items per endpoint, one array per page; issues, closed issues and files span two pages. */
+/** Projected items per endpoint, one array per page; issues span three pages and files two. */
 const OUTPUTS: Record<string, unknown[][]> = {
-  'issues?state=open': [[ISSUE], [PR_AS_ISSUE]],
-  'issues?state=closed': [[OLD_CLOSED_ISSUE], [NOT_PLANNED_ISSUE]],
+  'issues?state=all': [[ISSUE, PR_AS_ISSUE], [OLD_CLOSED_ISSUE], [NOT_PLANNED_ISSUE]],
   'pulls?state=open': [[OPEN_PR]],
   'pulls?state=closed': [[MERGED_PR]],
   'pulls/2/files': [['a/CLAUDE.md'], ['b.md']],

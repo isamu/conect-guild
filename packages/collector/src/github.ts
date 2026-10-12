@@ -42,15 +42,19 @@ export type RawPr = z.infer<typeof rawPrSchema>;
 const PER_PAGE = 'per_page=100';
 
 /**
- * Every open and every closed issue, the whole history (PRs still included). The history of the
- * snapshot is counted afresh from these on every fetch (docs/DESIGN.md 4.1).
+ * Every issue, open and closed, the whole history (PRs still included), from one list. One list
+ * sorted by creation time means an issue that closes or reopens while the pages are read is still
+ * read once with one of its states; two lists (open, closed) could miss it in both. A new issue
+ * created meanwhile shifts the pages and repeats an item; build.ts keeps the copy read last. The
+ * history of the snapshot is counted afresh from these on every fetch (docs/DESIGN.md 4.1).
  */
 export async function fetchIssues(gh: GhRunner, repo: string): Promise<RawIssue[]> {
-  const [open, closed] = await bothOrThrow(
-    ghApiProjected(gh, `repos/${repo}/issues?state=open&${PER_PAGE}`, ISSUE_PROJECTION),
-    ghApiProjected(gh, `repos/${repo}/issues?state=closed&${PER_PAGE}`, ISSUE_PROJECTION),
+  const issues = await ghApiProjected(
+    gh,
+    `repos/${repo}/issues?state=all&sort=created&direction=desc&${PER_PAGE}`,
+    ISSUE_PROJECTION,
   );
-  return parseOrThrow(z.array(rawIssueSchema), [...open, ...closed]);
+  return parseOrThrow(z.array(rawIssueSchema), issues);
 }
 
 /** Every open PR and every closed PR (the pulls API has no `since`). */

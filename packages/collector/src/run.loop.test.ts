@@ -37,7 +37,7 @@ function clockedHarness(gh: GhRunner, untilMs: number, patch: Partial<RunDeps> =
 }
 
 function githubCycles(gh: { calls: string[] }): number {
-  return gh.calls.filter((c) => c.includes('issues?state=open')).length;
+  return gh.calls.filter((c) => c.includes('issues?state=all')).length;
 }
 
 describe('runCollector loop', () => {
