@@ -60,7 +60,7 @@ export interface AmbientSeed {
 
 export type AmbientSeeds = Readonly<Record<MemberId, AmbientSeed>>;
 
-function seed(random: Random): AmbientSeed {
+function drawSeed(random: Random): AmbientSeed {
   const span = AMBIENT.maxIntervalMs - AMBIENT.minIntervalMs;
   const intervalMs = Math.round(AMBIENT.minIntervalMs + random() * span);
   return { intervalMs, phaseMs: Math.floor(random() * intervalMs) };
@@ -68,12 +68,12 @@ function seed(random: Random): AmbientSeed {
 
 export function createAmbientSeeds(random: Random): AmbientSeeds {
   return {
-    kaname: seed(random),
-    minori: seed(random),
-    hibiki: seed(random),
-    hirame: seed(random),
-    sasae: seed(random),
-    yukihiro: seed(random),
+    kaname: drawSeed(random),
+    minori: drawSeed(random),
+    hibiki: drawSeed(random),
+    hirame: drawSeed(random),
+    sasae: drawSeed(random),
+    yukihiro: drawSeed(random),
   };
 }
 

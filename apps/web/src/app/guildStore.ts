@@ -31,7 +31,7 @@ export const REFRESH_INTERVAL_MS = 5_000;
  */
 export const MESSAGE_HOLD_MS = 8_000;
 /** How long the last message stays before the window goes back to the narration (Issue #30). */
-export const MESSAGE_LAST_HOLD_MS = 30_000;
+const MESSAGE_LAST_HOLD_MS = 30_000;
 
 export interface GuildState {
   /** The last successfully loaded snapshot; kept when later fetches fail. */

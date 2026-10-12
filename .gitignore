@@ -7,3 +7,5 @@ apps/web/.data/
 .DS_Store
 __pycache__/
 coverage/
+playwright-report/
+test-results/

@@ -104,6 +104,7 @@ describe.each(DEPARTMENTS)(
         flip: false,
         offset: { x: 0, y: 0 },
         mark: null,
+        withPet: false,
       };
       // The mood may already say "working" while the member is still out (the walk back is to come).
       expect(moving(EMPTY_DIRECTOR, 0, things, ambientOf(WORKING, { [member]: away }))).toEqual(

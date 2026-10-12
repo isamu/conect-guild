@@ -56,6 +56,7 @@ describe('director: back from play (idle.ts)', () => {
         flip: false,
         offset: { x: 0, y: 0 },
         mark: { kind: 'z' as const, rise: 0.5 },
+        withPet: false,
       },
     };
     const ambient: AmbientContext = {
@@ -88,6 +89,7 @@ describe('isAtSeat (Issue #29)', () => {
     flip: false,
     offset: { x: 0, y: 3 },
     mark: null,
+    withPet: false,
   });
 
   it('is at the seat with nothing going on, dozing or asleep there', () => {

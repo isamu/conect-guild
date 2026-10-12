@@ -37,7 +37,7 @@ describe('map: size and contents', () => {
   it('uses every tile kind of the art contract, and only those', () => {
     const used = new Set([...GROUND.flat(), ...MAP_OBJECTS.map((o) => o.tile)]);
     const byName = (a: string, b: string) => a.localeCompare(b);
-    expect([...used].sort(byName)).toEqual([...TILE_NAMES].sort(byName));
+    expect([...used].toSorted(byName)).toEqual(TILE_NAMES.toSorted(byName));
   });
 
   it('keeps every piece of furniture inside the map', () => {

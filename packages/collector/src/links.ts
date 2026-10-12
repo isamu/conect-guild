@@ -25,7 +25,7 @@ function sameRepoNumbers(refs: readonly IssueRef[], repo: string): number[] {
     )
     .map((ref) => ref.number)
     .filter((n) => n > 0);
-  return [...new Set(numbers)].sort((a, b) => a - b);
+  return [...new Set(numbers)].toSorted((a, b) => a - b);
 }
 
 /**

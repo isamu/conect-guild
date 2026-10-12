@@ -98,7 +98,7 @@ function collectEvents(baseline: Baseline, snapshot: Snapshot, index: IssueIndex
     const event = makeEvent('pr-merged', pr.number, assignPr(pr, index).department);
     byId.set(event.id, event);
   }
-  return [...byId.values()].sort(
+  return [...byId.values()].toSorted(
     (a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || a.number - b.number,
   );
 }

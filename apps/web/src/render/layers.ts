@@ -71,8 +71,9 @@ function standsOn(item: DecorPlacement): MapObject | undefined {
 function buildLayers(): FrontLayer[] {
   const objects = MAP_OBJECTS.filter(isFront);
   const parts = MAP_OBJECTS.flatMap(throneParts);
-  const depths = [...new Set([...objects, ...parts.map((p) => p.object)].map(bottomOf))];
-  depths.sort((a, b) => a - b);
+  const depths = [...new Set([...objects, ...parts.map((p) => p.object)].map(bottomOf))].toSorted(
+    (a, b) => a - b,
+  );
   return depths.map((depth) => {
     const here = objects.filter((o) => bottomOf(o) === depth);
     const on = (item: DecorPlacement) => {
@@ -120,8 +121,8 @@ export function drawSteps<T extends Deep, L extends Deep>(
   layers: readonly L[],
 ): DrawStep<T, L>[] {
   const steps: DrawStep<T, L>[] = [];
-  const pending = [...layers].sort((a, b) => a.depth - b.depth);
-  const ordered = [...members].sort((a, b) => a.depth - b.depth);
+  const pending = layers.toSorted((a, b) => a.depth - b.depth);
+  const ordered = members.toSorted((a, b) => a.depth - b.depth);
   for (const member of ordered) {
     for (let layer = pending[0]; layer !== undefined && layer.depth <= member.depth;) {
       steps.push({ kind: 'layer', layer });
@@ -142,8 +143,8 @@ export function stageSteps<T extends Deep, L extends Deep>(
   members: readonly T[],
   layers: readonly L[],
 ): DrawStep<T, L>[] {
-  const held = [...members]
-    .sort((a, b) => a.depth - b.depth)
+  const held = members
+    .toSorted((a, b) => a.depth - b.depth)
     .map((member): DrawStep<T, L> => ({ kind: 'held', member }));
   return [...drawSteps(members, layers), ...held];
 }

@@ -4,7 +4,7 @@ import type { MemberId } from '../guild.config';
 import type { SoundCue } from './scores';
 
 /** Which sound each event plays when its message reaches the window. */
-export const EVENT_CUES: Readonly<Record<GuildEventKind, SoundCue>> = {
+const EVENT_CUES: Readonly<Record<GuildEventKind, SoundCue>> = {
   'issue-opened': 'scroll',
   'pr-merged': 'chest',
   'issue-closed': 'clear',
