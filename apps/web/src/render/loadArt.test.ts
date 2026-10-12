@@ -48,6 +48,21 @@ describe('loadArt', () => {
     expect(createImageBitmap).toHaveBeenCalledTimes(9);
   });
 
+  it('takes the 7-frame sheet when the same URL served the 4-frame one before', async () => {
+    let width = 4 * SPRITE_SIZE;
+    vi.stubGlobal('fetch', vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(ok));
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn<(blob: Blob) => Promise<ImageBitmap>>(() => Promise.resolve(bitmap(width))),
+    );
+    const before = await loadArt();
+    for (const id of IDS) expect(before.sprites.hasHoldFrames(id)).toBe(false);
+    // The server now has the 7-frame sheets at the same URLs; the page loads the art again.
+    width = 7 * SPRITE_SIZE;
+    const after = await loadArt();
+    for (const id of IDS) expect(after.sprites.hasHoldFrames(id)).toBe(true);
+  });
+
   it('gives the holding frames when the sheets the server sends now are 7 frames wide', async () => {
     stubPictures(ok);
     const art = await loadArt();
