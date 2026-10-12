@@ -44,8 +44,11 @@ export interface SoundScreen {
    * sound starts with it (two sounds never start together).
    */
   readonly summons: { readonly id: number } | null;
-  /** False while narrow screens hide the canvas: the call is not played there, so it is not heard. */
-  readonly stageShown: boolean;
+  /**
+   * False while narrow screens hide the canvas, null before it reports: the call is not played
+   * there, so it is not heard.
+   */
+  readonly stageShown: boolean | null;
 }
 
 export interface SoundControllerOptions {

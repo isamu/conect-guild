@@ -60,6 +60,8 @@ describe('summonsCue', () => {
 
   it('stays silent while the canvas is not shown (the call is not played there)', () => {
     expect(summonsCue({ id: 2 }, 1, { other: null, stageShown: false })).toBeNull();
+    // Before the canvas first reports whether it is shown.
+    expect(summonsCue({ id: 2 }, 1, { other: null, stageShown: null })).toBeNull();
   });
 });
 
