@@ -2,14 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { KING_LEVEL, type PartyLevel } from '../app/partyLevel';
 import type { MemberId } from '../guild.config';
 import { levelsOf, levelTags, type LevelTag } from './levelTags';
-import {
-  MAP_OBJECTS,
-  overlaps,
-  PLACES,
-  spriteRect,
-  TALLEST_WINDOW_EXTENTS,
-  type PxRect,
-} from './map';
+import { MAP_OBJECTS, overlaps, spriteRect, TALLEST_WINDOW_EXTENTS, type PxRect } from './map';
 import { BUBBLE_RISE, DETAIL_SCALE, OVERHEAD_OFFSET, OVERHEAD_TOP, TILE_SIZE } from './metrics';
 import { DEFAULT_SEATS } from './scenes';
 
@@ -104,11 +97,15 @@ describe('levelTags', () => {
         expect(overlaps(tagRect(tag), speech(seat)), tag.text).toBe(false);
   });
 
-  it('keeps かなめ’s tag clear of a visitor standing in front of the counter', () => {
-    const kaname = tags[0];
-    expect(kaname).toBeDefined();
-    if (kaname !== undefined)
-      expect(overlaps(tagRect(kaname), spriteRect(PLACES.counterFront))).toBe(false);
+  it('centres each tag on its seat, かなめ’s on the middle of the counter', () => {
+    for (const [index, id] of (
+      ['kaname', 'minori', 'hibiki', 'hirame', 'sasae'] as const
+    ).entries())
+      expect(tags[index]?.x, id).toBe(DEFAULT_SEATS[id].col * TILE_SIZE + TILE_SIZE / 2);
+    const counter = MAP_OBJECTS.filter((object) => object.tile.startsWith('counter'));
+    const left = Math.min(...counter.map((object) => object.col));
+    const right = Math.max(...counter.map((object) => object.col + object.w));
+    expect(tags[0]?.x).toBe(((left + right) / 2) * TILE_SIZE);
   });
 
   it('follows the seats it is given', () => {

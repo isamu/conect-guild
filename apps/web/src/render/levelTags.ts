@@ -5,7 +5,9 @@ import { TILE_SIZE } from './metrics';
 /**
  * 「Lv N」 under each seat, small and faint, always on (Issue #19; the president asked for it to be
  * quiet). Each tag sits on the front of the member's desk (かなめ: her counter), below where the
- * desk hides the feet, so it never meets the bubbles over the heads. Pure: drawLevelTags.ts draws.
+ * desk hides the feet, so it never meets the bubbles over the heads. かなめ's sits in the middle of
+ * the counter like the others; a visitor standing in front of it may hide it for a moment (the
+ * president's call, 2026-10-12). Pure: drawLevelTags.ts draws.
  */
 
 /** The level of each member who has one (the king has none). */
@@ -20,12 +22,6 @@ export interface LevelTag {
 
 /** How far below the feet on the seat the tag is centred: on the desk's (or counter's) front. */
 export const TAG_BELOW_FEET = 46;
-
-/**
- * Sideways shift per member, in logical px. かなめ's goes to the left of the counter's front, as
- * visitors stand right in front of its middle (map.ts PLACES.counterFront) to hand her things.
- */
-const TAG_SHIFT: Readonly<Partial<Record<MemberId, number>>> = { kaname: -2 * TILE_SIZE };
 
 export function levelsOf(
   rows: readonly { readonly id: MemberId; readonly level: { readonly level: number | null } }[],
@@ -44,7 +40,7 @@ export function levelTags(levels: Levels, seats: Readonly<Record<MemberId, TileP
     return [
       {
         text: `Lv ${String(level)}`,
-        x: seat.col * TILE_SIZE + TILE_SIZE / 2 + (TAG_SHIFT[id] ?? 0),
+        x: seat.col * TILE_SIZE + TILE_SIZE / 2,
         y: (seat.row + 1) * TILE_SIZE + TAG_BELOW_FEET,
       },
     ];
