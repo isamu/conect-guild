@@ -81,3 +81,22 @@ describe('createCalls: starts', () => {
     expect(calls.view(frame, END).calling).toBe(false);
   });
 });
+
+describe('createCalls: halted', () => {
+  it('drops the call playing and those to come, and takes none while halted', () => {
+    const { calls, frame, onCallStart, onActive } = setup();
+    calls.add(['kaname'], 0);
+    calls.add(['sasae'], 0);
+    calls.view(frame, 0);
+    calls.setHalted(true);
+    expect(calls.view(frame, 10)).toMatchObject({ speeches: {}, calling: false });
+    calls.add(['minori'], 20);
+    expect(calls.view(frame, 20).calling).toBe(false);
+    calls.setHalted(false);
+    expect(calls.view(frame, END).calling).toBe(false);
+    expect(onCallStart).toHaveBeenCalledTimes(1);
+    expect(onActive).not.toHaveBeenCalled();
+    calls.add(['minori'], 3 * END);
+    expect(calls.view(frame, 3 * END).speeches).toEqual({ yukihiro: '！' });
+  });
+});

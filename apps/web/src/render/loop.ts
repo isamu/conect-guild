@@ -80,6 +80,8 @@ export interface StageParty {
   readonly bubbles: Bubbles;
   readonly moods: AmbientMoods;
   readonly idleSince: IdleSince;
+  /** The screen is halted (not live): the king's calls are dropped, to come or playing. */
+  readonly halted: boolean;
 }
 
 export interface RenderLoop {
@@ -269,6 +271,8 @@ interface Cast {
   readonly crew: IdleCrew;
   readonly calls: Calls;
   frame(director: Director, t: number, moods: AmbientMoods): StageFrame;
+  /** Takes a new party: the idle times (members whose time changed walk back) and the halt. */
+  receive(director: Director, party: StageParty, t: number): Director;
 }
 
 /** The members' small moves and long idle spells over the director's scenes, and the king's calls. */
@@ -285,9 +289,14 @@ function createCast(
     wallNow: options.wallNow ?? (() => Date.now()),
     onActive: options.onActive,
   });
+  const calls = createCalls(options);
   return {
     crew,
-    calls: createCalls(options),
+    calls,
+    receive: (director, party, t) => {
+      calls.setHalted(party.halted);
+      return crew.setSince(director, party.idleSince, t);
+    },
     frame: (director, t, moods) =>
       frameAt(director, t, DEFAULT_SEATS, {
         moods,
@@ -364,7 +373,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
     },
     setParty(party) {
       ({ bubbles, moods } = party);
-      director = cast.crew.setSince(director, party.idleSince, stageNow());
+      director = cast.receive(director, party, stageNow());
       schedule.now();
     },
     resize(nextCssWidth, pixelRatio) {

@@ -33,8 +33,10 @@ export interface CallView {
 }
 
 export interface Calls {
-  /** The king calls `members` at stage time `t`, or after the call playing. */
+  /** The king calls `members` at stage time `t`, or after the call playing; none while halted. */
   add(members: readonly MemberId[], t: number): void;
+  /** Halted (the screen is not live): the calls to come and the one playing are dropped. */
+  setHalted(halted: boolean): void;
   /**
    * The frame at `t` with the call playing applied, and its words. Reports a call that starts
    * (`onCallStart`) and drops the finished ones.
@@ -52,9 +54,14 @@ export function createCalls(options: CallsOptions): Calls {
   let list: readonly Summons[] = [];
   let announced: number | null = null;
   let holds: Holds = NO_HOLDS;
+  let halted = false;
   return {
     add(members, t) {
-      list = addSummons(list, members, t);
+      if (!halted) list = addSummons(list, members, t);
+    },
+    setHalted(next) {
+      halted = next;
+      if (halted) list = [];
     },
     view(frame, t) {
       const speeches = speechesAt(list, t);

@@ -26,6 +26,8 @@ const props = defineProps<{
   idleSeeds: IdleSeeds;
   /** The president's latest order: the king calls those members when its id changes (Issue #28). */
   summons: Summons | null;
+  /** The screen is halted: the king's calls stop (to come and playing). */
+  halted: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -55,7 +57,7 @@ function setIdleSince(next: IdleSince): void {
 }
 
 function stageParty(rows: readonly PartyRow[]): StageParty {
-  return { bubbles: bubblesOf(rows), moods: ambientMoodsOf(rows), idleSince };
+  return { bubbles: bubblesOf(rows), moods: ambientMoodsOf(rows), idleSince, halted: props.halted };
 }
 
 /**
@@ -131,6 +133,13 @@ watch(
   (rows) => {
     setIdleSince(lastActive.observe(rows, Date.now()));
     loop?.setParty(stageParty(rows));
+  },
+);
+
+watch(
+  () => props.halted,
+  () => {
+    loop?.setParty(stageParty(props.party));
   },
 );
 
