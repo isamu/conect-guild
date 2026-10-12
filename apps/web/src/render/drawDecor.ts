@@ -1,7 +1,7 @@
 import type { DecorName } from '../../../../assets/decor/decor';
 import { decorPose, type DecorMotion } from './ambient';
 import type { GuildArt } from './art';
-import type { AnimatedDecor } from './decor';
+import type { AnimatedDecor } from './animatedDecor';
 import { decorDraw } from './decorArt';
 import { TILE_SIZE, TRINKETS } from './metrics';
 import {

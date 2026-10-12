@@ -1,4 +1,5 @@
-import { ANIMATED_DECOR, STILL_DECOR, type AnimatedDecor, type DecorPlacement } from './decor';
+import { ANIMATED_DECOR, STILL_DECOR, type AnimatedDecor } from './animatedDecor';
+import type { DecorPlacement } from './decor';
 import { contains, MAP_OBJECTS, type MapObject, type PxRect, type TileName } from './map';
 import { TILE_SIZE } from './metrics';
 
