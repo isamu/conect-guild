@@ -1,6 +1,8 @@
 import type { TilePos } from '../guild.config';
 import { CONFETTI_MS } from './confetti';
+import { OVERHEAD_TOP } from './metrics';
 import { staySegment, type Segment } from './motion';
+import type { Point } from './path';
 
 /**
  * The level-up on the stage (docs/DESIGN.md 4.6, Issue #19): the member hops twice at their seat
@@ -22,6 +24,8 @@ export const LEVEL_UP = {
   bannerRisePx: 12,
   /** ... and fade out over the last part of their time. */
   bannerFadeMs: 600,
+  /** Room left between the words and a speech bubble under them, logical px. */
+  bannerGapPx: 2,
 } as const;
 
 /** The hops at the seat, one stay segment each (motion.poseOnSegment lifts the feet). */
@@ -47,4 +51,18 @@ export function bannerAt(elapsedMs: number): BannerView | null {
     rise: (bannerRisePx * elapsedMs) / bannerMs,
     alpha: Math.min(1, (bannerMs - elapsedMs) / bannerFadeMs),
   };
+}
+
+/**
+ * Where the words "LEVEL UP" stand (the bottom centre of the text): over the confetti's origin,
+ * risen by `banner.rise`. While the member answers the king's call (summons.ts, a bubble over the
+ * head drawn at `speakerFeet`), the words go up over the top of that bubble, so neither hides the
+ * other.
+ */
+export function bannerPoint(origin: Point, banner: BannerView, speakerFeet: Point | null): Point {
+  const over =
+    speakerFeet === null
+      ? origin.y
+      : Math.min(origin.y, speakerFeet.y - OVERHEAD_TOP - LEVEL_UP.bannerGapPx);
+  return { x: origin.x, y: over - banner.rise };
 }

@@ -83,6 +83,8 @@ export interface AmbientContext {
 }
 
 export interface ConfettiView {
+  /** Whose seat it flies over. */
+  readonly actor: MemberId;
   readonly origin: Point;
   readonly particles: readonly PlacedParticle[];
   /** The words "LEVEL UP" of a level-up (levelUp.ts); null for a cleared quest. */
@@ -276,6 +278,7 @@ export function frameAt(
   // Over the seat, even while the member walks to the counter and back.
   const confetti = director.bursts
     .map((burst): ConfettiView => ({
+      actor: burst.actor,
       origin: burstOrigin(seatedPoint(standingPose(seats[burst.actor]).point)),
       particles: confettiAt(burst.particles, now - burst.start),
       banner: burst.levelUp === true ? bannerAt(now - burst.start) : null,

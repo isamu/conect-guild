@@ -270,7 +270,7 @@ function paint(painter: Painter, scale: number, moment: Moment): void {
   drawShade(ctx, painter.scratch, light, lampLights(moment.now));
   drawLevelTags(ctx, levelTags(moment.levels, DEFAULT_SEATS));
   drawOverhead(ctx, moment);
-  drawLevelUpBanners(ctx, moment.frame.confetti);
+  drawLevelUpBanners(ctx, moment);
 }
 
 /** The canvas, the scenery drawn once and an empty canvas for the shade. */
