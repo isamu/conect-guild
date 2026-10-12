@@ -127,10 +127,12 @@ onMounted(() => {
     if (unmounted || element === null) return;
     try {
       start(element, art);
-    } finally {
-      // Also when the stage could not start (no 2D context): nothing would ever wait on it.
-      emit('ready');
+    } catch (error: unknown) {
+      // No 2D context, for one: the windows (board, party, messages, sounds) still work without
+      // the room, so the screen and the demo go on.
+      globalThis.console.error('the stage could not start', error);
     }
+    emit('ready');
   });
 });
 
