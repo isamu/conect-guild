@@ -142,6 +142,15 @@ describe('guild store summons after an interruption', () => {
     expect(store.state.summons).toBeNull();
   });
 
+  it('does not take a reading older than the last as the new starting point', async () => {
+    const { store, load } = setup();
+    // At work at 10 s; an older reading (waiting, at 5 s) comes in late; then at work at 15 s.
+    await load(ok(reading(10, 'working')), 10);
+    await load(ok(reading(5, 'idle')), 12);
+    await load(ok(reading(15, 'working')), 15);
+    expect(store.state.summons).toBeNull();
+  });
+
   it('stays quiet when the sessions were unavailable in between', async () => {
     const { store, load } = setup();
     await load(ok(reading(0, 'idle')), 0);

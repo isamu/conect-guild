@@ -59,3 +59,16 @@ export function summonedMembers(
     return before !== undefined && WAITING.has(before) && next.states[id] === 'working';
   });
 }
+
+/**
+ * The reading the one after `next` is compared with: `next`, unless it is not later than
+ * `previous` (the same file read again, or a clock moved back), which keeps `previous`. A missing
+ * reading (unavailable or stale) is kept as null, so the next one only starts over.
+ */
+export function comparedReading(
+  previous: SessionReading | null,
+  next: SessionReading | null,
+): SessionReading | null {
+  if (previous === null || next === null) return next;
+  return next.checkedAt > previous.checkedAt ? next : previous;
+}

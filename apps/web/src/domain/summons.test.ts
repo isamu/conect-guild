@@ -2,7 +2,7 @@ import type { SessionState, SnapshotSessions } from '@conect-guild/snapshot';
 import { describe, expect, it } from 'vitest';
 import { SESSION_STALE_AFTER_MS } from '../guild.config';
 import { at, T0 } from './fixtures.test-util';
-import { readSessions, summonedMembers, type SessionReading } from './summons';
+import { comparedReading, readSessions, summonedMembers, type SessionReading } from './summons';
 
 /** かなめ, 経理, 広報, 企画, 総務 in this order. */
 type Five = readonly [SessionState, SessionState, SessionState, SessionState, SessionState];
@@ -122,5 +122,24 @@ describe('summonedMembers: changes that are not orders', () => {
     const before: SessionReading = { checkedAt: at(T0), states: {} };
     const after = reading(['working', 'idle', 'idle', 'idle', 'idle'], later);
     expect(summonedMembers(before, after)).toEqual([]);
+  });
+});
+
+describe('comparedReading', () => {
+  const before = reading(['working', 'idle', 'idle', 'idle', 'idle'], at(T0) + 5_000);
+
+  it('moves on to a later reading', () => {
+    const next = reading(ALL_IDLE, at(T0) + 5_001);
+    expect(comparedReading(before, next)).toBe(next);
+  });
+
+  it('keeps the previous one for a reading that is not later (same time or the clock moved back)', () => {
+    expect(comparedReading(before, reading(ALL_IDLE, at(T0) + 5_000))).toBe(before);
+    expect(comparedReading(before, reading(ALL_IDLE, at(T0)))).toBe(before);
+  });
+
+  it('starts over from a missing reading, and from nothing', () => {
+    expect(comparedReading(before, null)).toBeNull();
+    expect(comparedReading(null, before)).toBe(before);
   });
 });

@@ -11,7 +11,12 @@ import { createKeyValueStore, type KeyValueStore } from '../adapters/storage';
 import { parseBaseline } from '../domain/baseline';
 import { diffSnapshot } from '../domain/events';
 import { diffEntries, type MessageEntry } from '../domain/message';
-import { readSessions, summonedMembers, type SessionReading } from '../domain/summons';
+import {
+  comparedReading,
+  readSessions,
+  summonedMembers,
+  type SessionReading,
+} from '../domain/summons';
 import type { MemberId } from '../guild.config';
 import { createMessageQueue, type GuildMessage, type MessageQueue } from './messageQueue';
 import { globalScheduler, type Cancel, type Scheduler } from './scheduler';
@@ -151,7 +156,7 @@ function noteSessions(state: GuildState, result: SnapshotLoadResult, now: number
   }
   const next = readSessions(result.snapshot.sessions, now);
   const members = summonedMembers(state.sessionReading, next);
-  state.sessionReading = next;
+  state.sessionReading = comparedReading(state.sessionReading, next);
   if (members.length > 0) state.summons = { id: (state.summons?.id ?? 0) + 1, members };
 }
 
