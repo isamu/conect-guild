@@ -8,7 +8,7 @@ import {
   type SoundCue,
 } from './scores';
 
-const CUES: readonly SoundCue[] = ['scroll', 'chest', 'clear', 'permission', 'text'];
+const CUES: readonly SoundCue[] = ['scroll', 'chest', 'clear', 'permission', 'summon', 'text'];
 
 const pitches = (cue: SoundCue) => SCORES[cue].notes.flatMap((note) => note.midi ?? []);
 
@@ -61,6 +61,14 @@ describe('SCORES', () => {
     const p = pitches('permission');
     expect(p).toHaveLength(2);
     expect(p[0]).toBeGreaterThan(p[1] ?? Infinity);
+  });
+
+  it('summon is two notes rising, lower than every note of the other cues (the king)', () => {
+    const p = pitches('summon');
+    expect(p).toHaveLength(2);
+    expect(p[1]).toBeGreaterThan(p[0] ?? Infinity);
+    for (const cue of CUES.filter((c) => c !== 'summon'))
+      expect(Math.max(...p)).toBeLessThan(Math.min(...pitches(cue)));
   });
 
   it('text is three equal blips, quieter than the others', () => {

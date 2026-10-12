@@ -36,6 +36,8 @@ export function useGuild(options: GuildStoreOptions = {}) {
   // The canvas starts a scene when its message reaches the window (in queue order; a message
   // waits until its scene's cast is free, so the scene starts with it).
   const cue = computed(() => sceneCue(message.value));
+  // The president's latest order (Issue #28): the king calls on the canvas.
+  const summons = computed(() => state.summons);
 
   return {
     state,
@@ -45,6 +47,7 @@ export function useGuild(options: GuildStoreOptions = {}) {
     fetchStatus,
     message,
     cue,
+    summons,
     nextMessage: () => {
       store.nextMessage();
     },

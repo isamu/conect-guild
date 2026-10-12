@@ -1,8 +1,8 @@
 import type { KeyValueStore } from '../adapters/storage';
 import type { GuildEvent } from '../domain/events';
-import { cueForMessage, mayPlay, newlyAwaiting, type PartyMember } from './judge';
+import { callRings, cueForMessage, mayPlay, newlyAwaiting, type PartyMember } from './judge';
 import type { TonePlayer } from './player';
-import { SCORES, type SoundCue } from './scores';
+import { SCORES, scoreLengthMs, type SoundCue } from './scores';
 import {
   loadSoundSettings,
   nextVolume,
@@ -29,6 +29,11 @@ export interface SoundController {
    * several parts at once is judged in one fixed order: the halt, then the party, then the message.
    */
   screenChanged(screen: SoundScreen): void;
+  /**
+   * A call of the king starts on the stage (Issue #28): it rings with it, unless another sound
+   * still plays. The stage starts a call only while it is seen, after the call before it.
+   */
+  callStarted(): void;
   setHidden(hidden: boolean): void;
 }
 
@@ -43,6 +48,8 @@ export interface SoundScreen {
 export interface SoundControllerOptions {
   readonly player: TonePlayer;
   readonly storage: KeyValueStore;
+  /** Ms on any steady clock (performance.now by default), to know when a sound is over. */
+  readonly now?: () => number;
 }
 
 export function createSoundController(options: SoundControllerOptions): SoundController {
@@ -52,10 +59,18 @@ export function createSoundController(options: SoundControllerOptions): SoundCon
   let halted = false;
   let previousParty: readonly PartyMember[] | null = null;
   let lastMessageId: number | null = null;
+  const now = options.now ?? (() => performance.now());
+  // When the last sound other than the king's call is over; null before any.
+  let otherEndsAt: number | null = null;
 
   function play(cue: SoundCue): void {
     if (!mayPlay({ enabled: settings.enabled, hidden, halted })) return;
-    player.play(SCORES[cue], VOLUME_GAIN[settings.volume]);
+    const played = player.play(SCORES[cue], VOLUME_GAIN[settings.volume]);
+    // Only a sound that really rings (not while the audio is suspended) makes the call wait.
+    if (played && cue !== 'summon') {
+      // Sounds that start together may end apart: the call waits for the last of them.
+      otherEndsAt = Math.max(otherEndsAt ?? 0, now() + scoreLengthMs(SCORES[cue]));
+    }
   }
 
   function update(next: SoundSettings): void {
@@ -101,6 +116,9 @@ export function createSoundController(options: SoundControllerOptions): SoundCon
       const message = screen.message;
       if (message !== null && message.id !== lastMessageId) play(cueForMessage(message));
       lastMessageId = message?.id ?? null;
+    },
+    callStarted() {
+      if (callRings(now(), otherEndsAt)) play('summon');
     },
     setHidden(next) {
       hidden = next;
