@@ -352,8 +352,8 @@ export function sceneContext(
     random: options.random ?? Math.random,
     tossRandom: options.tossRandom ?? Math.random,
     pickLine: picker.pick,
-    sawLines: (lines) => {
-      picker.saw(lines);
+    sawLines: (lines, now) => {
+      picker.saw(lines, now);
     },
   };
 }
@@ -393,7 +393,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
     const { bubbles, moods, levels } = party;
     const { frame, speeches, calling, cues } = stageAt(cast, director, t, moods);
     paint(painter, scale, { now: t, hour: localHour(), frame, bubbles, speeches, cues, levels });
-    context.sawLines(seenLines(frame.lines, speeches));
+    context.sawLines(seenLines(director.lines, t, speeches), t);
     director = prune(director, t);
     // A call needs no more than the ambient pace: its words and turns change every few hundred ms.
     const ambient = Object.keys(moods).length > 0 || ANIMATED_DECOR.length > 0 || calling;
