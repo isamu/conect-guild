@@ -10,7 +10,7 @@ import type { Point } from './path';
 import type { SpeechLine, Speeches } from './summons';
 
 /**
- * What shows over a member's head: one thing at a time (docs/DESIGN.md 4.11, Issue #47). The first
+ * What shows over a member's head: one thing at a time (docs/DESIGN.md 4.12, Issue #47). The first
  * that is there wins: the words of the king's call (summons.ts), a line of a scene (lines.ts), the
  * waiting bubble (bubbles.ts), the sign of a long idle spell (idle.ts). Those below are hidden
  * meanwhile, not delayed: each keeps its own times.

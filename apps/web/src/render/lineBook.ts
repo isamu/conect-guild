@@ -2,7 +2,7 @@ import type { MemberId } from '../guild.config';
 
 /**
  * What the members say over their heads at the moments of a scene (Issue #47, docs/DESIGN.md
- * 4.11). Fixed lines only: no title, label or branch name from a snapshot ever reaches a bubble,
+ * 4.12). Fixed lines only: no title, label or branch name from a snapshot ever reaches a bubble,
  * and the types keep it so (a bubble takes a SpokenLine, a union of these literals). Hiragana and
  * katakana with a few signs, at most 7 characters (lines.test.ts checks every one); no names, so
  * renaming a member in guild.settings.ts never puts a wrong name in someone's mouth. Nothing that

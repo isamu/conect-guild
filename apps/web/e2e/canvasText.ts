@@ -36,7 +36,7 @@ export function installCanvasTextRecorder(): void {
 }
 
 /** The texts drawn on the canvas so far, once per text and place. */
-function drawnTexts(page: Page): Promise<string[]> {
+export function drawnTexts(page: Page): Promise<string[]> {
   return page.evaluate(() => window.e2eCanvasTexts ?? []);
 }
 

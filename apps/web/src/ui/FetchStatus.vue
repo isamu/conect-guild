@@ -7,6 +7,8 @@ defineProps<{
   effectsAvailable: boolean;
   /** Result of the last "基準を消す". */
   baselineNotice: string | null;
+  /** The demo mode (Issue #49): its data are fictional and its baseline is not stored. */
+  demo?: boolean;
 }>();
 
 const emit = defineEmits<{ 'clear-baseline': [] }>();
@@ -37,7 +39,9 @@ const emit = defineEmits<{ 'clear-baseline': [] }>();
       localStorage が使えないため、演出は出ません
     </p>
     <p class="fetch__line">
+      <span v-if="demo" class="fetch__note">デモ（架空のデータ）</span>
       <button
+        v-else
         type="button"
         class="rpg-button"
         title="この端末に保存した差分の基準（番号・状態・時刻）を消します"

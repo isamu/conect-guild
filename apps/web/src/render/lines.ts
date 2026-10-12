@@ -4,7 +4,7 @@ import { linesOf, sceneOfLine, type LineScene, type SpokenLine } from './lineBoo
 import { LINES } from './metrics';
 
 /**
- * The members' lines at the moments of a scene (Issue #47, docs/DESIGN.md 4.11). Pure but for
+ * The members' lines at the moments of a scene (Issue #47, docs/DESIGN.md 4.12). Pure but for
  * createLinePicker, whose memory of the last lines seen is the only state: the times are passed in and
  * the random source is injected (`lineRandom` in render/loop.ts, apart from the confetti's and the
  * toss's, so their sequences stay as they were).
