@@ -1,8 +1,4 @@
 import { DECOR, type DecorName } from '../../../../assets/decor/decor';
-import { DECOR_MOTION, type DecorMotion } from './ambient';
-import type { TileRect } from './map';
-import { AMBIENT } from './metrics';
-import { triggerOf, type DecorTrigger } from './trinkets';
 
 /**
  * The small things that make the office busy (assets/decor/decor.ts): on the walls, on the desks
@@ -14,8 +10,16 @@ import { triggerOf, type DecorTrigger } from './trinkets';
  * frame as it drifts with the sun (daylight.ts).
  */
 
-export interface DecorPlacement extends TileRect {
+/**
+ * Where a thing sits, in tile units (the shape of map.TileRect, written out so this file imports
+ * nothing of render: map.isWalkable reads DECOR_PLACEMENTS).
+ */
+export interface DecorPlacement {
   readonly name: DecorName;
+  readonly col: number;
+  readonly row: number;
+  readonly w: number;
+  readonly h: number;
   /** True when members cannot walk on its cells. */
   readonly solid: boolean;
 }
@@ -28,7 +32,7 @@ function place(name: DecorName, col: number, row: number): DecorPlacement {
   return { name, col, row, w, h, solid: !FLOOR_PATCHES.has(name) };
 }
 
-function isFloorPatch(placement: DecorPlacement): boolean {
+export function isFloorPatch(placement: DecorPlacement): boolean {
   return FLOOR_PATCHES.has(placement.name);
 }
 
@@ -96,28 +100,3 @@ export const DECOR_PLACEMENTS: readonly DecorPlacement[] = [
 
 /** Drawn every frame over the cached ground, before the members (they drift with the sun). */
 export const FLOOR_PATCH_DECOR: readonly DecorPlacement[] = DECOR_PLACEMENTS.filter(isFloorPatch);
-
-/** Drawn once after the furniture, lower ones last so they overlap the ones behind them. */
-export const STILL_DECOR: readonly DecorPlacement[] = DECOR_PLACEMENTS.filter(
-  (item) => !isFloorPatch(item) && DECOR_MOTION[item.name] === undefined,
-).toSorted((a, b) => a.row + a.h - (b.row + b.h));
-
-export interface AnimatedDecor {
-  readonly placement: DecorPlacement;
-  readonly motion: DecorMotion;
-  /** Shifts this one's flicker or breath against the others. */
-  readonly phaseMs: number;
-  /** When it moves (trinkets.ts); null when it always does (the lamps and the pet). */
-  readonly trigger: DecorTrigger | null;
-}
-
-/** Drawn every frame (the lamps, the pet and the things that move at times), under the members. */
-export const ANIMATED_DECOR: readonly AnimatedDecor[] = DECOR_PLACEMENTS.flatMap((placement) => {
-  const motion = DECOR_MOTION[placement.name];
-  return motion === undefined ? [] : [{ placement, motion }];
-}).map(({ placement, motion }, index) => ({
-  placement,
-  motion,
-  phaseMs: index * AMBIENT.decorPhaseStepMs,
-  trigger: triggerOf(placement),
-}));
