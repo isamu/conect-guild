@@ -8,3 +8,5 @@ assets/
 .mulmoterminal.json
 .scoria/
 scoria.config.json
+playwright-report/
+test-results/
