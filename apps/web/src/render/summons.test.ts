@@ -13,8 +13,10 @@ import { DEFAULT_SEATS } from './scenes';
 import { seatedPoint } from './seating';
 import {
   addSummons,
+  endedSummons,
   faceThrone,
   isSummoning,
+  newCallStart,
   pruneSummons,
   replyStart,
   speechesAt,
@@ -83,6 +85,30 @@ describe('summons timing', () => {
 
   it('counts an order still to come as playing', () => {
     expect(isSummoning([order(['kaname'], 1_000)], 0)).toBe(true);
+  });
+});
+
+describe('call starts and ends', () => {
+  it('reports each call of a row once, when it starts, not when it is added', () => {
+    const list = addSummons(addSummons([], ['kaname'], 0), ['sasae'], 0);
+    expect(newCallStart(list, 0, null)).toBe(0);
+    expect(newCallStart(list, 10, 0)).toBeNull();
+    // The second call waits for the first: nothing new until its start.
+    expect(newCallStart(list, END - 1, 0)).toBeNull();
+    expect(newCallStart(list, END, 0)).toBe(END);
+    expect(newCallStart(list, END + 1, END)).toBeNull();
+  });
+
+  it('reports nothing before a call or between calls', () => {
+    expect(newCallStart([order(['kaname'], 100)], 99, null)).toBeNull();
+    expect(newCallStart([], 0, null)).toBeNull();
+  });
+
+  it('lists the calls over by now, as pruneSummons drops them', () => {
+    const list = addSummons(addSummons([], ['kaname'], 0), ['sasae'], 0);
+    expect(endedSummons(list, END - 1)).toEqual([]);
+    expect(endedSummons(list, END)).toEqual([order(['kaname'])]);
+    expect(pruneSummons(list, END)).toEqual([order(['sasae'], END)]);
   });
 });
 

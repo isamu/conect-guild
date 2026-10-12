@@ -61,6 +61,24 @@ export function pruneSummons(list: readonly Summons[], now: number): Summons[] {
   return list.filter((summons) => summonsEnd(summons) > now);
 }
 
+/** The orders over by `now` (those pruneSummons drops). */
+export function endedSummons(list: readonly Summons[], now: number): Summons[] {
+  return list.filter((summons) => summonsEnd(summons) <= now);
+}
+
+/**
+ * The start of the order playing at `now` when it is not `announced` (the start already reported):
+ * the moment its "！" and its sound begin. Null otherwise. Starts are unique (addSummons).
+ */
+export function newCallStart(
+  list: readonly Summons[],
+  now: number,
+  announced: number | null,
+): number | null {
+  const start = playing(list, now)?.start;
+  return start === undefined || start === announced ? null : start;
+}
+
 /** The order playing at `now`, if any (they never overlap: addSummons). */
 function playing(list: readonly Summons[], now: number): Summons | undefined {
   return list.find((summons) => summons.start <= now && now < summonsEnd(summons));

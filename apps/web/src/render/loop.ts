@@ -31,15 +31,8 @@ import { AMBIENT } from './metrics';
 import type { IdleSeeds, IdleSince } from './idle';
 import { createIdleCrew, playEvent, type IdleCrew } from './idleCrew';
 import { DEFAULT_SEATS } from './scenes';
-import {
-  addSummons,
-  isSummoning,
-  pruneSummons,
-  speechesAt,
-  withSummons,
-  type Speeches,
-  type Summons,
-} from './summons';
+import { createCalls, type CallView, type Calls } from './calls';
+import type { Speeches } from './summons';
 import { decorCuesOf, type DecorCues } from './trinkets';
 
 /**
@@ -77,6 +70,8 @@ export interface RenderLoopOptions {
   readonly wallNow?: () => number;
   /** Members in a scene at `at` (epoch ms), on every frame that shows them in one. */
   readonly onActive?: (ids: readonly MemberId[], at: number) => void;
+  /** A call of the king (summons.ts) starts on the stage now: its sound rings with it. */
+  readonly onCallStart?: () => void;
   /** The idle spells' per-member salts, so the narration tells the same outings (Issue #30). */
   readonly idleSeeds?: IdleSeeds;
 }
@@ -270,40 +265,6 @@ function createPainter(ctx: CanvasRenderingContext2D, art: GuildArt): Painter {
   return { ctx, scratch: { ctx: context2d(image), image }, background, front, art };
 }
 
-/** A frame with the king's call applied, its words, and whether calls go on after it. */
-interface CallView {
-  readonly frame: StageFrame;
-  readonly speeches: Speeches;
-  readonly calling: boolean;
-}
-
-interface Calls {
-  /** The king calls `members` at stage time `t` (or after the call playing); they are awake now. */
-  add(members: readonly MemberId[], t: number): void;
-  /** The frame at `t` with the call playing applied, and its words; drops the finished calls. */
-  view(frame: StageFrame, t: number): CallView;
-}
-
-/**
- * The king's calls (summons.ts, Issue #28) on the stage clock. Reporting the king and the members
- * as active (`onActive`) wakes them from a long idle spell and redraws the party (GuildCanvas).
- */
-function createCalls(options: Pick<RenderLoopOptions, 'wallNow' | 'onActive'>): Calls {
-  let list: readonly Summons[] = [];
-  return {
-    add(members, t) {
-      list = addSummons(list, members, t);
-      options.onActive?.([...members, 'yukihiro'], (options.wallNow ?? Date.now)());
-    },
-    view(frame, t) {
-      const speeches = speechesAt(list, t);
-      const applied = withSummons(frame, list, t, DEFAULT_SEATS);
-      list = pruneSummons(list, t);
-      return { frame: applied, speeches, calling: isSummoning(list, t) };
-    },
-  };
-}
-
 interface Cast {
   readonly crew: IdleCrew;
   readonly calls: Calls;
@@ -314,7 +275,7 @@ interface Cast {
 function createCast(
   art: GuildArt,
   random: Random,
-  options: Pick<RenderLoopOptions, 'wallNow' | 'onActive' | 'idleSeeds'>,
+  options: Pick<RenderLoopOptions, 'wallNow' | 'onActive' | 'onCallStart' | 'idleSeeds'>,
 ): Cast {
   const seeds = createAmbientSeeds(random);
   const hasHoldFrames = (id: MemberId): boolean => art.sprites.hasHoldFrames(id);
@@ -337,6 +298,17 @@ function createCast(
   };
 }
 
+/** What the stage shows at `t`: the members with the king's call, its words, the small things. */
+function stageAt(
+  cast: Cast,
+  director: Director,
+  t: number,
+  moods: AmbientMoods,
+): CallView & { readonly cues: DecorCues } {
+  const view = cast.calls.view(cast.frame(director, t, moods), t);
+  return { ...view, cues: decorCuesOf(moods, director.bursts, t, view.frame.members) };
+}
+
 export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   const { canvas, art } = options;
   const now = options.now ?? (() => performance.now());
@@ -356,8 +328,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
 
   function draw(): void {
     const t = stageNow();
-    const { frame, speeches, calling } = cast.calls.view(cast.frame(director, t, moods), t);
-    const cues = decorCuesOf(moods, director.bursts, t, frame.members);
+    const { frame, speeches, calling, cues } = stageAt(cast, director, t, moods);
     paint(painter, scale, { now: t, hour: localHour(), frame, bubbles, speeches, cues });
     director = prune(director, t);
     // A call needs no more than the ambient pace: its words and turns change every few hundred ms.
@@ -388,8 +359,8 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
       refresh();
     },
     summon(members) {
-      // Its onActive redraws the party (setParty), so the call shows at once.
-      if (!paused() && members.length > 0) cast.calls.add(members, stageNow());
+      if (!paused()) cast.calls.add(members, stageNow());
+      schedule.now();
     },
     setParty(party) {
       ({ bubbles, moods } = party);
