@@ -104,7 +104,19 @@ const CASES: readonly { kind: GuildEventKind; department: DepartmentLabel; away:
   { kind: 'issue-opened', department: '経理', away: 'kaname' },
   { kind: 'pr-merged', department: '企画', away: 'hirame' },
   { kind: 'pr-merged', department: '総務', away: 'kaname' },
+  { kind: 'level-up', department: '経理', away: 'minori' },
+  { kind: 'level-up', department: '総務', away: 'sasae' },
 ];
+
+/** A level-up's hops and confetti start at the seat once the member is back there. */
+function expectHopsAtSeat(director: Director, away: MemberId): void {
+  const [walk, hops] = director.tracks.filter((track) => track.actor === away);
+  const back = walk === undefined ? undefined : trackEnd(walk);
+  expect(back).toBeDefined();
+  expect(hops?.segments[0]?.start).toBe(back);
+  expect(hops?.segments[0]?.path).toEqual([DEFAULT_SEATS[away]]);
+  expect(director.bursts[0]?.start).toBe(back);
+}
 
 describe('playEvent with members out playing', () => {
   for (const { kind, department, away } of CASES) {
@@ -129,6 +141,7 @@ describe('playEvent with members out playing', () => {
           expect(walk).toBeDefined();
           expect(burst?.start).toBe(walk && trackEnd(walk));
         }
+        if (kind === 'level-up') expectHopsAtSeat(s.director, away);
         const step = largestStep(s, t, 30_000);
         expect(step.px, `${String(step.id)} jumped at +${String(step.t)} ms`).toBeLessThanOrEqual(
           MAX_STEP_PX,

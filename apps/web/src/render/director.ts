@@ -3,7 +3,15 @@ import type { MemberId, TilePos } from '../guild.config';
 import { ambientPose, type AmbientMoods, type AmbientSeeds, type HandProp } from './ambient';
 import { burstOrigin, confettiAt, CONFETTI_MS, type PlacedParticle } from './confetti';
 import type { IdleMark, IdlePose, IdlePoses } from './idle';
-import { poseOnSegment, standingPose, type Pose, type Segment, type SpriteFrame } from './motion';
+import { bannerAt, type BannerView } from './levelUp';
+import {
+  hopLift,
+  poseOnSegment,
+  standingPose,
+  type Pose,
+  type Segment,
+  type SpriteFrame,
+} from './motion';
 import { tileToPoint, type Point } from './path';
 import { seatedPoint } from './seating';
 import { castOf, planScene, type Burst, type SceneContext, type Track } from './scenes';
@@ -77,6 +85,8 @@ export interface AmbientContext {
 export interface ConfettiView {
   readonly origin: Point;
   readonly particles: readonly PlacedParticle[];
+  /** The words "LEVEL UP" of a level-up (levelUp.ts); null for a cleared quest. */
+  readonly banner: BannerView | null;
 }
 
 export interface StageFrame {
@@ -135,14 +145,26 @@ export function sendHome(director: Director, id: MemberId, walk: Segment): Direc
   };
 }
 
-/** Where a member is at `now`: on a running track, otherwise standing at their seat. */
-export function poseAt(director: Director, id: MemberId, now: number, seat: TilePos): Pose {
+/** The segment of a running track the member is on at `now`; undefined when none runs. */
+function segmentAt(director: Director, id: MemberId, now: number): Segment | undefined {
   for (const track of director.tracks) {
     if (track.actor !== id) continue;
     const segment = track.segments.find((s) => s.start <= now && now < s.end);
-    if (segment !== undefined) return poseOnSegment(segment, now);
+    if (segment !== undefined) return segment;
   }
-  return standingPose(seat);
+  return undefined;
+}
+
+/** Where a member is at `now`: on a running track, otherwise standing at their seat. */
+export function poseAt(director: Director, id: MemberId, now: number, seat: TilePos): Pose {
+  const segment = segmentAt(director, id, now);
+  return segment === undefined ? standingPose(seat) : poseOnSegment(segment, now);
+}
+
+/** How high a member hops at `now` (a level-up, levelUp.ts); 0 when they do not. */
+export function hopAt(director: Director, id: MemberId, now: number): number {
+  const segment = segmentAt(director, id, now);
+  return segment === undefined ? 0 : hopLift(segment, now);
 }
 
 /** True while a member walks, stays or holds something in a scene, or has confetti over them. */
@@ -235,9 +257,12 @@ export function frameAt(
     const atSeat = isAtSeat(director, now, { id, seat: seats[id], idle });
     if (!scene && idle !== undefined) return idleMember(id, idle, atSeat);
     const pose = poseAt(director, id, now, seats[id]);
+    // A hop lifts the drawing only: the sink and the depth stay those of the feet on the seat.
+    const seated = seatedPoint(pose.point);
+    const point = { x: seated.x, y: seated.y - hopAt(director, id, now) };
     return {
       id,
-      pose: { ...pose, point: seatedPoint(pose.point) },
+      pose: { ...pose, point },
       depth: pose.point.y,
       hand: null,
       inScene: scene,
@@ -253,6 +278,7 @@ export function frameAt(
     .map((burst): ConfettiView => ({
       origin: burstOrigin(seatedPoint(standingPose(seats[burst.actor]).point)),
       particles: confettiAt(burst.particles, now - burst.start),
+      banner: burst.levelUp === true ? bannerAt(now - burst.start) : null,
     }))
     .filter((view) => view.particles.length > 0);
   const flights = director.flights

@@ -26,6 +26,7 @@ import {
 import { drawAnimatedDecor } from './drawDecor';
 import { drawLightPatches, drawShade, drawWindowSun, type ShadeScratch } from './drawDaylight';
 import { drawLevelTags } from './drawLevelTags';
+import { drawLevelUpBanners } from './drawLevelUp';
 import { BACK_ANIMATED_DECOR, FRONT_LAYERS } from './layers';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './map';
 import { AMBIENT } from './metrics';
@@ -269,6 +270,7 @@ function paint(painter: Painter, scale: number, moment: Moment): void {
   drawShade(ctx, painter.scratch, light, lampLights(moment.now));
   drawLevelTags(ctx, levelTags(moment.levels, DEFAULT_SEATS));
   drawOverhead(ctx, moment);
+  drawLevelUpBanners(ctx, moment.frame.confetti);
 }
 
 /** The canvas, the scenery drawn once and an empty canvas for the shade. */

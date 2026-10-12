@@ -11,6 +11,7 @@ import {
   type Prop,
   type Segment,
 } from './motion';
+import { hopSegments } from './levelUp';
 import { findPath, type TilePath } from './path';
 import { planToss, shouldToss, type Flight } from './toss';
 
@@ -27,6 +28,7 @@ import { planToss, shouldToss, type Flight } from './toss';
  * - pr-merged: the member takes up a chest, walks to the counter front and hands it over across the
  *   counter; かなめ holds it up a while, the member walks back to the seat
  * - issue-closed: confetti over the member's seat
+ * - level-up: the member hops twice at the seat, with confetti and "LEVEL UP" over it (levelUp.ts)
  * - no department: かなめ only raises the scroll / chest at the reception (confetti stays the same)
  * - issue-opened to a near desk, now and then: かなめ tosses the scroll from the counter and the
  *   member catches it at the seat (toss.ts, Issue #12)
@@ -50,11 +52,13 @@ export interface Track {
   readonly segments: readonly Segment[];
 }
 
-/** Confetti over a member; it follows the member while it lasts. */
+/** Confetti over a member's seat. */
 export interface Burst {
   readonly actor: MemberId;
   readonly start: number;
   readonly particles: readonly Particle[];
+  /** True for a level-up: the words "LEVEL UP" show with the confetti (levelUp.ts). */
+  readonly levelUp?: true;
 }
 
 export interface Scene {
@@ -82,6 +86,7 @@ export function actorOf(event: Pick<GuildEvent, 'department'>): MemberId {
 /** Members whose movement a scene takes over (they must not be in two scenes at once). */
 export function castOf(event: Pick<GuildEvent, 'kind' | 'department'>): MemberId[] {
   if (event.kind === 'issue-closed') return [];
+  if (event.kind === 'level-up') return [actorOf(event)];
   const actor = actorOf(event);
   return actor === 'kaname' ? [actor] : [actor, 'kaname'];
 }
@@ -242,6 +247,13 @@ export function planScene(event: GuildEvent, start: number, context: SceneContex
     return {
       tracks: [],
       bursts: [{ actor, start, particles: createConfetti(context.random) }],
+      flights: [],
+    };
+  }
+  if (event.kind === 'level-up') {
+    return {
+      tracks: [{ actor, segments: hopSegments(context.seats[actor], start) }],
+      bursts: [{ actor, start, particles: createConfetti(context.random), levelUp: true }],
       flights: [],
     };
   }
