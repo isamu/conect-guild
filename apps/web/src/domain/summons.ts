@@ -42,7 +42,7 @@ const ORDER: readonly MemberId[] = ['kaname', 'minori', 'hibiki', 'hirame', 'sas
  * Members whose session went from waiting (resting / idle) to working between `previous` and
  * `next`. None on the first reading (no previous), when either reading is missing (unavailable or
  * stale: coming back from old information is not an order) or when the readings are more than
- * `staleAfterMs` apart (the change may be long past). A session that goes back to work after a
+ * `staleAfterMs` apart (the change may be long past) or the next is not later than the previous. A session that goes back to work after a
  * permission (awaiting-permission → working) was not given an order.
  */
 export function summonedMembers(
@@ -51,7 +51,9 @@ export function summonedMembers(
   staleAfterMs: number = SESSION_STALE_AFTER_MS,
 ): MemberId[] {
   if (previous === null || next === null) return [];
-  if (next.checkedAt - previous.checkedAt > staleAfterMs) return [];
+  const gap = next.checkedAt - previous.checkedAt;
+  // Not after the previous one (a clock moved back): which state came first is unknown.
+  if (gap <= 0 || gap > staleAfterMs) return [];
   return ORDER.filter((id) => {
     const before = previous.states[id];
     return before !== undefined && WAITING.has(before) && next.states[id] === 'working';

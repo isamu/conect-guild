@@ -30,6 +30,9 @@ const END = REPLY + SUMMONS.replyMs;
 const order = (members: readonly MemberId[], start = 0): Summons => ({ start, members });
 
 const seatPoint = (id: MemberId) => seatedPoint(tileToPoint(DEFAULT_SEATS[id]));
+/** How much deeper the sleepers of sleepyFrame are drawn. */
+const SLEEP_SINK = 4;
+const sunk = (id: MemberId) => ({ x: seatPoint(id).x, y: seatPoint(id).y + SLEEP_SINK });
 
 function member(frame: StageFrame, id: MemberId): MemberPose {
   const found = frame.members.find((m) => m.id === id);
@@ -42,7 +45,7 @@ function sleepyFrame(): StageFrame {
   const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS);
   const asleep = (m: MemberPose): MemberPose => ({
     ...m,
-    pose: { ...m.pose, point: { x: m.pose.point.x, y: m.pose.point.y + 4 } },
+    pose: { ...m.pose, point: { x: m.pose.point.x, y: m.pose.point.y + SLEEP_SINK } },
     mark: { kind: 'z', rise: 0.5 },
   });
   return {
@@ -129,7 +132,8 @@ describe('withSummons: the king', () => {
     const frame = sleepyFrame();
     const list = [order(['hibiki'])];
     const calling = member(withSummons(frame, list, 0, DEFAULT_SEATS), 'yukihiro');
-    const at = seatPoint('yukihiro');
+    // Woken where he is drawn: nothing jumps when the call starts or ends.
+    const at = sunk('yukihiro');
     expect(calling.pose).toEqual({
       point: { x: at.x, y: at.y - SUMMONS.kingRisePx },
       frame: 0,
@@ -158,13 +162,27 @@ describe('withSummons: the answer', () => {
     const frame = sleepyFrame();
     const next = withSummons(frame, [order(['minori', 'hibiki'])], REPLY, DEFAULT_SEATS);
     const minori = member(next, 'minori');
-    expect(minori.pose).toEqual({ point: seatPoint('minori'), frame: 1, flip: false, held: null });
+    expect(minori.pose).toEqual({ point: sunk('minori'), frame: 1, flip: false, held: null });
     expect(minori.mark).toBeNull();
     expect(minori.hand).toBeNull();
     expect(member(next, 'hibiki').pose).toMatchObject({ frame: 1, flip: true });
     // Those not called, and the king, are left as they were.
     expect(member(next, 'sasae')).toEqual(member(frame, 'sasae'));
     expect(member(next, 'yukihiro')).toEqual(member(frame, 'yukihiro'));
+  });
+
+  it('keeps an ambient offset where it is while turning (no jump)', () => {
+    const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS);
+    const shifted: StageFrame = {
+      ...frame,
+      members: frame.members.map((m) =>
+        m.id === 'sasae'
+          ? { ...m, pose: { ...m.pose, point: { x: m.pose.point.x + 2, y: m.pose.point.y - 2 } } }
+          : m,
+      ),
+    };
+    const next = withSummons(shifted, [order(['sasae'])], REPLY, DEFAULT_SEATS);
+    expect(member(next, 'sasae').pose.point).toEqual(member(shifted, 'sasae').pose.point);
   });
 
   it('has かなめ hop facing front, then stand still', () => {

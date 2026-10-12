@@ -2,8 +2,6 @@ import type { MemberId, TilePos } from '../guild.config';
 import type { MemberPose, StageFrame } from './director';
 import { SUMMONS } from './metrics';
 import type { MoveFrame } from './motion';
-import { tileToPoint, type Point } from './path';
-import { seatedPoint } from './seating';
 
 /**
  * The king speaks to whom the president gave an order (Issue #28). Pure: stage time is passed in.
@@ -85,13 +83,16 @@ export function faceThrone(seat: TilePos, throne: TilePos): { frame: MoveFrame; 
   return { frame: 1, flip: seat.col > throne.col };
 }
 
-/** A member sitting at their seat in a still frame, `lift` px up. */
+/**
+ * A member at their seat in a still frame, `lift` px up from where they are drawn now (an ambient
+ * offset or the sink of a doze stays, so nothing jumps when the call starts or ends). What they
+ * handle at the desk is put down and the idle sign goes.
+ */
 function sitting(
   member: MemberPose,
-  seat: TilePos,
   look: { frame: MoveFrame; flip: boolean; lift: number },
 ): MemberPose {
-  const at: Point = seatedPoint(tileToPoint(seat));
+  const at = member.pose.point;
   return {
     ...member,
     pose: {
@@ -113,7 +114,7 @@ function answering(
   if (!member.atSeat || member.inScene) return member;
   const face = faceThrone(seats[member.id], seats[KING]);
   const hop = face.frame === 0 && since < SUMMONS.hopMs ? SUMMONS.hopPx : 0;
-  return sitting(member, seats[member.id], { ...face, lift: hop });
+  return sitting(member, { ...face, lift: hop });
 }
 
 /**
@@ -133,7 +134,7 @@ export function withSummons(
     if (now < reply) {
       if (member.id !== KING) return member;
       const lift = now < summons.start + SUMMONS.callMs ? SUMMONS.kingRisePx : 0;
-      return sitting(member, seats[KING], { frame: 0, flip: false, lift });
+      return sitting(member, { frame: 0, flip: false, lift });
     }
     return summons.members.includes(member.id) ? answering(member, seats, now - reply) : member;
   });

@@ -86,6 +86,18 @@ describe('summonedMembers', () => {
     );
   });
 
+  it('says nothing when the next reading is not later than the previous one', () => {
+    const before = reading(ALL_IDLE, later);
+    const working: Five = ['working', 'idle', 'idle', 'idle', 'idle'];
+    expect(summonedMembers(before, reading(working, later))).toEqual([]);
+    expect(summonedMembers(before, reading(working, later - 1))).toEqual([]);
+    expect(summonedMembers(before, reading(working, later + 1))).toEqual(['kaname']);
+  });
+});
+
+describe('summonedMembers: changes that are not orders', () => {
+  const later = at(T0) + 5_000;
+
   it('does not repeat while the session stays at work', () => {
     const working: Five = ['working', 'idle', 'idle', 'idle', 'idle'];
     expect(summonedMembers(reading(working), reading(working, later))).toEqual([]);
