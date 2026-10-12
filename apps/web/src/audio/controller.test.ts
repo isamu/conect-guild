@@ -4,7 +4,7 @@ import type { GuildEvent, GuildEventKind } from '../domain/events';
 import { createSoundController, type SoundScreen } from './controller';
 import type { PartyMember } from './judge';
 import type { TonePlayer } from './player';
-import { SCORES, type Score, type SoundCue } from './scores';
+import { SCORES, scoreLengthMs, type Score, type SoundCue } from './scores';
 import { SOUND_STORAGE_KEY, VOLUME_GAIN } from './settings';
 
 class FakeStorage implements StorageLike {
@@ -66,14 +66,14 @@ function setup(stored?: { enabled: boolean; volume: 1 | 2 | 3 }) {
   const storage = new FakeStorage();
   if (stored !== undefined) storage.items.set(SOUND_STORAGE_KEY, JSON.stringify(stored));
   const player = new FakePlayer();
-  const controller = createSoundController({ player, storage: createKeyValueStore(() => storage) });
-  let screen: SoundScreen = {
-    halted: false,
-    party: [],
-    message: null,
-    summons: null,
-    stageShown: true,
-  };
+  // A steady clock the tests move by hand (ms).
+  const clock = { now: 0 };
+  const controller = createSoundController({
+    player,
+    storage: createKeyValueStore(() => storage),
+    now: () => clock.now,
+  });
+  let screen: SoundScreen = { halted: false, party: [], message: null };
   let nextId = 1;
   /** Hands over the screen with `patch` applied, as the one watcher in app/useSound.ts does. */
   const show = (patch: Partial<SoundScreen>) => {
@@ -85,7 +85,7 @@ function setup(stored?: { enabled: boolean; volume: 1 | 2 | 3 }) {
     id: nextId++,
     event: kind === null ? null : event(kind),
   });
-  return { storage, player, controller, show, message };
+  return { storage, player, controller, show, message, clock };
 }
 
 describe('createSoundController: settings', () => {
@@ -247,50 +247,48 @@ describe('createSoundController: permissions', () => {
   });
 });
 
-describe("createSoundController: the king's summons", () => {
-  it('rings once per order, not again while the same one stays', () => {
-    const { player, show } = setup({ enabled: true, volume: 2 });
-    show({ party: party() });
-    show({ summons: { id: 1 } });
-    show({ party: party() });
-    show({ summons: { id: 1 } });
-    show({ summons: { id: 2 } });
+describe("createSoundController: the king's call", () => {
+  it('rings each time a call starts on the stage, including calls in a row', () => {
+    const { player, controller, clock } = setup({ enabled: true, volume: 2 });
+    controller.callStarted();
+    // The second order of a row starts once the first call is over (render/summons.ts).
+    clock.now = 3_700;
+    controller.callStarted();
     expect(cues(player)).toEqual(['summon', 'summon']);
   });
 
-  it('is silent before the first order, while muted, hidden or halted, and does not catch up', () => {
+  it('is silent while muted, hidden or halted, and does not catch up', () => {
     const { player, controller, show } = setup({ enabled: true, volume: 2 });
-    show({ summons: null });
     controller.setHidden(true);
-    show({ summons: { id: 1 } });
+    controller.callStarted();
     controller.setHidden(false);
-    show({ halted: true, summons: { id: 2 } });
+    show({ halted: true });
+    controller.callStarted();
     show({ halted: false });
     expect(player.played).toEqual([]);
 
     const muted = setup();
-    muted.show({ summons: { id: 1 } });
+    muted.controller.callStarted();
     muted.controller.toggle();
-    muted.show({ party: party() });
     expect(cues(muted.player).filter((cue) => cue === 'summon')).toEqual([]);
   });
 
-  it('is silent for an order that comes while the canvas is hidden, and does not catch up', () => {
-    const { player, show } = setup({ enabled: true, volume: 2 });
-    show({ stageShown: false, summons: { id: 1 } });
-    show({ stageShown: true });
-    expect(player.played).toEqual([]);
-    show({ summons: { id: 2 } });
-    expect(cues(player)).toEqual(['summon']);
+  it('gives way to a sound still playing, and rings once it is over', () => {
+    const { player, controller, show, message, clock } = setup({ enabled: true, volume: 2 });
+    show({ message: message('pr-merged') });
+    clock.now = scoreLengthMs(SCORES.chest) - 1;
+    controller.callStarted();
+    expect(cues(player)).toEqual(['chest']);
+    clock.now = scoreLengthMs(SCORES.chest);
+    controller.callStarted();
+    expect(cues(player)).toEqual(['chest', 'summon']);
   });
 
-  it('gives way to a message or a permission sound that starts with it', () => {
-    const { player, show, message } = setup({ enabled: true, volume: 2 });
+  it('does not make other sounds wait (only the call gives way)', () => {
+    const { player, controller, show } = setup({ enabled: true, volume: 2 });
     show({ party: party() });
-    show({ message: message('issue-opened'), summons: { id: 1 } });
-    show({ party: party('minori'), summons: { id: 2 } });
-    expect(cues(player)).toEqual(['scroll', 'permission']);
-    show({ summons: { id: 3 } });
-    expect(cues(player)).toEqual(['scroll', 'permission', 'summon']);
+    controller.callStarted();
+    show({ party: party('minori') });
+    expect(cues(player)).toEqual(['summon', 'permission']);
   });
 });

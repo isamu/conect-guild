@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GuildEvent, GuildEventKind } from '../domain/events';
-import {
-  cueForMessage,
-  mayPlay,
-  messageCue,
-  newlyAwaiting,
-  summonsCue,
-  type PartyMember,
-} from './judge';
+import { callRings, cueForMessage, mayPlay, newlyAwaiting, type PartyMember } from './judge';
 
 const event = (kind: GuildEventKind): GuildEvent => ({
   id: `${kind}#1`,
@@ -36,32 +29,15 @@ const party = (...awaiting: PartyMember['id'][]): PartyMember[] =>
     state: awaiting.includes(id) ? 'awaiting-permission' : 'working',
   }));
 
-describe('messageCue', () => {
-  it('rings a message whose id is new, once', () => {
-    expect(messageCue({ id: 2, event: event('pr-merged') }, 1)).toBe('chest');
-    expect(messageCue({ id: 2, event: null }, null)).toBe('text');
-    expect(messageCue({ id: 2, event: event('pr-merged') }, 2)).toBeNull();
-    expect(messageCue(null, 2)).toBeNull();
-  });
-});
-
-describe('summonsCue', () => {
-  it('rings the king for an order whose id is new', () => {
-    expect(summonsCue({ id: 1 }, null, { other: null, stageShown: true })).toBe('summon');
-    expect(summonsCue({ id: 2 }, 1, { other: null, stageShown: true })).toBe('summon');
+describe('callRings', () => {
+  it('rings when no other sound has played, or once the last one is over', () => {
+    expect(callRings(0, null)).toBe(true);
+    expect(callRings(1_000, 1_000)).toBe(true);
+    expect(callRings(1_001, 1_000)).toBe(true);
   });
 
-  it('stays silent for the same order, no order, or when another sound starts with it', () => {
-    expect(summonsCue({ id: 1 }, 1, { other: null, stageShown: true })).toBeNull();
-    expect(summonsCue(null, 1, { other: null, stageShown: true })).toBeNull();
-    expect(summonsCue({ id: 2 }, 1, { other: 'permission', stageShown: true })).toBeNull();
-    expect(summonsCue({ id: 2 }, 1, { other: 'scroll', stageShown: true })).toBeNull();
-  });
-
-  it('stays silent while the canvas is not shown (the call is not played there)', () => {
-    expect(summonsCue({ id: 2 }, 1, { other: null, stageShown: false })).toBeNull();
-    // Before the canvas first reports whether it is shown.
-    expect(summonsCue({ id: 2 }, 1, { other: null, stageShown: null })).toBeNull();
+  it('gives way while another sound still plays', () => {
+    expect(callRings(999, 1_000)).toBe(false);
   });
 });
 

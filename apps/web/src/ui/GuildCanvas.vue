@@ -33,6 +33,8 @@ const emit = defineEmits<{
   stageShown: [shown: boolean];
   /** Since when each member has had nothing to do, on every change (for the narration). */
   idleSince: [since: IdleSince];
+  /** A call of the king starts on the stage now (its sound rings with it, Issue #28). */
+  callStarted: [];
 }>();
 
 const canvas = useTemplateRef<HTMLCanvasElement>('canvas');
@@ -78,6 +80,9 @@ function start(element: HTMLCanvasElement, art: GuildArt): void {
     art,
     ...(fixedHour === null ? {} : { localHour: () => fixedHour }),
     idleSeeds: props.idleSeeds,
+    onCallStart: () => {
+      emit('callStarted');
+    },
     onActive: (ids, at) => {
       setIdleSince(lastActive.markActive(ids, at));
       loop?.setParty(stageParty(props.party));

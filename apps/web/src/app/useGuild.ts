@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, onMounted, shallowRef } from 'vue';
+import { computed, onBeforeUnmount, onMounted } from 'vue';
 import { documentVisibility } from '../adapters/visibility';
 import { createGuildStore, type GuildStoreOptions } from './guildStore';
 import { buildBoard, buildFetchStatus, buildKingBubble, buildParty, sceneCue } from './guildView';
@@ -36,11 +36,8 @@ export function useGuild(options: GuildStoreOptions = {}) {
   // The canvas starts a scene when its message reaches the window (in queue order; a message
   // waits until its scene's cast is free, so the scene starts with it).
   const cue = computed(() => sceneCue(message.value));
-  // The president's latest order (Issue #28): the king calls on the canvas, with a sound.
+  // The president's latest order (Issue #28): the king calls on the canvas.
   const summons = computed(() => state.summons);
-  // Whether the canvas is on screen (narrow screens hide it); null until it first reports. The
-  // king's call is not heard unseen.
-  const stageShown = shallowRef<boolean | null>(null);
 
   return {
     state,
@@ -51,12 +48,10 @@ export function useGuild(options: GuildStoreOptions = {}) {
     message,
     cue,
     summons,
-    stageShown,
     nextMessage: () => {
       store.nextMessage();
     },
     setStageShown: (shown: boolean) => {
-      stageShown.value = shown;
       store.setStageShown(shown);
     },
     clearBaseline: () => {

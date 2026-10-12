@@ -18,26 +18,13 @@ export function cueForMessage(message: { readonly event: GuildEvent | null }): S
   return message.event === null ? 'text' : EVENT_CUES[message.event.kind];
 }
 
-/** The sound of the head message when it newly reached the window (its id is not `lastId`). */
-export function messageCue(
-  message: { readonly id: number; readonly event: GuildEvent | null } | null,
-  lastId: number | null,
-): SoundCue | null {
-  return message === null || message.id === lastId ? null : cueForMessage(message);
-}
-
 /**
- * The king's call for a new order of the president (Issue #28; its id is not `lastId`), unless
- * `other` starts with it (two sounds never start together, and the call gives way) or the canvas is
- * not known to be shown (null before it reports; the call is not played there, so not heard).
+ * Whether the king's call rings when it starts on the stage at `now` (Issue #28): not while
+ * another sound still plays (until `otherEndsAt`, null when none has played), so two never sound
+ * together and the call gives way.
  */
-export function summonsCue(
-  summons: { readonly id: number } | null,
-  lastId: number | null,
-  context: { readonly other: SoundCue | null; readonly stageShown: boolean | null },
-): SoundCue | null {
-  if (summons === null || summons.id === lastId) return null;
-  return context.other === null && context.stageShown === true ? 'summon' : null;
+export function callRings(now: number, otherEndsAt: number | null): boolean {
+  return otherEndsAt === null || now >= otherEndsAt;
 }
 
 export interface PartyMember {
