@@ -32,7 +32,9 @@ export function eventMessage(
     case 'issue-closed':
       return `${actor}は クエスト#${n}${title}を クリアした！`;
     case 'pr-merged':
-      return `${actor}は PR#${n}${title}を てにいれた！`;
+      return event.department === null
+        ? `かなめの受付に PR#${n}${title}が とどいた！`
+        : `${actor}は PR#${n}${title}を かなめに とどけた！`;
     case 'issue-opened':
       return event.department === null
         ? `かなめの受付に クエスト#${n}${title}が とどいた！`
@@ -40,11 +42,25 @@ export function eventMessage(
   }
 }
 
+/** A message window line and the event it reports (null for a notice). */
+export interface MessageEntry {
+  readonly text: string;
+  readonly event: GuildEvent | null;
+}
+
+/** The diff's notice (if any) first, then one entry per event, in the diff's order. */
+export function diffEntries(
+  diff: DiffResult,
+  snapshot: Pick<Snapshot, 'issues' | 'prs'>,
+): MessageEntry[] {
+  const entries = diff.events.map((event) => ({ text: eventMessage(event, snapshot), event }));
+  return diff.notice === null ? entries : [{ text: diff.notice.message, event: null }, ...entries];
+}
+
 /** The diff's notice (if any) first, then one line per event, in the diff's order. */
 export function diffMessages(
   diff: DiffResult,
   snapshot: Pick<Snapshot, 'issues' | 'prs'>,
 ): string[] {
-  const lines = diff.events.map((event) => eventMessage(event, snapshot));
-  return diff.notice === null ? lines : [diff.notice.message, ...lines];
+  return diffEntries(diff, snapshot).map((entry) => entry.text);
 }

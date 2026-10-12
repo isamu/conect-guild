@@ -242,3 +242,47 @@ describe('diffSnapshot: order and duplicates', () => {
     expect(again.events).toEqual([]);
   });
 });
+
+describe('diffSnapshot: Issues closed in both the baseline and the snapshot', () => {
+  it('does not clear again a closedAt newer than the baseline that has not changed', () => {
+    // A closedAt later than the baseline's fetchedAt (clock skew, sample data) stays the same.
+    const future = minutesAfter(T0, 600);
+    const base = baselineOf({ issues: [closedIssue(1, future)] });
+    for (const fetchedAt of [T1, LATER]) {
+      const result = diffSnapshot(base, snapshot({ fetchedAt, issues: [closedIssue(1, future)] }));
+      expect(result.events).toEqual([]);
+    }
+  });
+
+  it('clears again when the closedAt moved later (reopened and closed again)', () => {
+    const result = diffSnapshot(
+      baselineOf({ issues: [closedIssue(1, minutesAfter(T0, -5))] }),
+      snapshot({ fetchedAt: T1, issues: [closedIssue(1, minutesAfter(T0, 600))] }),
+    );
+    expect(ids(result)).toEqual(['issue-closed#1']);
+  });
+
+  it('does not clear when the closedAt moved earlier (not a new close)', () => {
+    const result = diffSnapshot(
+      baselineOf({ issues: [closedIssue(1, minutesAfter(T0, 600))] }),
+      snapshot({ fetchedAt: T1, issues: [closedIssue(1, minutesAfter(T0, -5))] }),
+    );
+    expect(result.events).toEqual([]);
+  });
+
+  it('does not clear when either closedAt is unknown', () => {
+    const unknown = issue(1, { state: 'closed', closedAt: null });
+    expect(
+      diffSnapshot(
+        baselineOf({ issues: [unknown] }),
+        snapshot({ fetchedAt: T1, issues: [closedIssue(1, T1)] }),
+      ).events,
+    ).toEqual([]);
+    expect(
+      diffSnapshot(
+        baselineOf({ issues: [closedIssue(1, T0)] }),
+        snapshot({ fetchedAt: T1, issues: [unknown] }),
+      ).events,
+    ).toEqual([]);
+  });
+});

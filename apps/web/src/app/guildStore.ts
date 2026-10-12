@@ -9,8 +9,8 @@ import {
 import { createKeyValueStore, type KeyValueStore } from '../adapters/storage';
 import { parseBaseline } from '../domain/baseline';
 import { diffSnapshot } from '../domain/events';
-import { diffMessages } from '../domain/message';
-import { createMessageQueue, type GuildMessage } from './messageQueue';
+import { diffEntries, type MessageEntry } from '../domain/message';
+import { createMessageQueue, type GuildMessage, type MessageQueue } from './messageQueue';
 import { globalScheduler, type Cancel, type Scheduler } from './scheduler';
 
 export type { GuildMessage } from './messageQueue';
@@ -18,7 +18,10 @@ export type { GuildMessage } from './messageQueue';
 /** localStorage key of the diff baseline (numbers, states and times only). */
 export const BASELINE_STORAGE_KEY = 'conect-guild:baseline';
 export const REFRESH_INTERVAL_MS = 30_000;
-/** How long a message stays before the next queued one replaces it. The last one stays. */
+/**
+ * How long a message stays at least before the next queued one replaces it; longer when the next
+ * one's scene has to wait for its cast (app/messageQueue.ts). The last one stays.
+ */
 export const MESSAGE_HOLD_MS = 8_000;
 
 export interface GuildState {
@@ -32,7 +35,10 @@ export interface GuildState {
   effectsAvailable: boolean;
   /** Epoch ms of the latest finished fetch (success or failure). */
   checkedAt: number | null;
-  /** Message window queue; the head is on screen. */
+  /**
+   * Message window queue; the head is on screen. Each new event of a fetch arrives here once, on
+   * its message, and its scene plays when that message reaches the head.
+   */
   messages: readonly GuildMessage[];
   /** Result of the last "基準を消す". */
   baselineNotice: string | null;
@@ -55,15 +61,19 @@ export interface GuildStore {
   stop(): void;
   /** Fetches once. Skipped while another fetch is in flight. */
   refresh(): Promise<void>;
-  /** Removes the head message (the ▼ button). */
+  /** The ▼ button: skips the rest of the hold (the next message still waits for its scene). */
   nextMessage(): void;
+  /** Stops the messages (and the scenes they start) while the page is hidden. */
+  setHidden(hidden: boolean): void;
+  /** Whether the canvas is on screen; while it is not, messages do not wait for scenes. */
+  setStageShown(shown: boolean): void;
   /** Removes the stored baseline; the next fetch counts as the first one (no events). */
   clearBaseline(): void;
 }
 
 interface SyncOutcome {
   readonly effectsAvailable: boolean;
-  readonly lines: readonly string[];
+  readonly entries: readonly MessageEntry[];
 }
 
 /**
@@ -72,13 +82,14 @@ interface SyncOutcome {
  */
 function syncBaseline(storage: KeyValueStore, snapshot: Snapshot): SyncOutcome {
   const stored = storage.read(BASELINE_STORAGE_KEY, z.unknown());
-  if (!stored.ok && stored.reason === 'unavailable') return { effectsAvailable: false, lines: [] };
+  if (!stored.ok && stored.reason === 'unavailable')
+    return { effectsAvailable: false, entries: [] };
   const diff = diffSnapshot(stored.ok ? parseBaseline(stored.value) : null, snapshot);
   if (diff.baselineUpdate.action === 'replace') {
     const written = storage.write(BASELINE_STORAGE_KEY, diff.baselineUpdate.baseline);
-    if (!written.ok) return { effectsAvailable: false, lines: [] };
+    if (!written.ok) return { effectsAvailable: false, entries: [] };
   }
-  return { effectsAvailable: true, lines: diffMessages(diff, snapshot) };
+  return { effectsAvailable: true, entries: diffEntries(diff, snapshot) };
 }
 
 function initialState(): GuildState {
@@ -93,12 +104,12 @@ function initialState(): GuildState {
   };
 }
 
-/** Applies one fetch result. Returns the message lines to queue. */
+/** Applies one fetch result. Returns the messages (with their events) to queue. */
 function applyResult(
   state: GuildState,
   storage: KeyValueStore,
   result: SnapshotLoadResult,
-): readonly string[] {
+): readonly MessageEntry[] {
   if (!result.ok) {
     state.failure = result.reason;
     // Once halted, only a snapshot of the expected version resumes the screen.
@@ -110,7 +121,22 @@ function applyResult(
   state.halted = false;
   const outcome = syncBaseline(storage, result.snapshot);
   state.effectsAvailable = outcome.effectsAvailable;
-  return outcome.lines;
+  return outcome.entries;
+}
+
+/** The message queue that publishes into `state.messages`. */
+function queueInto(
+  state: GuildState,
+  options: { scheduler: Scheduler; now: () => number; holdMs: number | undefined },
+): MessageQueue {
+  return createMessageQueue({
+    scheduler: options.scheduler,
+    now: options.now,
+    holdMs: options.holdMs ?? MESSAGE_HOLD_MS,
+    publish: (list) => {
+      state.messages = list;
+    },
+  });
 }
 
 export function createGuildStore(options: GuildStoreOptions = {}): GuildStore {
@@ -119,9 +145,7 @@ export function createGuildStore(options: GuildStoreOptions = {}): GuildStore {
   const now = options.now ?? Date.now;
   const scheduler = options.scheduler ?? globalScheduler;
   const state = shallowReactive<GuildState>(initialState());
-  const queue = createMessageQueue(scheduler, options.messageHoldMs ?? MESSAGE_HOLD_MS, (list) => {
-    state.messages = list;
-  });
+  const queue = queueInto(state, { scheduler, now, holdMs: options.messageHoldMs });
   let cancelRefresh: Cancel | null = null;
   let inFlight = false;
   // Bumped by stop(), so a fetch that started before it cannot touch the state.
@@ -135,7 +159,11 @@ export function createGuildStore(options: GuildStoreOptions = {}): GuildStore {
       const result = await load();
       if (started !== generation) return;
       state.checkedAt = now();
-      queue.push(applyResult(state, storage, result));
+      const entries = applyResult(state, storage, result);
+      // While halted the window is hidden: hold the messages (and their scenes) until it is back.
+      if (state.halted) queue.pause();
+      else queue.resume();
+      queue.push(entries);
     } finally {
       inFlight = false;
     }
@@ -159,6 +187,12 @@ export function createGuildStore(options: GuildStoreOptions = {}): GuildStore {
     refresh,
     nextMessage() {
       queue.next();
+    },
+    setHidden(hidden) {
+      queue.setHidden(hidden);
+    },
+    setStageShown(shown) {
+      queue.setStageShown(shown);
     },
     clearBaseline() {
       const removed = storage.remove(BASELINE_STORAGE_KEY);

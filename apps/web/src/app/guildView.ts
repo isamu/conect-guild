@@ -8,6 +8,7 @@ import {
   type MemberConfig,
   type MemberId,
 } from '../guild.config';
+import type { GuildEvent } from '../domain/events';
 import { isSnapshotStale } from '../domain/freshness';
 import {
   assignPr,
@@ -18,6 +19,7 @@ import {
 } from '../domain/party';
 import { toQuests, type Quest } from '../domain/quest';
 import { countRecentRewards } from '../domain/reward';
+import type { GuildMessage } from './messageQueue';
 
 /**
  * Pure builders that turn a snapshot into what the windows show. The windows only render these;
@@ -176,6 +178,41 @@ export function buildKingBubble(snapshot: SnapshotLists | null): KingBubbleView 
     waiting: president > 0,
     detail: president > 0 ? `承認まち ${String(president)} 件` : '承認まちの PR はありません',
   };
+}
+
+/** A scene to start on the canvas: the event of the message now in the window. */
+export interface SceneCue {
+  /** The message id, so the same message never starts its scene twice. */
+  readonly id: number;
+  readonly event: GuildEvent;
+}
+
+/** The cue for the head message; null when it reports no event (a notice) or there is none. */
+export function sceneCue(message: GuildMessage | null): SceneCue | null {
+  const event = message?.event ?? null;
+  return message === null || event === null ? null : { id: message.id, event };
+}
+
+/** Cues the canvas has seen: the last one, and those waiting for its loop to start. */
+export interface CueQueue {
+  readonly lastId: number | null;
+  readonly waiting: readonly SceneCue[];
+}
+
+export const EMPTY_CUE_QUEUE: CueQueue = { lastId: null, waiting: [] };
+
+/**
+ * Queues a cue that reached the window, once per message. The canvas plays the queue as soon as
+ * its loop runs, so cues that arrive while the pictures load are played in order, not lost.
+ */
+export function receiveCue(queue: CueQueue, cue: SceneCue | null): CueQueue {
+  if (cue === null || cue.id === queue.lastId) return queue;
+  return { lastId: cue.id, waiting: [...queue.waiting, cue] };
+}
+
+/** The queued cues to play now (oldest first), and the queue without them. */
+export function takeCues(queue: CueQueue): { queue: CueQueue; play: readonly SceneCue[] } {
+  return { queue: { ...queue, waiting: [] }, play: queue.waiting };
 }
 
 const FAILURE_LABELS: Readonly<Record<SnapshotLoadFailure, string>> = {

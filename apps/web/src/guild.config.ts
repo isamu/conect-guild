@@ -9,9 +9,10 @@ export type DepartmentLabel = (typeof DEPARTMENT_LABELS)[number];
 
 export type MemberId = 'kaname' | 'minori' | 'hibiki' | 'hirame' | 'sasae' | 'yukihiro';
 
-export interface Seat {
-  readonly x: number;
-  readonly y: number;
+/** A cell on the office tile map (32 px tiles, 32 x 18; src/render/map.ts). */
+export interface TilePos {
+  readonly col: number;
+  readonly row: number;
 }
 
 export interface MemberConfig {
@@ -22,8 +23,11 @@ export interface MemberConfig {
   readonly role: string;
   /** Accent colour for the name plate and speech bubble. */
   readonly color: string;
-  /** Seat on the office map. Provisional pixel coordinates until the M2 tile map exists. */
-  readonly seat: Seat;
+  /**
+   * Where the member is when at home: the tile under their feet (src/render/map.ts). Department
+   * members sit on the chair right behind their desk; render/seating.ts sinks them into it.
+   */
+  readonly seat: TilePos;
 }
 
 export const MEMBERS: Readonly<Record<MemberId, MemberConfig>> = {
@@ -32,36 +36,43 @@ export const MEMBERS: Readonly<Record<MemberId, MemberConfig>> = {
     name: 'かなめ',
     role: '司令塔',
     color: '#e0b040',
-    seat: { x: 320, y: 220 },
+    seat: { col: 16, row: 7 },
   },
   minori: {
     id: 'minori',
     name: 'みのり',
     role: '経理',
     color: '#4caf50',
-    seat: { x: 120, y: 120 },
+    seat: { col: 12, row: 4 },
   },
   hibiki: {
     id: 'hibiki',
     name: 'ひびき',
     role: '広報',
     color: '#e91e63',
-    seat: { x: 220, y: 120 },
+    seat: { col: 20, row: 4 },
   },
   hirame: {
     id: 'hirame',
     name: 'ひらめ',
     role: '企画',
     color: '#2196f3',
-    seat: { x: 420, y: 120 },
+    seat: { col: 11, row: 10 },
   },
-  sasae: { id: 'sasae', name: 'ささえ', role: '総務', color: '#9c6b3f', seat: { x: 520, y: 120 } },
+  sasae: {
+    id: 'sasae',
+    name: 'ささえ',
+    role: '総務',
+    color: '#9c6b3f',
+    seat: { col: 21, row: 10 },
+  },
   yukihiro: {
     id: 'yukihiro',
     name: 'ゆきひろ',
     role: '社長',
     color: '#8e44ad',
-    seat: { x: 320, y: 40 },
+    // The throne is three tiles wide and high (cols 15-17, rows 2-4): the king sits in its middle.
+    seat: { col: 16, row: 3 },
   },
 };
 

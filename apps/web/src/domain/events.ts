@@ -58,8 +58,18 @@ function issueEvent(
     return closedAfter(issue, baselineAt) ? 'issue-closed' : null;
   }
   if (issue.state !== 'closed') return null;
-  // Closed in the baseline too: only a reopen and re-close between fetches (newer closedAt) counts.
-  return before.state === 'open' || closedAfter(issue, baselineAt) ? 'issue-closed' : null;
+  return before.state === 'open' || reclosed(issue, before) ? 'issue-closed' : null;
+}
+
+/**
+ * Closed in the baseline too: only a reopen and re-close between fetches counts, seen as a
+ * closedAt later than the baseline's. Comparing with the baseline's fetchedAt instead would clear
+ * again on every fetch an Issue whose closedAt is later than that fetch (clock skew, sample data).
+ * A closedAt that moved earlier is no new close.
+ */
+function reclosed(issue: SnapshotIssue, before: Baseline['issues'][number]): boolean {
+  if (issue.closedAt === null || before.closedAt === null) return false;
+  return Date.parse(issue.closedAt) > Date.parse(before.closedAt);
 }
 
 function prMerged(

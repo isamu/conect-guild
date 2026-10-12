@@ -15,8 +15,12 @@ import {
   buildKingBubble,
   buildParty,
   countWaits,
+  EMPTY_CUE_QUEUE,
   formatClock,
+  receiveCue,
+  sceneCue,
   STATE_LABELS,
+  takeCues,
 } from './guildView';
 
 describe('buildBoard', () => {
@@ -202,5 +206,66 @@ describe('buildKingBubble', () => {
 
   it('does not wait before the first snapshot', () => {
     expect(buildKingBubble(null)).toEqual({ waiting: false, detail: null });
+  });
+});
+
+describe('sceneCue', () => {
+  const closed = {
+    id: 'issue-closed#98',
+    kind: 'issue-closed',
+    number: 98,
+    department: '総務',
+  } as const;
+
+  it('cues the event of the message in the window, keyed by the message id', () => {
+    expect(sceneCue({ id: 7, text: 'クリアした！', event: closed })).toEqual({
+      id: 7,
+      event: closed,
+    });
+  });
+
+  it('cues nothing for a notice or an empty window', () => {
+    expect(sceneCue({ id: 8, text: 'この期間の出来事は復元できません', event: null })).toBeNull();
+    expect(sceneCue(null)).toBeNull();
+  });
+});
+
+describe('receiveCue / takeCues', () => {
+  const event = {
+    id: 'pr-merged#5',
+    kind: 'pr-merged',
+    number: 5,
+    department: '経理',
+  } as const;
+  const first = { id: 3, event };
+  const second = { id: 4, event: { ...event, id: 'pr-merged#6', number: 6 } };
+
+  it('plays a cue that arrived before the loop ran', () => {
+    const { play } = takeCues(receiveCue(EMPTY_CUE_QUEUE, first));
+    expect(play).toEqual([first]);
+  });
+
+  it('keeps every cue that arrived while the pictures loaded, in order', () => {
+    const queue = receiveCue(receiveCue(EMPTY_CUE_QUEUE, first), second);
+    expect(takeCues(queue).play).toEqual([first, second]);
+  });
+
+  it('does not queue the same message twice', () => {
+    const once = receiveCue(EMPTY_CUE_QUEUE, first);
+    expect(receiveCue(once, first)).toBe(once);
+    const played = takeCues(once).queue;
+    expect(takeCues(receiveCue(played, first)).play).toEqual([]);
+  });
+
+  it('queues nothing without a cue, and empties the queue once taken', () => {
+    expect(receiveCue(EMPTY_CUE_QUEUE, null)).toBe(EMPTY_CUE_QUEUE);
+    const { queue } = takeCues(receiveCue(EMPTY_CUE_QUEUE, first));
+    expect(queue).toEqual({ lastId: 3, waiting: [] });
+    expect(takeCues(queue).play).toEqual([]);
+  });
+
+  it('queues a message again after another one (a new message id)', () => {
+    const queue = takeCues(receiveCue(EMPTY_CUE_QUEUE, first)).queue;
+    expect(takeCues(receiveCue(queue, second)).play).toEqual([second]);
   });
 });
