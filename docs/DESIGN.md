@@ -347,8 +347,8 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 - `npm run verify` = lint + typecheck + test。CI は push と PR で `npm ci --ignore-scripts` → verify → build（サンプルデータのみ）
 - scoria でコードの健康状態を測る（Issue #33）。`.github/workflows/scoria.yml` が PR と main への push で `npm run test:coverage`（`coverage/lcov.info` を出す。遅いので verify には入れない）→ `npx -y scoria@0.3.0` を動かし、`.scoria/baseline.json` からの変化をジョブのサマリーに、指摘を SARIF で code scanning に出す。`mode: report` なので CI は落とさない。scoria は package.json に入れない（scoria 自身の依存の npm audit の警告がこのリポジトリのものに見えるため）
 - 画面の E2E は Playwright（Issue #34）。`npm run test:e2e` で動かし、遅いので verify には入れない。CI は verify と並行の別ジョブ e2e で、ブラウザを Playwright の版ごとにキャッシュして `npx playwright install --with-deps chromium` で入れ、失敗時はレポートを artifact に残す
-  - 設定は `apps/web/playwright.config.ts`、テストは `apps/web/e2e/`。開発サーバーは 5196 番（`--strictPort`、host は vite.config.ts の 127.0.0.1）で立て、既に動いているサーバーは使わない。chromium だけ、headless、retries は CI だけ 1。テストは 1 本ずつ順に動かす（開発サーバーと snapshot を共有するため）
-  - データはダミーだけ: テストのたびに `public/snapshot.sample.json` を guild.settings.ts の repo と固定した時刻に合わせ、`apps/web/.data/snapshot.json` に 0600 で置く。実行の前に `.data` を作り、既にあれば（collector の実データや、強制終了した回の残り）触らずに止める。実行の後に自分で作った `.data` を消す。テストの間は同じ checkout で collector を動かさない
+  - 設定は `apps/web/playwright.config.ts`、テストは `apps/web/e2e/`。開発サーバーは 5196 番（`--strictPort`、host は vite.config.ts の 127.0.0.1）で立て、既に動いているサーバーは使わない。chromium だけ、headless、retries は CI だけ 1。テストは 1 本ずつ順に動かす（アプリの 5 秒ごとの再取得を実時間で待つので、負荷で遅れないように）
+  - データはダミーだけで、`apps/web/.data` には一切触れない（collector の実データを上書きしたり消したりしないため）。`/snapshot.json` は Playwright の `context.route` が全部横取りし、`public/snapshot.sample.json` を guild.settings.ts の repo と固定した時刻に合わせたものを返す。テスト中の中身の差し替え（Issue を閉じる、別のリポジトリ）は route が返す値を変えて行う。横取りの印のヘッダーが無い `/snapshot.json` の応答（開発サーバーから来たもの）がページに 1 件でも届いたら、そのテストを落とす。これで `.data` に実データがあっても画面やレポートには出ない
   - 時刻は `page.clock.setFixedTime` で固定する（タイマーは動かし、5 秒ごとの再取得はそのまま）。音は AudioContext をページ内で偽物に差し替える
   - 確かめること: 開いて console・ページのエラーが無い、掲示板・パーティ・メッセージ窓・取得のようすに値が出る、Canvas に部屋が描かれる（単色でない）、`?hour=12` と `?hour=21.5` で明るさが違う、「音を出す」と音量の切り替え（再読み込み後も残る）、「基準を消す」、760px 未満で窓が縦に積まれ Canvas が隠れる、別のリポジトリの snapshot で止まる、Issue を閉じると「クリアした！」が出る、メッセージ窓のクリックで次へ進み最後に閉じる
   - 見た目の比較（スクリーンショットの差分）は OS で描画が違うので後で検討する
@@ -383,6 +383,7 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 ## 変更履歴
 
 - **Issue #34（2026-10-12）** Playwright で画面の E2E テストを入れた（7 章、9 章）。開発時の依存に `@playwright/test` を足した（社長の承認済み）
+  - 最初は `.data/snapshot.json` にサンプルを書いて開発サーバーから返していたが、同じ checkout の collector と上書きし合い、後始末で実データを消しうるため、`.data` に触れず route で返す形に改めた（統合レビューの指摘）
 - **Issue #30（2026-10-12）** 出来事が無いあいだ、メッセージ窓にようすのナレーションを出すようにした（4.9）
   - 遊びの行き先を Canvas と合わせるため、暇の段階の塩を画面で作って Canvas（render/loop.ts・idleCrew.ts）に渡す形にした
   - 最後のメッセージを 30 秒で自動で閉じ、ナレーションに戻すようにした。以前は ▼ で閉じるまで残り、ナレーションに戻らなかった（6 章 M2。社長の判断）
