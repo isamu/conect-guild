@@ -305,7 +305,7 @@ describe('waveAt', () => {
 });
 
 describe('petAwakeAt', () => {
-  it('keeps the cat’s old rhythm: up for 1.68 s once every 21 s (docs/DESIGN.md 8)', () => {
+  it('wakes up for 1.68 s once every 21 s (docs/DESIGN.md 8)', () => {
     expect(TRINKETS.petIntervalMs).toBe(21_000);
     expect(TRINKETS.petSitMs).toBe(1_680);
   });
