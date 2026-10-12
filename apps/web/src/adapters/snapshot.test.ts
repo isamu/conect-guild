@@ -9,7 +9,7 @@ import {
 } from './snapshot';
 
 const validSnapshot = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   fetchedAt: '2026-10-12T00:00:00Z',
   repo: 'example/guild',
   issues: [
@@ -24,6 +24,7 @@ const validSnapshot = {
     },
   ],
   prs: [],
+  history: { openedIssueCount: 1, completedIssues: [], mergedPrs: [] },
   sessions: {
     status: 'ok',
     checkedAt: '2026-10-12T00:00:05Z',
@@ -137,6 +138,12 @@ describe('loadSnapshot: bodies', () => {
     expect(result).toEqual({ ok: false, reason: 'schema-version' });
   });
 
+  it('reports a v2 snapshot (no history) from the previous collector as schema-version', async () => {
+    const body = JSON.stringify({ ...validSnapshot, schemaVersion: 2, history: undefined });
+    const result = await loadSnapshot({ url: '/s.json', fetchFn: respondWith(body) });
+    expect(result).toEqual({ ok: false, reason: 'schema-version' });
+  });
+
   it('clears its timer after success', async () => {
     vi.useFakeTimers();
     try {
@@ -150,8 +157,9 @@ describe('loadSnapshot: bodies', () => {
 
 describe('validateSnapshot', () => {
   it.each([
-    ['the previous version', { ...validSnapshot, schemaVersion: 1 }],
-    ['a newer version', { ...validSnapshot, schemaVersion: 3 }],
+    ['the version before history (2)', { ...validSnapshot, schemaVersion: 2 }],
+    ['the version before sessions (1)', { ...validSnapshot, schemaVersion: 1 }],
+    ['a newer version', { ...validSnapshot, schemaVersion: 4 }],
     ['version 0', { ...validSnapshot, schemaVersion: 0 }],
     ['an otherwise empty object with another version', { schemaVersion: 99 }],
   ])('reports schema-version for %s', (_label, value) => {
@@ -166,6 +174,17 @@ describe('validateSnapshot', () => {
     ['a string schemaVersion', { ...validSnapshot, schemaVersion: '1' }],
     ['a missing issues array', { ...validSnapshot, issues: undefined }],
     ['missing sessions', { ...validSnapshot, sessions: undefined }],
+    ['a missing history', { ...validSnapshot, history: undefined }],
+    [
+      'a title in the history',
+      {
+        ...validSnapshot,
+        history: {
+          ...validSnapshot.history,
+          completedIssues: [{ number: 1, departments: [], title: 't' }],
+        },
+      },
+    ],
     [
       'a session id in the sessions',
       { ...validSnapshot, sessions: { ...validSnapshot.sessions, id: 'x' } },
