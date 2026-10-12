@@ -1,0 +1,134 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { loadSoundSettings } from '../audio/settings';
+import { DEMO_LOOP_MS } from '../domain/demo';
+import { createDemoSession, DEMO_REFRESH_INTERVAL_MS, isDemoQuery } from './demo';
+import { createGuildStore } from './guildStore';
+
+const START = Date.parse('2026-10-12T03:00:00.000Z');
+
+describe('isDemoQuery', () => {
+  it('is on for demo=1 only', () => {
+    expect(isDemoQuery('?demo=1')).toBe(true);
+    expect(isDemoQuery('?hour=12&demo=1')).toBe(true);
+    expect(isDemoQuery('demo=1')).toBe(true);
+    for (const search of ['', '?', '?demo', '?demo=', '?demo=0', '?demo=true', '?demo=11'])
+      expect(isDemoQuery(search), search).toBe(false);
+  });
+});
+
+/** Throws on any use: the demo must not reach localStorage or the network. */
+function forbidden(name: string) {
+  return vi.fn(() => {
+    throw new Error(`${name} was used in the demo`);
+  });
+}
+
+/** The store as App.vue builds it in the demo, the timers faked. */
+function setup() {
+  const demo = createDemoSession(() => Date.now());
+  const store = createGuildStore(demo.guildOptions);
+  const heads: string[] = [];
+  let lastId = -1;
+  const record = () => {
+    const head = store.state.messages[0];
+    if (head !== undefined && head.id !== lastId) {
+      lastId = head.id;
+      heads.push(head.text);
+    }
+  };
+  const run = async (ms: number) => {
+    for (let t = 0; t < ms; t += 100) {
+      await vi.advanceTimersByTimeAsync(100);
+      record();
+    }
+  };
+  return { demo, store, heads, run };
+}
+
+const fetchSpy = forbidden('fetch');
+const storage = {
+  getItem: forbidden('getItem'),
+  setItem: forbidden('setItem'),
+  removeItem: forbidden('removeItem'),
+};
+
+describe('the demo session', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ now: START });
+    vi.stubGlobal('fetch', fetchSpy);
+    vi.stubGlobal('localStorage', storage);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  it('waits at the start (an empty board) until はじめる', async () => {
+    const { demo, store, heads, run } = setup();
+    store.start();
+    await run(20_000);
+    expect(demo.started.value).toBe(false);
+    expect(store.state.snapshot?.issues).toEqual([]);
+    expect(heads).toEqual([]);
+    store.stop();
+  });
+
+  it('plays the script after はじめる and repeats it every loop, never fetching nor storing', async () => {
+    const { demo, store, heads, run } = setup();
+    store.start();
+    await run(2_000);
+    demo.start();
+    await run(2 * DEMO_LOOP_MS);
+    // Two loops: six messages each, all from the fictional script.
+    expect(heads).toHaveLength(12);
+    expect(heads[0]).toContain('「10 月分の請求書を作る」');
+    expect(heads.some((text) => text.includes('クリアした！'))).toBe(true);
+    expect(heads[6]).toContain('「秋の講座の告知文を書く」');
+    expect(store.state.halted).toBe(false);
+    expect(store.state.effectsAvailable).toBe(true);
+    expect(store.state.summons?.members).toBeDefined();
+    // The real data's path is never taken, and nothing is kept in localStorage.
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(storage.getItem).not.toHaveBeenCalled();
+    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(storage.removeItem).not.toHaveBeenCalled();
+    store.stop();
+  });
+
+  it('starts once: a second はじめる does not rewind the script', async () => {
+    const { demo, store, heads, run } = setup();
+    store.start();
+    demo.start();
+    await run(15_000);
+    const seen = heads.length;
+    demo.start();
+    await run(1_000);
+    expect(heads.length).toBeGreaterThanOrEqual(seen);
+    expect(store.state.snapshot?.issues.length).toBeGreaterThan(0);
+    store.stop();
+  });
+});
+
+describe('the demo, alone', () => {
+  it('reads the script often, so the events follow it closely', async () => {
+    vi.useFakeTimers({ now: START });
+    const demo = createDemoSession(() => Date.now());
+    const load = vi.spyOn(demo.guildOptions, 'loadSnapshot');
+    const store = createGuildStore(demo.guildOptions);
+    store.start();
+    await vi.advanceTimersByTimeAsync(10 * DEMO_REFRESH_INTERVAL_MS);
+    expect(load.mock.calls.length).toBeGreaterThanOrEqual(10);
+    store.stop();
+    vi.useRealTimers();
+  });
+
+  it('turns the sound on in memory only', () => {
+    vi.stubGlobal('localStorage', storage);
+    const demo = createDemoSession(() => Date.now());
+    expect(loadSoundSettings(demo.storage)).toEqual({ enabled: true, volume: 2 });
+    expect(storage.setItem).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+});
