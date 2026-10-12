@@ -3,8 +3,8 @@ import type { MemberId, TilePos } from '../guild.config';
 import { ambientPose, type AmbientMoods, type AmbientSeeds, type HandProp } from './ambient';
 import { burstOrigin, confettiAt, CONFETTI_MS, type PlacedParticle } from './confetti';
 import type { IdleMark, IdlePose, IdlePoses } from './idle';
-import { poseOnSegment, standingPose, walkSegment, type Pose, type SpriteFrame } from './motion';
-import { findPath, type Point } from './path';
+import { poseOnSegment, standingPose, type Pose, type Segment, type SpriteFrame } from './motion';
+import type { Point } from './path';
 import { seatedPoint } from './seating';
 import { castOf, planScene, type Burst, type SceneContext, type Track } from './scenes';
 
@@ -111,22 +111,17 @@ export function scheduleEvent(
 }
 
 /**
- * A member out playing (idle.ts) walks back from `from` to their seat, starting at `now` or when
- * their current track ends. As a track it makes scenes for them wait until they are back.
+ * A member out playing (idle.ts) walks back to their seat along `walk` (idle.homeWalk). As a track
+ * it makes scenes for them wait until they are back.
  */
-export function sendHome(
-  director: Director,
-  walk: { readonly id: MemberId; readonly from: TilePos; readonly seat: TilePos },
-  now: number,
-): Director {
-  const { id, from, seat } = walk;
-  const path = findPath(from, seat);
-  if (path === null || path.length < 2) return director;
-  const segment = walkSegment(path, Math.max(now, director.busyUntil[id] ?? now));
+export function sendHome(director: Director, id: MemberId, walk: Segment): Director {
   return {
     ...director,
-    tracks: [...director.tracks, { actor: id, segments: [segment] }],
-    busyUntil: { ...director.busyUntil, [id]: segment.end },
+    tracks: [...director.tracks, { actor: id, segments: [walk] }],
+    busyUntil: {
+      ...director.busyUntil,
+      [id]: Math.max(walk.end, director.busyUntil[id] ?? walk.end),
+    },
   };
 }
 

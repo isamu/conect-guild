@@ -1,7 +1,7 @@
 import type { MemberId } from '../guild.config';
 import type { Random } from './confetti';
 import { inScene, sendHome, type Director } from './director';
-import { awayTile, createIdleSeeds, idlePosesAt, type IdlePoses, type IdleSince } from './idle';
+import { createIdleSeeds, homeWalk, idlePosesAt, type IdlePoses, type IdleSince } from './idle';
 import { DEFAULT_SEATS } from './scenes';
 
 /**
@@ -60,10 +60,11 @@ export function createIdleCrew(options: IdleCrewOptions): IdleCrew {
     const poses = idlePosesAt(current(), seeds, wallNow());
     let next = director;
     for (const id of ids) {
-      const feet = poses[id]?.feet;
-      const seat = DEFAULT_SEATS[id];
-      const from = feet === undefined ? null : awayTile(feet, seat);
-      if (from !== null && !inScene(next, id, t)) next = sendHome(next, { id, from, seat }, t);
+      const step = poses[id]?.step;
+      // A member with a track running or to come is taken already (and is not out playing).
+      if (step === undefined || (next.busyUntil[id] ?? t) > t) continue;
+      const walk = homeWalk(step, DEFAULT_SEATS[id], t);
+      if (walk !== null) next = sendHome(next, id, walk);
     }
     return next;
   }

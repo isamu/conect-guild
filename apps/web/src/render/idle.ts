@@ -1,9 +1,9 @@
 import type { MemberState } from '../domain/party';
 import type { MemberId, TilePos } from '../guild.config';
 import type { Random } from './confetti';
-import { IDLE, TILE_SIZE } from './metrics';
-import { poseOnSegment, walkSegment, type MoveFrame, type Segment } from './motion';
-import { tileToPoint, type Point, type TilePath } from './path';
+import { IDLE } from './metrics';
+import { MS_PER_TILE, poseOnSegment, walkSegment, type MoveFrame, type Segment } from './motion';
+import { findPath, tileToPoint, type Point, type TilePath } from './path';
 import { DEFAULT_SEATS } from './scenes';
 import { PLAY_SPOTS, type PlaySpot } from './idleSpots';
 
@@ -143,9 +143,18 @@ export type IdleMark =
   | { readonly kind: 'z'; readonly rise: number }
   | { readonly kind: 'bubble'; readonly glyph: '…' | '♪' };
 
+/** Between two tiles: `progress` (0 to 1) of the way from `from` to `to`; equal tiles when still. */
+export interface IdleStep {
+  readonly from: TilePos;
+  readonly to: TilePos;
+  readonly progress: number;
+}
+
 export interface IdlePose {
   /** The feet on the floor, before the seat's sink. */
   readonly feet: Point;
+  /** Where the feet are on the tile grid (to walk back from exactly there). */
+  readonly step: IdleStep;
   readonly frame: MoveFrame;
   readonly flip: boolean;
   /** Added after the sink (nodding, sleeping deeper), logical px. */
@@ -154,6 +163,18 @@ export interface IdlePose {
 }
 
 const STILL: Point = { x: 0, y: 0 };
+
+const still = (tile: TilePos): IdleStep => ({ from: tile, to: tile, progress: 0 });
+
+/** The step of a walk at `now` (as motion.poseOnSegment places the feet). */
+function stepOn(segment: Segment, now: number): IdleStep {
+  const { path } = segment;
+  const elapsed = Math.min(Math.max(now - segment.start, 0), segment.end - segment.start);
+  const progress = elapsed / MS_PER_TILE;
+  const index = Math.min(Math.floor(progress), path.length - 2);
+  const from = path[index] ?? path[0];
+  return { from, to: path[index + 1] ?? from, progress: progress - index };
+}
 
 function phase(salt: number, now: number, cycleMs: number): { index: number; elapsed: number } {
   const t = now + (salt % cycleMs);
@@ -165,13 +186,15 @@ function phase(salt: number, now: number, cycleMs: number): { index: number; ela
 function dozePose(seat: TilePos, salt: number, now: number): IdlePose {
   const { index, elapsed } = phase(salt, now, IDLE.dozeCycleMs);
   const feet = tileToPoint(seat);
+  const step = still(seat);
   if (index % 4 === 0 && elapsed < IDLE.yawnMs) {
-    return { feet, frame: 1, flip: index % 8 === 0, offset: STILL, mark: null };
+    return { feet, step, frame: 1, flip: index % 8 === 0, offset: STILL, mark: null };
   }
   const nod = Math.floor(elapsed / (IDLE.nodMs / 2)) % 2 === 1 ? IDLE.nodPx : 0;
   const dots = index % 3 === 1 && elapsed < IDLE.dozeDotsMs;
   return {
     feet,
+    step,
     frame: 0,
     flip: false,
     offset: { x: 0, y: nod },
@@ -183,6 +206,7 @@ function sleepPose(seat: TilePos, salt: number, now: number): IdlePose {
   const { elapsed } = phase(salt, now, IDLE.zRiseMs);
   return {
     feet: tileToPoint(seat),
+    step: still(seat),
     frame: 0,
     flip: false,
     offset: { x: 0, y: IDLE.sleepSinkPx },
@@ -195,7 +219,14 @@ function stayPose(outing: Outing, now: number): IdlePose {
   const { spot } = outing;
   const feet = tileToPoint(spot.tile);
   const step = Math.floor((now - outing.out.end) / IDLE.bubbleMs);
-  const base = { feet, frame: 0 as const, flip: false, offset: STILL, mark: null };
+  const base = {
+    feet,
+    step: still(spot.tile),
+    frame: 0 as const,
+    flip: false,
+    offset: STILL,
+    mark: null,
+  };
   if (spot.kind === 'chat' && spot.partner !== null) {
     const glyph = step % 2 === 0 ? '…' : '♪';
     const flip = DEFAULT_SEATS[spot.partner].col < spot.tile.col;
@@ -217,7 +248,14 @@ function playPose(outing: Outing, now: number): IdlePose {
   else if (now >= outing.back.start) walking = outing.back;
   if (walking === null) return stayPose(outing, now);
   const pose = poseOnSegment(walking, now);
-  return { feet: pose.point, frame: pose.frame, flip: pose.flip, offset: STILL, mark: null };
+  return {
+    feet: pose.point,
+    step: stepOn(walking, now),
+    frame: pose.frame,
+    flip: pose.flip,
+    offset: STILL,
+    mark: null,
+  };
 }
 
 export function idlePose(
@@ -248,11 +286,27 @@ export function idlePosesAt(
   return poses;
 }
 
-/** The tile nearest the feet, or null when that is the seat (no need to walk back). */
-export function awayTile(feet: Point, seat: TilePos): TilePos | null {
-  const tile = {
-    col: Math.round(feet.x / TILE_SIZE - 0.5),
-    row: Math.round(feet.y / TILE_SIZE - 1),
-  };
-  return tile.col === seat.col && tile.row === seat.row ? null : tile;
+/**
+ * The walk back to the seat from exactly where the feet are, starting at `now`; null when already
+ * on the seat or there is no way. Between two tiles the walk goes on through the one the seat is
+ * nearer from; the segment then starts a little before `now`, so the feet do not jump.
+ */
+export function homeWalk(step: IdleStep, seat: TilePos, now: number): Segment | null {
+  const { from, to, progress } = step;
+  const same = (a: TilePos, b: TilePos) => a.col === b.col && a.row === b.row;
+  if (same(from, to)) {
+    if (same(from, seat)) return null;
+    const path = findPath(from, seat);
+    return path === null || path.length < 2 ? null : walkSegment(path, now);
+  }
+  const ways = [
+    { first: from, rest: findPath(to, seat), done: progress },
+    { first: to, rest: findPath(from, seat), done: 1 - progress },
+  ].flatMap(({ first, rest, done }) =>
+    rest === null ? [] : [walkSegment([first, ...rest], now - done * MS_PER_TILE)],
+  );
+  return ways.reduce<Segment | null>(
+    (best, walk) => (best === null || walk.end < best.end ? walk : best),
+    null,
+  );
 }

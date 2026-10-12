@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { MemberState } from '../domain/party';
 import type { MemberId, TilePos } from '../guild.config';
 import {
-  awayTile,
+  homeWalk,
   createIdleSeeds,
   idleActivities,
   idleHash,
@@ -17,6 +17,7 @@ import {
 import { PLAY_SPOTS } from './idleSpots';
 import { isUnderWindow, isWalkable } from './map';
 import { IDLE } from './metrics';
+import { MS_PER_TILE, poseOnSegment } from './motion';
 import { tileToPoint } from './path';
 import { DEFAULT_SEATS } from './scenes';
 
@@ -53,9 +54,8 @@ function tilesWalked(id: MemberId, kind: string): TilePos[] {
   const outing = outingFor(id, kind);
   const tiles: TilePos[] = [];
   for (let now = outing.out.start; now < outing.back.end; now += 50) {
-    const pose = idlePose({ kind: 'play', outing }, DEFAULT_SEATS[id], 1, now);
-    const tile = awayTile(pose.feet, DEFAULT_SEATS[id]);
-    if (tile !== null) tiles.push(tile);
+    const { step } = idlePose({ kind: 'play', outing }, DEFAULT_SEATS[id], 1, now);
+    tiles.push(step.from, step.to);
   }
   return tiles;
 }
@@ -345,15 +345,66 @@ describe('idlePosesAt', () => {
   });
 });
 
-describe('awayTile', () => {
+describe('homeWalk', () => {
   const seat = DEFAULT_SEATS.sasae;
-  it('is null on the seat, the nearest tile elsewhere', () => {
-    expect(awayTile(tileToPoint(seat), seat)).toBeNull();
-    const next = { col: seat.col - 1, row: seat.row };
-    expect(awayTile(tileToPoint(next), seat)).toEqual(next);
-    const between = { x: tileToPoint(next).x + 10, y: tileToPoint(next).y };
-    expect(awayTile(between, seat)).toEqual(next);
-    const nearSeat = { x: tileToPoint(next).x + 20, y: tileToPoint(next).y };
-    expect(awayTile(nearSeat, seat)).toBeNull();
+  const left = { col: seat.col - 1, row: seat.row };
+  const twoLeft = { col: seat.col - 2, row: seat.row };
+  const still = (tile: TilePos) => ({ from: tile, to: tile, progress: 0 });
+
+  it('is null on the seat or when there is no way', () => {
+    expect(homeWalk(still(seat), seat, 0)).toBeNull();
+    expect(homeWalk(still({ col: -3, row: 0 }), seat, 0)).toBeNull();
+  });
+
+  it('walks back from a tile, starting now', () => {
+    const walk = homeWalk(still(twoLeft), seat, 1_000);
+    expect(walk?.start).toBe(1_000);
+    expect(walk?.path).toEqual([twoLeft, left, seat]);
+  });
+
+  it('goes on from between two tiles without a jump, toward the seat', () => {
+    const step = { from: twoLeft, to: left, progress: 0.4 };
+    const walk = homeWalk(step, seat, 1_000);
+    expect(walk?.path).toEqual([twoLeft, left, seat]);
+    expect(walk?.start).toBeCloseTo(1_000 - 0.4 * MS_PER_TILE);
+    if (walk === null) return;
+    const feet = poseOnSegment(walk, 1_000).point;
+    expect(feet.x).toBeCloseTo(
+      tileToPoint(twoLeft).x + 0.4 * (tileToPoint(left).x - tileToPoint(twoLeft).x),
+    );
+  });
+
+  it('turns round between two tiles when walking away from the seat', () => {
+    const step = { from: left, to: twoLeft, progress: 0.25 };
+    const walk = homeWalk(step, seat, 1_000);
+    expect(walk?.path).toEqual([twoLeft, left, seat]);
+    expect(walk?.start).toBeCloseTo(1_000 - 0.75 * MS_PER_TILE);
+    if (walk === null) return;
+    const feet = poseOnSegment(walk, 1_000).point;
+    expect(feet.x).toBeCloseTo(
+      tileToPoint(left).x - 0.25 * (tileToPoint(left).x - tileToPoint(twoLeft).x),
+    );
+  });
+
+  it('finishes the last step when it was just leaving the seat', () => {
+    const walk = homeWalk({ from: seat, to: left, progress: 0.1 }, seat, 500);
+    expect(walk?.path).toEqual([left, seat]);
+    expect(walk?.end).toBeCloseTo(500 + 0.1 * MS_PER_TILE);
+  });
+
+  it('matches the pose of a member out playing at any moment', () => {
+    const outing = outingFor('hirame', 'pet');
+    for (let now = outing.out.start; now < outing.back.end; now += 333) {
+      const pose = idlePose({ kind: 'play', outing }, DEFAULT_SEATS.hirame, 1, now);
+      const walk = homeWalk(pose.step, DEFAULT_SEATS.hirame, now);
+      if (walk === null) {
+        expect(pose.feet).toEqual(tileToPoint(DEFAULT_SEATS.hirame));
+        continue;
+      }
+      const start = poseOnSegment(walk, now).point;
+      expect(start.x).toBeCloseTo(pose.feet.x);
+      expect(start.y).toBeCloseTo(pose.feet.y);
+      expect(walk.path.at(-1)).toEqual(DEFAULT_SEATS.hirame);
+    }
   });
 });
