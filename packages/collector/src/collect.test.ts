@@ -29,7 +29,7 @@ describe('collectSnapshot', () => {
     let fileCalls = 0;
     const gh: GhRunner = async (args) => {
       const path = args.at(-1) ?? '';
-      if (path.includes('pulls?state=open')) {
+      if (path.includes('pulls?state=all')) {
         return lines(Array.from({ length: OPEN_PR_COUNT }, (_, i) => openPr(i + 1)));
       }
       if (!path.includes('/files')) return '';

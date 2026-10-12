@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { ghApiProjected, parseOrThrow, type GhRunner } from './gh.ts';
-import { bothOrThrow } from './limit.ts';
 
 // Each list is projected inside gh (jq) to exactly these fields, so issue
 // bodies and file diffs never reach the collector. strictObject catches a
@@ -57,17 +56,19 @@ export async function fetchIssues(gh: GhRunner, repo: string): Promise<RawIssue[
   return parseOrThrow(z.array(rawIssueSchema), issues);
 }
 
-/** Every open PR and every closed PR (the pulls API has no `since`). */
+/**
+ * Every PR, open and closed, from one list sorted by creation time, for the same reason as
+ * fetchIssues: a PR updated, merged or closed while the pages are read keeps its place, so it is
+ * read at least once (a list sorted by update time would move it to the front, past the pages
+ * already read). A PR read twice (a new PR shifted the pages) is newest in the copy read last.
+ */
 export async function fetchPrs(gh: GhRunner, repo: string): Promise<RawPr[]> {
-  const [open, closed] = await bothOrThrow(
-    ghApiProjected(gh, `repos/${repo}/pulls?state=open&${PER_PAGE}`, PR_PROJECTION),
-    ghApiProjected(
-      gh,
-      `repos/${repo}/pulls?state=closed&sort=updated&direction=desc&${PER_PAGE}`,
-      PR_PROJECTION,
-    ),
+  const prs = await ghApiProjected(
+    gh,
+    `repos/${repo}/pulls?state=all&sort=created&direction=desc&${PER_PAGE}`,
+    PR_PROJECTION,
   );
-  return parseOrThrow(z.array(rawPrSchema), [...open, ...closed]);
+  return parseOrThrow(z.array(rawPrSchema), prs);
 }
 
 /** Paths of the files a PR changes (never the diff itself). */

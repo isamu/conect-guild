@@ -50,8 +50,7 @@ const MERGED_PR = {
 /** Projected items per endpoint, one array per page; issues span three pages and files two. */
 const OUTPUTS: Record<string, unknown[][]> = {
   'issues?state=all': [[ISSUE, PR_AS_ISSUE], [OLD_CLOSED_ISSUE], [NOT_PLANNED_ISSUE]],
-  'pulls?state=open': [[OPEN_PR]],
-  'pulls?state=closed': [[MERGED_PR]],
+  'pulls?state=all': [[OPEN_PR], [MERGED_PR]],
   'pulls/2/files': [['a/CLAUDE.md'], ['b.md']],
 };
 

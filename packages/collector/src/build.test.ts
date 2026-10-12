@@ -97,19 +97,14 @@ describe('selectRecentPrs', () => {
     expect(selectRecentPrs(items, CUTOFF).map((p) => p.number)).toEqual([1, 2, 3]);
   });
 
-  it('keeps the closed copy when a PR was merged while the lists were fetched', () => {
+  it('keeps the copy read last when a PR was read twice (merged while the pages were read)', () => {
     const merged = pr({
       number: 7,
       state: 'closed',
       merged_at: '2026-10-11T00:00:00Z',
       closed_at: '2026-10-11T00:00:00Z',
     });
-    for (const items of [
-      [pr({ number: 7 }), merged],
-      [merged, pr({ number: 7 })],
-    ]) {
-      expect(selectRecentPrs(items, CUTOFF)).toEqual([merged]);
-    }
+    expect(selectRecentPrs([pr({ number: 7 }), merged], CUTOFF)).toEqual([merged]);
   });
 });
 

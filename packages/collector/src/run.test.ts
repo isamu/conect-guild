@@ -77,11 +77,7 @@ describe('collectOnce: nothing is written', () => {
       'gh-failed',
     ],
     ['gh prints broken JSON', { 'issues?state=all': '{"number":\n' }, 'validation-failed'],
-    [
-      'an item has the wrong shape',
-      { 'pulls?state=open': '{"number":"x"}\n' },
-      'validation-failed',
-    ],
+    ['an item has the wrong shape', { 'pulls?state=all': '{"number":"x"}\n' }, 'validation-failed'],
     ['a file entry is not a path', { 'pulls/2/files': '{"filename":"a"}\n' }, 'validation-failed'],
     [
       'gh fails for the issues (the history)',
@@ -270,5 +266,46 @@ describe('collectOnce: an issue that changes while the pages are read', () => {
     expect(snapshot.history.openedIssueCount).toBe(1);
     expect(snapshot.history.completedIssues).toEqual(completed);
     expect(snapshot.issues.map((i) => i.number)).toEqual([7]);
+  });
+});
+
+describe('collectOnce: PRs that change while the pages are read', () => {
+  const base = {
+    title: SECRET_TITLE,
+    body: 'Closes #1',
+    head_ref: SECRET_BRANCH,
+  };
+  const open = (number: number) => ({
+    ...base,
+    number,
+    state: 'open',
+    merged_at: null,
+    closed_at: null,
+  });
+  const merged = (number: number) => ({
+    ...base,
+    number,
+    state: 'closed',
+    merged_at: '2026-10-11T00:00:00Z',
+    closed_at: '2026-10-11T00:00:00Z',
+  });
+  const lines = (...items: object[]) => items.map((i) => `${JSON.stringify(i)}\n`).join('');
+
+  it('counts a PR merged at a page boundary once and fetches no files for it', async () => {
+    // Page 1 ends with PR 8 still open; a new PR 9 shifts the pages, so page 2 starts with PR 8
+    // again, now merged. An old merged PR 3 updated meanwhile keeps its place (creation order).
+    const gh = fakeGh({ 'pulls?state=all': lines(open(9), open(8), merged(8), merged(3)) });
+    const deps = harness(gh);
+    await collectOnce(deps);
+    const snapshot = snapshotSchema.parse(JSON.parse(deps.writes[0] ?? ''));
+    expect(snapshot.history.mergedPrs.map((p) => p.number)).toEqual([3, 8]);
+    expect(snapshot.prs.map((p) => [p.number, p.state])).toEqual([
+      [9, 'open'],
+      [8, 'closed'],
+      [3, 'closed'],
+    ]);
+    expect(gh.calls.filter((c) => c.includes('/files'))).toEqual([
+      'repos/yukihiroyamaguchi569/conect-management/pulls/9/files?per_page=100',
+    ]);
   });
 });

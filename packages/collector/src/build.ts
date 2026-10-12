@@ -29,25 +29,11 @@ function isOpenOrRecentlyClosed(
 }
 
 /**
- * One issue per number. Issues come from one list read page by page (github.ts fetchIssues), so
- * an issue read twice (the pages shifted) is newest in the copy read last.
+ * One item per number. Issues and PRs each come from one list read page by page (github.ts), so
+ * an item read twice (the pages shifted) is newest in the copy read last.
  */
-function uniqueReadLast(issues: readonly RawIssue[]): RawIssue[] {
-  return [...new Map(issues.map((issue) => [issue.number, issue])).values()];
-}
-
-/**
- * One item per number. An item fetched from both the open and the closed list
- * was closed while we were fetching, so the closed copy wins.
- */
-function uniquePreferClosed<
-  T extends { readonly number: number; readonly state: 'open' | 'closed' },
->(items: readonly T[]): T[] {
-  const byNumber = new Map<number, T>();
-  for (const item of items) {
-    if (!byNumber.has(item.number) || item.state === 'closed') byNumber.set(item.number, item);
-  }
-  return [...byNumber.values()];
+function uniqueReadLast<T extends { readonly number: number }>(items: readonly T[]): T[] {
+  return [...new Map(items.map((item) => [item.number, item])).values()];
 }
 
 function isoOrNull(value: string | null): string | null {
@@ -72,7 +58,7 @@ export function toSnapshotIssues(raw: readonly RawIssue[], cutoff: Date): Snapsh
 
 /** All open PRs and those closed or merged since `cutoff`. */
 export function selectRecentPrs(raw: readonly RawPr[], cutoff: Date): RawPr[] {
-  return uniquePreferClosed(raw).filter((pr) => isOpenOrRecentlyClosed(pr, cutoff));
+  return uniqueReadLast(raw).filter((pr) => isOpenOrRecentlyClosed(pr, cutoff));
 }
 
 /** Snapshot form of a PR. The body is read for links only and dropped here. */
@@ -127,7 +113,7 @@ export function toHistory(
   const completed = issues.filter(
     (issue) => issue.state === 'closed' && issue.state_reason === 'completed',
   );
-  const merged = uniquePreferClosed(rawPrs).filter((pr) => pr.merged_at !== null);
+  const merged = uniqueReadLast(rawPrs).filter((pr) => pr.merged_at !== null);
   return {
     openedIssueCount: issues.length,
     completedIssues: completed.map(toHistoryIssue).toSorted(byNumber),

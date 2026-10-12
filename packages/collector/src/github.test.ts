@@ -98,6 +98,15 @@ describe('fetchPrs', () => {
     const filter = projectionFilter(
       '{number, title, body, state, merged_at, closed_at, head_ref: .head.ref}',
     );
-    expect(gh.filters).toEqual([filter, filter]);
+    expect(gh.filters).toEqual([filter]);
+  });
+
+  it('asks for every PR in one list sorted by creation, so an updated PR keeps its page', async () => {
+    const gh = recordingGh('');
+    await fetchPrs(gh, 'o/r');
+    expect(gh.args.map((a) => a.at(-1))).toEqual([
+      'repos/o/r/pulls?state=all&sort=created&direction=desc&per_page=100',
+    ]);
+    expect(gh.args.every((a) => a.includes('--paginate'))).toBe(true);
   });
 });

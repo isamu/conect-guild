@@ -162,15 +162,15 @@ describe('toHistory: PRs', () => {
     expect(history.mergedPrs[0]?.linkedIssues).toEqual([7, 8]);
   });
 
-  it('counts a PR seen as open and as merged once, as merged', () => {
-    const merged = pr(7);
+  it('counts a PR read twice (the pages shifted) once, in the state read last', () => {
     const open = pr(7, { state: 'open', merged_at: null, closed_at: null });
-    for (const prs of [
-      [open, merged],
-      [merged, open],
-    ]) {
-      expect(historyOf([], prs).mergedPrs.map((p) => p.number)).toEqual([7]);
-    }
+    // Merged while the pages were read.
+    expect(historyOf([], [open, pr(7)]).mergedPrs.map((p) => p.number)).toEqual([7]);
+    // Read twice as merged, the second copy with a relabelled branch: the later copy wins.
+    const later = pr(7, { head_ref: 'pr/x' });
+    expect(historyOf([], [pr(7), later]).mergedPrs).toEqual([
+      { number: 7, linkedIssues: [], branchDepartment: '広報' },
+    ]);
   });
 
   it('sorts by number', () => {
