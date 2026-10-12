@@ -33,8 +33,11 @@ export interface CallView {
 }
 
 export interface Calls {
-  /** The king calls `members` at stage time `t`, or after the call playing; none while halted. */
-  add(members: readonly MemberId[], t: number): void;
+  /**
+   * The king calls `members` at stage time `t`, or after the call playing; none while halted, nor
+   * for a null `t` (nothing is drawn: the page is hidden or the canvas not shown). True when added.
+   */
+  add(members: readonly MemberId[], t: number | null): boolean;
   /** Halted (the screen is not live): the calls to come and the one playing are dropped. */
   setHalted(halted: boolean): void;
   /**
@@ -58,7 +61,9 @@ export function createCalls(options: CallsOptions): Calls {
   let halted = false;
   return {
     add(members, t) {
-      if (!halted) list = addSummons(list, members, t);
+      if (halted || t === null || members.length === 0) return false;
+      list = addSummons(list, members, t);
+      return true;
     },
     setHalted(next) {
       halted = next;

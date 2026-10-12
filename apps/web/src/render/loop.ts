@@ -392,8 +392,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
       refresh();
     },
     summon(members) {
-      if (!paused()) cast.calls.add(members, stageNow());
-      schedule.now();
+      if (cast.calls.add(members, paused() ? null : stageNow())) schedule.now();
     },
     setParty(party) {
       ({ bubbles, moods } = party);
