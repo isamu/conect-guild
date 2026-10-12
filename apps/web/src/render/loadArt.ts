@@ -36,11 +36,16 @@ const SPRITE_URLS: Readonly<Record<MemberId, string>> = {
   yukihiro: yukihiroUrl,
 };
 
-async function loadImage(url: string): Promise<HTMLImageElement> {
-  const image = new Image();
-  image.src = url;
-  await image.decode();
-  return image;
+/**
+ * Fetched and revalidated, not through an <img>: in development the URLs carry no content hash, so
+ * when the art is loaded again in the same page (a component remounted by HMR) an <img> of the same
+ * URL comes from the page's image cache, and a 4-frame sheet stayed after the 7-frame one replaced
+ * it (hands.hasHoldFrames: items raised without lifting the hands).
+ */
+async function loadImage(url: string): Promise<ImageBitmap> {
+  const response = await fetch(url, { cache: 'no-cache' });
+  if (!response.ok) throw new Error(`picture: HTTP ${String(response.status)}`);
+  return createImageBitmap(await response.blob());
 }
 
 async function loadTiles(): Promise<TileArt> {
