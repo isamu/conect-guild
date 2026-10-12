@@ -2,8 +2,9 @@ import type { GuildEvent } from '../domain/events';
 import type { MemberId, TilePos } from '../guild.config';
 import { ambientPose, type AmbientMoods, type AmbientSeeds, type HandProp } from './ambient';
 import { burstOrigin, confettiAt, CONFETTI_MS, type PlacedParticle } from './confetti';
-import { poseOnSegment, standingPose, type Pose, type SpriteFrame } from './motion';
-import type { Point } from './path';
+import type { IdleMark, IdlePose, IdlePoses } from './idle';
+import { poseOnSegment, standingPose, walkSegment, type Pose, type SpriteFrame } from './motion';
+import { findPath, type Point } from './path';
 import { seatedPoint } from './seating';
 import { castOf, planScene, type Burst, type SceneContext, type Track } from './scenes';
 
@@ -52,6 +53,8 @@ export interface MemberPose {
   readonly hand: HandProp | null;
   /** True while the member is in a scene (inScene): no ambient move and no waiting bubble. */
   readonly inScene: boolean;
+  /** A sign over the head in a long idle spell ("Z", "…", "♪"); null otherwise. */
+  readonly mark: IdleMark | null;
 }
 
 /** The small moves while members are out of scenes (ambient.ts). */
@@ -60,6 +63,8 @@ export interface AmbientContext {
   readonly seeds: AmbientSeeds;
   /** True when the member's sheet has the holding frames (art.SpriteArt.hasHoldFrames). */
   readonly hasHoldFrames: (id: MemberId) => boolean;
+  /** Members in a long idle spell (idle.ts): these replace the ambient move out of scenes. */
+  readonly idle?: IdlePoses;
 }
 
 export interface ConfettiView {
@@ -105,6 +110,26 @@ export function scheduleEvent(
   };
 }
 
+/**
+ * A member out playing (idle.ts) walks back from `from` to their seat, starting at `now` or when
+ * their current track ends. As a track it makes scenes for them wait until they are back.
+ */
+export function sendHome(
+  director: Director,
+  walk: { readonly id: MemberId; readonly from: TilePos; readonly seat: TilePos },
+  now: number,
+): Director {
+  const { id, from, seat } = walk;
+  const path = findPath(from, seat);
+  if (path === null || path.length < 2) return director;
+  const segment = walkSegment(path, Math.max(now, director.busyUntil[id] ?? now));
+  return {
+    ...director,
+    tracks: [...director.tracks, { actor: id, segments: [segment] }],
+    busyUntil: { ...director.busyUntil, [id]: segment.end },
+  };
+}
+
 /** Where a member is at `now`: on a running track, otherwise standing at their seat. */
 export function poseAt(director: Director, id: MemberId, now: number, seat: TilePos): Pose {
   for (const track of director.tracks) {
@@ -127,6 +152,24 @@ export function inScene(director: Director, id: MemberId, now: number): boolean 
   );
 }
 
+/** The member as their long idle spell shows them: dozing, asleep or out playing. */
+function idleMember(id: MemberId, idle: IdlePose): MemberPose {
+  const sunk = seatedPoint(idle.feet);
+  return {
+    id,
+    pose: {
+      point: { x: sunk.x + idle.offset.x, y: sunk.y + idle.offset.y },
+      frame: idle.frame,
+      flip: idle.flip,
+      held: null,
+    },
+    depth: idle.feet.y,
+    hand: null,
+    inScene: false,
+    mark: idle.mark,
+  };
+}
+
 /** Applies the member's ambient move to the pose at their seat; scenes are left as they are. */
 function withAmbient(
   member: MemberPose,
@@ -137,6 +180,7 @@ function withAmbient(
   if (ambient === undefined || mood === undefined || member.inScene) {
     return member;
   }
+  if (ambient.idle?.[member.id] !== undefined) return member;
   const move = ambientPose(mood, ambient.seeds[member.id], now, ambient.hasHoldFrames(member.id));
   const { point } = member.pose;
   return {
@@ -159,13 +203,17 @@ export function frameAt(
 ): StageFrame {
   // Ordered by the tile before sinking and the ambient offsets, so a bob never swaps who is in front.
   const members = MEMBER_IDS.map((id): MemberPose => {
+    const scene = inScene(director, id, now);
+    const idle = ambient?.idle?.[id];
+    if (!scene && idle !== undefined) return idleMember(id, idle);
     const pose = poseAt(director, id, now, seats[id]);
     return {
       id,
       pose: { ...pose, point: seatedPoint(pose.point) },
       depth: pose.point.y,
       hand: null,
-      inScene: inScene(director, id, now),
+      inScene: scene,
+      mark: null,
     };
   })
     .sort((a, b) => a.depth - b.depth)

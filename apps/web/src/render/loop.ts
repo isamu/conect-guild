@@ -29,7 +29,9 @@ import { drawLightPatches, drawShade, drawWindowSun, type ShadeScratch } from '.
 import { BACK_ANIMATED_DECOR, FRONT_LAYERS } from './layers';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './map';
 import { AMBIENT } from './metrics';
-import { DEFAULT_SEATS } from './scenes';
+import type { IdleSince } from './idle';
+import { createIdleCrew, type IdleCrew } from './idleCrew';
+import { castOf, DEFAULT_SEATS } from './scenes';
 import { decorCuesOf, type DecorCues } from './trinkets';
 
 /**
@@ -63,14 +65,27 @@ export interface RenderLoopOptions {
   readonly localHour?: () => number;
   readonly random?: Random;
   readonly visibility?: PageVisibility;
+  /** Epoch ms, for the long idle spells (idle.ts); they go on while the page is hidden. */
+  readonly wallNow?: () => number;
+  /** Members in a scene at `at` (epoch ms), on every frame that shows them in one. */
+  readonly onActive?: (ids: readonly MemberId[], at: number) => void;
+}
+
+export interface StageParty {
+  readonly bubbles: Bubbles;
+  readonly moods: AmbientMoods;
+  readonly idleSince: IdleSince;
 }
 
 export interface RenderLoop {
   /** Starts the scene for an event now (or when its cast is free); dropped while not shown. */
   play(event: GuildEvent): void;
-  setBubbles(bubbles: Bubbles): void;
-  /** The members' ambient moves (from the party state). */
-  setMoods(moods: AmbientMoods): void;
+  /**
+   * What the party state shows on the stage: the waiting bubbles, the ambient moves, and since
+   * when each member has had nothing to do (idle.ts; a member whose time changes while out playing
+   * walks back to their seat).
+   */
+  setParty(party: StageParty): void;
   /** Matches the backing store to the displayed width (CSS px) and the device pixel ratio. */
   resize(cssWidth: number, pixelRatio: number): void;
   /** Cancels the pending frame and stops listening; the loop does nothing after this. */
@@ -238,14 +253,38 @@ function createPainter(ctx: CanvasRenderingContext2D, art: GuildArt): Painter {
   return { ctx, scratch: { ctx: context2d(image), image }, background, front, art };
 }
 
+/** The members' small moves and long idle spells over the director's scenes. */
+function createCast(
+  art: GuildArt,
+  random: Random,
+  options: Pick<RenderLoopOptions, 'wallNow' | 'onActive'>,
+): { crew: IdleCrew; frame: (director: Director, t: number, moods: AmbientMoods) => StageFrame } {
+  const seeds = createAmbientSeeds(random);
+  const hasHoldFrames = (id: MemberId): boolean => art.sprites.hasHoldFrames(id);
+  const crew = createIdleCrew({
+    random,
+    wallNow: options.wallNow ?? (() => Date.now()),
+    onActive: options.onActive,
+  });
+  return {
+    crew,
+    frame: (director, t, moods) =>
+      frameAt(director, t, DEFAULT_SEATS, {
+        moods,
+        seeds,
+        hasHoldFrames,
+        idle: crew.frame(director, t),
+      }),
+  };
+}
+
 export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   const { canvas, art } = options;
   const now = options.now ?? (() => performance.now());
   const localHour = options.localHour ?? (() => hourOf(new Date()));
   const random = options.random ?? Math.random;
   const painter = createPainter(context2d(canvas), art);
-  const seeds = createAmbientSeeds(random);
-  const hasHoldFrames = (id: MemberId): boolean => art.sprites.hasHoldFrames(id);
+  const cast = createCast(art, random, options);
   const visibility = options.visibility ?? documentVisibility;
   // Narrow screens hide the canvas (display: none): its width is 0 and nothing is drawn.
   let cssWidth = 1;
@@ -258,7 +297,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
 
   function draw(): void {
     const t = stageNow();
-    const frame = frameAt(director, t, DEFAULT_SEATS, { moods, seeds, hasHoldFrames });
+    const frame = cast.frame(director, t, moods);
     const cues = decorCuesOf(moods, director.bursts, t);
     paint(painter, scale, { now: t, hour: localHour(), frame, bubbles, cues });
     director = prune(director, t);
@@ -283,15 +322,14 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   refresh();
   return {
     play(event) {
-      director = scheduleEvent(director, event, stageNow(), { seats: DEFAULT_SEATS, random });
+      // The cast comes back from play first; the scene waits for them (scheduleEvent).
+      const back = cast.crew.callCast(director, castOf(event), stageNow());
+      director = scheduleEvent(back, event, stageNow(), { seats: DEFAULT_SEATS, random });
       refresh();
     },
-    setBubbles(next) {
-      bubbles = next;
-      schedule.now();
-    },
-    setMoods(next) {
-      moods = next;
+    setParty(party) {
+      ({ bubbles, moods } = party);
+      director = cast.crew.setSince(director, party.idleSince, stageNow());
       schedule.now();
     },
     resize(nextCssWidth, pixelRatio) {
