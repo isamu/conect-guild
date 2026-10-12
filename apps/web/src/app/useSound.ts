@@ -41,26 +41,16 @@ export function useSound(sources: SoundSources) {
     for (const type of UNLOCK_EVENTS) document.removeEventListener(type, unlock, { capture: true });
   });
 
-  // Registered first, so a halt and a message of the same fetch see the halt first.
+  // One watcher for the halt, the party and the message: a fetch that changes several of them is
+  // handed over whole, so the controller judges them in its own order, not the watchers'.
   watch(
-    sources.halted,
-    (halted) => {
-      controller.setHalted(halted);
-    },
-    { immediate: true },
-  );
-  // Once per message: the id changes when a new message reaches the window.
-  watch(
-    () => sources.message.value?.id,
-    () => {
-      const message = sources.message.value;
-      if (message !== null) controller.messageShown(message);
-    },
-  );
-  watch(
-    sources.party,
-    (rows) => {
-      controller.partyChanged(rows);
+    () => ({
+      halted: sources.halted(),
+      party: sources.party.value,
+      message: sources.message.value,
+    }),
+    (screen) => {
+      controller.screenChanged(screen);
     },
     { immediate: true },
   );

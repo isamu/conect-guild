@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createKeyValueStore, type StorageLike } from '../adapters/storage';
 import type { GuildEvent, GuildEventKind } from '../domain/events';
-import { createSoundController } from './controller';
+import { createSoundController, type SoundScreen } from './controller';
 import type { PartyMember } from './judge';
 import type { TonePlayer } from './player';
 import { SCORES, type Score, type SoundCue } from './scores';
@@ -67,14 +67,26 @@ function setup(stored?: { enabled: boolean; volume: 1 | 2 | 3 }) {
   if (stored !== undefined) storage.items.set(SOUND_STORAGE_KEY, JSON.stringify(stored));
   const player = new FakePlayer();
   const controller = createSoundController({ player, storage: createKeyValueStore(() => storage) });
-  return { storage, player, controller };
+  let screen: SoundScreen = { halted: false, party: [], message: null };
+  let nextId = 1;
+  /** Hands over the screen with `patch` applied, as the one watcher in app/useSound.ts does. */
+  const show = (patch: Partial<SoundScreen>) => {
+    screen = { ...screen, ...patch };
+    controller.screenChanged(screen);
+  };
+  /** A new message (a new id) with the event of `kind`, or a notice for null. */
+  const message = (kind: GuildEventKind | null) => ({
+    id: nextId++,
+    event: kind === null ? null : event(kind),
+  });
+  return { storage, player, controller, show, message };
 }
 
 describe('createSoundController: settings', () => {
   it('starts muted and plays nothing', () => {
-    const { player, controller } = setup();
+    const { player, controller, show, message } = setup();
     expect(controller.settings()).toEqual({ enabled: false, volume: 2 });
-    controller.messageShown({ event: event('pr-merged') });
+    show({ message: message('pr-merged') });
     expect(player.played).toEqual([]);
   });
 
@@ -135,88 +147,96 @@ describe('createSoundController: settings', () => {
 
 describe('createSoundController: messages', () => {
   it('plays each event kind its own sound, and the blips for a notice', () => {
-    const { player, controller } = setup({ enabled: true, volume: 3 });
-    controller.messageShown({ event: event('issue-opened') });
-    controller.messageShown({ event: event('pr-merged') });
-    controller.messageShown({ event: event('issue-closed') });
-    controller.messageShown({ event: null });
+    const { player, show, message } = setup({ enabled: true, volume: 3 });
+    show({ message: message('issue-opened') });
+    show({ message: message('pr-merged') });
+    show({ message: message('issue-closed') });
+    show({ message: message(null) });
     expect(cues(player)).toEqual(['scroll', 'chest', 'clear', 'text']);
     expect(player.played.every((entry) => entry.volume === VOLUME_GAIN[3])).toBe(true);
   });
 
+  it('plays a message once, however often the rest of the screen changes', () => {
+    const { player, show, message } = setup({ enabled: true, volume: 2 });
+    show({ message: message('pr-merged') });
+    show({ party: party() });
+    show({ party: party() });
+    show({ message: null });
+    expect(cues(player)).toEqual(['chest']);
+  });
+
   it('stays silent while the page is hidden, and does not catch up when shown', () => {
-    const { player, controller } = setup({ enabled: true, volume: 2 });
+    const { player, controller, show, message } = setup({ enabled: true, volume: 2 });
     controller.setHidden(true);
-    controller.messageShown({ event: event('pr-merged') });
+    show({ message: message('pr-merged') });
     controller.setHidden(false);
+    show({ party: party() });
     expect(player.played).toEqual([]);
-    controller.messageShown({ event: event('issue-closed') });
+    show({ message: message('issue-closed') });
     expect(cues(player)).toEqual(['clear']);
   });
 
-  it('stays silent while halted', () => {
-    const { player, controller } = setup({ enabled: true, volume: 2 });
-    controller.setHalted(true);
-    controller.messageShown({ event: event('issue-opened') });
-    controller.partyChanged(party());
-    controller.partyChanged(party('minori'));
+  it('stays silent for a message that arrives with the halt (same fetch)', () => {
+    const { player, show, message } = setup({ enabled: true, volume: 2 });
+    show({ halted: true, message: message('issue-opened') });
+    show({ party: party() });
+    show({ party: party('minori') });
     expect(player.played).toEqual([]);
-    controller.setHalted(false);
-    controller.messageShown({ event: event('issue-opened') });
+    show({ halted: false, message: message('issue-opened') });
     expect(cues(player)).toEqual(['scroll']);
   });
 });
 
 describe('createSoundController: permissions', () => {
   it('rings once when someone newly waits, not again while they keep waiting', () => {
-    const { player, controller } = setup({ enabled: true, volume: 2 });
-    controller.partyChanged(party());
-    controller.partyChanged(party('minori'));
-    controller.partyChanged(party('minori'));
+    const { player, show } = setup({ enabled: true, volume: 2 });
+    show({ party: party() });
+    show({ party: party('minori') });
+    show({ party: party('minori') });
     expect(cues(player)).toEqual(['permission']);
   });
 
   it('rings once for several who start together, and again for a later one', () => {
-    const { player, controller } = setup({ enabled: true, volume: 2 });
-    controller.partyChanged(party());
-    controller.partyChanged(party('minori', 'hibiki'));
-    controller.partyChanged(party('minori', 'hibiki', 'kaname'));
+    const { player, show } = setup({ enabled: true, volume: 2 });
+    show({ party: party() });
+    show({ party: party('minori', 'hibiki') });
+    show({ party: party('minori', 'hibiki', 'kaname') });
     expect(cues(player)).toEqual(['permission', 'permission']);
   });
 
-  it('takes the first party after a halt as the new starting point, without ringing', () => {
-    const { player, controller } = setup({ enabled: true, volume: 2 });
-    controller.partyChanged(party());
-    controller.setHalted(true);
-    controller.setHalted(false);
-    // Waits that began during the halt were never seen: they do not ring on the way back.
-    controller.partyChanged(party('minori'));
+  it('takes the party of the fetch that ends a halt as the starting point, without ringing', () => {
+    const { player, show } = setup({ enabled: true, volume: 2 });
+    show({ party: party() });
+    show({ halted: true });
+    // The same fetch lifts the halt and brings a party with waits that began meanwhile.
+    show({ halted: false, party: party('minori') });
     expect(player.played).toEqual([]);
-    controller.partyChanged(party('minori', 'hibiki'));
+    // The next fetch's new wait rings: the recovery party stays the starting point.
+    show({ party: party('minori', 'hibiki') });
     expect(cues(player)).toEqual(['permission']);
   });
 
   it('does not ring for those already waiting on the first snapshot', () => {
-    const { player, controller } = setup({ enabled: true, volume: 2 });
-    controller.partyChanged([]);
-    controller.partyChanged(party('minori'));
+    const { player, show } = setup({ enabled: true, volume: 2 });
+    show({ party: [] });
+    show({ party: party('minori') });
     expect(player.played).toEqual([]);
   });
 
   it('does not ring later for a wait that began while hidden or muted', () => {
-    const { player, controller } = setup({ enabled: true, volume: 2 });
-    controller.partyChanged(party());
+    const { player, controller, show } = setup({ enabled: true, volume: 2 });
+    show({ party: party() });
     controller.setHidden(true);
-    controller.partyChanged(party('minori'));
+    show({ party: party('minori') });
     controller.setHidden(false);
-    controller.partyChanged(party('minori'));
+    show({ party: party('minori') });
     expect(player.played).toEqual([]);
 
     const muted = setup();
-    muted.controller.partyChanged(party());
-    muted.controller.partyChanged(party('minori'));
+    muted.show({ party: party() });
+    muted.show({ party: party('minori') });
     muted.controller.toggle();
-    muted.controller.partyChanged(party('minori'));
+    muted.show({ party: party('minori') });
     expect(cues(muted.player).filter((cue) => cue === 'permission')).toEqual([]);
   });
 });

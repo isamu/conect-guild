@@ -24,15 +24,20 @@ export interface SoundController {
   cycleVolume(): void;
   /** Any click or key press: lets a sound turned on in an earlier visit play again. */
   unlock(): void;
-  /** A message reached the window (the same moment its scene starts). */
-  messageShown(message: { readonly event: GuildEvent | null }): void;
   /**
-   * The party rows of a new snapshot (empty before the first one); rings once when someone newly
-   * waits for a permission.
+   * What the screen shows now, handed over whole on every change so that a fetch that changes
+   * several parts at once is judged in one fixed order: the halt, then the party, then the message.
    */
-  partyChanged(rows: readonly PartyMember[]): void;
+  screenChanged(screen: SoundScreen): void;
   setHidden(hidden: boolean): void;
-  setHalted(halted: boolean): void;
+}
+
+export interface SoundScreen {
+  readonly halted: boolean;
+  /** The party rows (empty before the first snapshot); a newly waiting member rings once. */
+  readonly party: readonly PartyMember[];
+  /** The head of the message queue; it rings once, when a new id reaches the window. */
+  readonly message: { readonly id: number; readonly event: GuildEvent | null } | null;
 }
 
 export interface SoundControllerOptions {
@@ -46,6 +51,7 @@ export function createSoundController(options: SoundControllerOptions): SoundCon
   let hidden = false;
   let halted = false;
   let previousParty: readonly PartyMember[] | null = null;
+  let lastMessageId: number | null = null;
 
   function play(cue: SoundCue): void {
     if (!mayPlay({ enabled: settings.enabled, hidden, halted })) return;
@@ -55,6 +61,15 @@ export function createSoundController(options: SoundControllerOptions): SoundCon
   function update(next: SoundSettings): void {
     settings = next;
     saveSoundSettings(storage, settings);
+  }
+
+  function partyChanged(rows: readonly PartyMember[]): void {
+    // No rows before the first snapshot: the first real party is the starting point.
+    if (rows.length === 0) return;
+    const fresh = newlyAwaiting(previousParty, rows);
+    previousParty = rows;
+    // One alert however many start waiting together.
+    if (fresh.length > 0) play('permission');
   }
 
   /** The feedback blip of the buttons, once the audio is unlocked by the same click. */
@@ -77,25 +92,18 @@ export function createSoundController(options: SoundControllerOptions): SoundCon
     unlock() {
       if (settings.enabled) void player.unlock();
     },
-    messageShown(message) {
-      play(cueForMessage(message));
-    },
-    partyChanged(rows) {
-      // No rows before the first snapshot: the first real party is the starting point.
-      if (rows.length === 0) return;
-      const fresh = newlyAwaiting(previousParty, rows);
-      previousParty = rows;
-      // One alert however many start waiting together.
-      if (fresh.length > 0) play('permission');
+    screenChanged(screen) {
+      // The party kept from before a halt is stale: the first one after it (of this same fetch)
+      // is only the new starting point, so waits that began meanwhile do not ring.
+      if (halted && !screen.halted) previousParty = null;
+      halted = screen.halted;
+      partyChanged(screen.party);
+      const message = screen.message;
+      if (message !== null && message.id !== lastMessageId) play(cueForMessage(message));
+      lastMessageId = message?.id ?? null;
     },
     setHidden(next) {
       hidden = next;
-    },
-    setHalted(next) {
-      // The party kept from before the halt is stale: the first one after it is only the new
-      // starting point, so waits that began meanwhile do not ring on the way back.
-      if (halted && !next) previousParty = null;
-      halted = next;
     },
   };
 }
