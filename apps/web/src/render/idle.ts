@@ -215,7 +215,15 @@ function sleepPose(seat: TilePos, salt: number, now: number): IdlePose {
   };
 }
 
-/** At the spot: chat bubbles in turn facing the partner, a "♪" turned toward the pet, looks at the window. */
+/** How far a member by the pet is crouched `elapsed` ms after arriving: down at the end of each turn. */
+export function crouchAt(elapsed: number): number {
+  return elapsed % IDLE.crouchEveryMs >= IDLE.crouchEveryMs - IDLE.crouchMs ? IDLE.crouchPx : 0;
+}
+
+/**
+ * At the spot: chat bubbles in turn facing the partner, a "♪" turned toward the pet with a crouch
+ * now and then, looks at the window.
+ */
 function stayPose(outing: Outing, now: number): IdlePose {
   const { spot } = outing;
   const feet = tileToPoint(spot.tile);
@@ -239,6 +247,7 @@ function stayPose(outing: Outing, now: number): IdlePose {
       ...base,
       frame: 1,
       flip,
+      offset: { x: 0, y: crouchAt(now - outing.out.end) },
       mark: step % 2 === 0 ? { kind: 'bubble', glyph: '♪' } : null,
     };
   }
