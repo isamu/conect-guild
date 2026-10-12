@@ -10,6 +10,7 @@ function issue(patch: Partial<RawIssue>): RawIssue {
     number: 1,
     title: 'Issue',
     state: 'open',
+    state_reason: null,
     labels: ['経理'],
     is_pull_request: false,
     created_at: '2026-10-01T00:00:00Z',

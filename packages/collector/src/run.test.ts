@@ -31,7 +31,7 @@ describe('collectOnce', () => {
   it('writes one validated snapshot built from every page', async () => {
     const deps = harness(fakeGh());
     await expect(collectOnce(deps)).resolves.toEqual({
-      github: { ok: true, issues: 1, prs: 2 },
+      github: { ok: true, issues: 1, prs: 2, history: { opened: 3, completed: 1, merged: 1 } },
       sessions: SESSIONS_OK,
     });
     expect(deps.writes).toHaveLength(1);
@@ -47,19 +47,29 @@ describe('collectOnce', () => {
       [4, [1], []],
     ]);
     expect(deps.writes[0]).not.toContain('Confidential body');
+    // The Issues closed long ago (from both pages) are in the history only: the completed one as
+    // completed, the not planned one only in the count. The branch became its department.
+    expect(snapshot.history).toEqual({
+      openedIssueCount: 3,
+      completedIssues: [{ number: 3, departments: ['経理'] }],
+      mergedPrs: [{ number: 4, linkedIssues: [1], branchDepartment: '経理' }],
+    });
   });
 
-  it('asks for closed issues since 7 days ago and files only for open PRs', async () => {
+  it('asks for every closed issue (no since, for the history) and files only for open PRs', async () => {
     const gh = fakeGh();
     await collectOnce(harness(gh));
     expect(gh.calls).toContain(
-      'repos/yukihiroyamaguchi569/conect-management/issues?state=closed&since=2026-10-05T00%3A00%3A00.000Z&per_page=100',
+      'repos/yukihiroyamaguchi569/conect-management/issues?state=closed&per_page=100',
     );
+    expect(gh.calls.some((c) => c.includes('since='))).toBe(false);
     expect(gh.calls.filter((c) => c.includes('/files'))).toEqual([
       'repos/yukihiroyamaguchi569/conect-management/pulls/2/files?per_page=100',
     ]);
   });
+});
 
+describe('collectOnce: nothing is written', () => {
   it.each([
     [
       'gh fails for one endpoint',
@@ -73,6 +83,27 @@ describe('collectOnce', () => {
       'validation-failed',
     ],
     ['a file entry is not a path', { 'pulls/2/files': '{"filename":"a"}\n' }, 'validation-failed'],
+    [
+      'gh fails for the closed issues (the history)',
+      { 'issues?state=closed': new CollectorError('gh-failed') },
+      'gh-failed',
+    ],
+    [
+      'a closed issue has no state_reason',
+      {
+        'issues?state=closed': `${JSON.stringify({
+          number: 3,
+          title: 't',
+          state: 'closed',
+          labels: [],
+          created_at: '2026-09-01T00:00:00Z',
+          updated_at: '2026-09-01T00:00:00Z',
+          closed_at: '2026-09-01T00:00:00Z',
+          is_pull_request: false,
+        })}\n`,
+      },
+      'validation-failed',
+    ],
   ])('does not write when %s', async (_label, overrides, kind) => {
     const deps = harness(fakeGh(overrides));
     await expect(collectOnce(deps)).resolves.toMatchObject({ github: { ok: false, kind } });
@@ -110,7 +141,7 @@ describe('runCollector --once', () => {
     const deps = harness(fakeGh());
     await expect(runCollector(['--once'], deps)).resolves.toBe(0);
     expect(deps.logs).toEqual([
-      '[collector] 2026-10-12T00:00:00.000Z ok: issues=1 prs=2',
+      '[collector] 2026-10-12T00:00:00.000Z ok: issues=1 prs=2 history: opened=3 completed=1 merged=1',
       '[collector] 2026-10-12T00:00:00.000Z sessions=5 ok',
     ]);
     expect(deps.errors).toEqual([]);
@@ -122,7 +153,7 @@ describe('runCollector --once', () => {
     });
     await expect(runCollector(['--once'], deps)).resolves.toBe(0);
     expect(deps.logs).toEqual([
-      '[collector] 2026-10-12T00:00:00.000Z ok: issues=1 prs=2',
+      '[collector] 2026-10-12T00:00:00.000Z ok: issues=1 prs=2 history: opened=3 completed=1 merged=1',
       '[collector] 2026-10-12T00:00:00.000Z sessions unavailable: parse-failed',
     ]);
   });

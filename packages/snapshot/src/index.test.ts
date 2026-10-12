@@ -23,7 +23,7 @@ describe('snapshotSchema', () => {
     expect(result.data?.schemaVersion).toBe(SNAPSHOT_SCHEMA_VERSION);
   });
 
-  it.each([1, 3])('rejects schemaVersion %i', (version) => {
+  it.each([1, 2, 4])('rejects schemaVersion %i', (version) => {
     expect(snapshotSchema.safeParse({ ...sampleRecord(), schemaVersion: version }).success).toBe(
       false,
     );
@@ -114,5 +114,89 @@ describe('snapshotSchema: session members', () => {
   ])('rejects %s', (_label, patch) => {
     expect(withSessions(okWithFirst(patch)).success).toBe(false);
     expect(withSessions(okWithFirst({})).success).toBe(true);
+  });
+});
+
+const EMPTY_HISTORY = { openedIssueCount: 0, completedIssues: [], mergedPrs: [] };
+
+function withHistory(patch: Record<string, unknown>) {
+  return snapshotSchema.safeParse({ ...sampleRecord(), history: { ...EMPTY_HISTORY, ...patch } });
+}
+
+describe('snapshotSchema: history', () => {
+  it('accepts an empty history and one with numbers and departments only', () => {
+    expect(withHistory({}).success).toBe(true);
+    const history = {
+      openedIssueCount: 3,
+      completedIssues: [
+        { number: 1, departments: ['経理', '総務'] },
+        { number: 2, departments: [] },
+      ],
+      mergedPrs: [
+        { number: 3, linkedIssues: [1], branchDepartment: null },
+        { number: 4, linkedIssues: [], branchDepartment: '広報' },
+      ],
+    };
+    expect(withHistory(history).success).toBe(true);
+  });
+
+  it.each([
+    ['a missing history', undefined],
+    ['a missing count', { completedIssues: [], mergedPrs: [] }],
+  ])('rejects %s', (_label, history) => {
+    expect(snapshotSchema.safeParse({ ...sampleRecord(), history }).success).toBe(false);
+  });
+});
+
+describe('snapshotSchema: history contents', () => {
+  it.each([
+    ['a negative count', { openedIssueCount: -1 }],
+    ['a fractional count', { openedIssueCount: 1.5 }],
+    ['more completed Issues than opened', { completedIssues: [{ number: 1, departments: [] }] }],
+    [
+      'the same Issue twice',
+      {
+        openedIssueCount: 2,
+        completedIssues: [
+          { number: 1, departments: [] },
+          { number: 1, departments: [] },
+        ],
+      },
+    ],
+    [
+      'the same PR twice',
+      {
+        mergedPrs: [
+          { number: 1, linkedIssues: [], branchDepartment: null },
+          { number: 1, linkedIssues: [], branchDepartment: null },
+        ],
+      },
+    ],
+    [
+      'a label that is not a department',
+      { openedIssueCount: 1, completedIssues: [{ number: 1, departments: ['bug'] }] },
+    ],
+    [
+      'a title slipped into an Issue',
+      { openedIssueCount: 1, completedIssues: [{ number: 1, departments: [], title: 't' }] },
+    ],
+    [
+      'a closing time slipped into an Issue',
+      {
+        openedIssueCount: 1,
+        completedIssues: [{ number: 1, departments: [], closedAt: '2026-10-12T00:00:00.000Z' }],
+      },
+    ],
+    [
+      'a branch name slipped into a PR',
+      { mergedPrs: [{ number: 1, linkedIssues: [], branchDepartment: null, headRef: 'pr/x' }] },
+    ],
+    [
+      'a branch name instead of a department',
+      { mergedPrs: [{ number: 1, linkedIssues: [], branchDepartment: 'pr/x' }] },
+    ],
+    ['all labels slipped into the history', { labels: ['経理'] }],
+  ])('rejects %s', (_label, patch) => {
+    expect(withHistory(patch).success).toBe(false);
   });
 });

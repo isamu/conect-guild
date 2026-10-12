@@ -1,4 +1,15 @@
-import type { SnapshotIssue, SnapshotPr } from '@conect-guild/snapshot';
+import type {
+  HistoryIssue,
+  HistoryPr,
+  SnapshotHistory,
+  SnapshotIssue,
+  SnapshotPr,
+} from '@conect-guild/snapshot';
+import {
+  DEPARTMENT_LABELS,
+  departmentFromBranch,
+  type BranchPrefixRule,
+} from '@conect-guild/snapshot/settings';
 import type { RawIssue, RawPr } from './github.ts';
 import { extractLinkedIssues } from './links.ts';
 
@@ -67,5 +78,51 @@ export function toSnapshotPr(pr: RawPr, repo: string, changedFiles: readonly str
     headRef: pr.head_ref,
     linkedIssues: extractLinkedIssues(pr.title, pr.body, repo),
     changedFiles: pr.state === 'open' ? [...changedFiles] : [],
+  };
+}
+
+function byNumber(a: { readonly number: number }, b: { readonly number: number }): number {
+  return a.number - b.number;
+}
+
+/** Only the department labels, in the fixed order; other labels stay out. */
+function toHistoryIssue(issue: RawIssue): HistoryIssue {
+  const departments = DEPARTMENT_LABELS.filter((label) => issue.labels.includes(label));
+  return { number: issue.number, departments };
+}
+
+/** Only the department the branch name points at goes in; the branch name stays out. */
+function toHistoryPr(
+  pr: RawPr,
+  repo: string,
+  branchPrefixes: readonly BranchPrefixRule[],
+): HistoryPr {
+  return {
+    number: pr.number,
+    linkedIssues: extractLinkedIssues(pr.title, pr.body, repo),
+    branchDepartment: departmentFromBranch(pr.head_ref, branchPrefixes),
+  };
+}
+
+/**
+ * The whole history, counted afresh from what GitHub says now (docs/DESIGN.md 4.1, 4.2): how many
+ * Issues were ever opened, the Issues closed as completed, and the merged PRs. Numbers and
+ * departments only; titles, other labels, branch names and times are dropped here.
+ */
+export function toHistory(
+  rawIssues: readonly RawIssue[],
+  rawPrs: readonly RawPr[],
+  repo: string,
+  branchPrefixes: readonly BranchPrefixRule[],
+): SnapshotHistory {
+  const issues = uniquePreferClosed(rawIssues.filter((issue) => !issue.is_pull_request));
+  const completed = issues.filter(
+    (issue) => issue.state === 'closed' && issue.state_reason === 'completed',
+  );
+  const merged = uniquePreferClosed(rawPrs).filter((pr) => pr.merged_at !== null);
+  return {
+    openedIssueCount: issues.length,
+    completedIssues: completed.map(toHistoryIssue).toSorted(byNumber),
+    mergedPrs: merged.map((pr) => toHistoryPr(pr, repo, branchPrefixes)).toSorted(byNumber),
   };
 }

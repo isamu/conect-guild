@@ -6,7 +6,7 @@ import { bothOrThrow } from './limit.ts';
 // bodies and file diffs never reach the collector. strictObject catches a
 // projection that lets anything else through.
 const ISSUE_PROJECTION =
-  '{number, title, state, labels: [.labels[].name], created_at, updated_at, closed_at, is_pull_request: has("pull_request")}';
+  '{number, title, state, state_reason, labels: [.labels[].name], created_at, updated_at, closed_at, is_pull_request: has("pull_request")}';
 const PR_PROJECTION = '{number, title, body, state, merged_at, closed_at, head_ref: .head.ref}';
 const FILE_PROJECTION = '.filename';
 
@@ -14,6 +14,9 @@ const rawIssueSchema = z.strictObject({
   number: z.number().int().positive(),
   title: z.string(),
   state: z.enum(['open', 'closed']),
+  // completed, not_planned, duplicate, reopened or null. Kept as a string so a reason GitHub adds
+  // later does not stop the collector; only `completed` counts (build.ts toHistory).
+  state_reason: z.string().nullable(),
   labels: z.array(z.string()),
   created_at: z.iso.datetime(),
   updated_at: z.iso.datetime(),
@@ -38,16 +41,14 @@ export type RawPr = z.infer<typeof rawPrSchema>;
 
 const PER_PAGE = 'per_page=100';
 
-/** Open issues (all) plus closed issues updated since `since` (PRs still included). */
-export async function fetchIssues(gh: GhRunner, repo: string, since: Date): Promise<RawIssue[]> {
-  const sinceParam = encodeURIComponent(since.toISOString());
+/**
+ * Every open and every closed issue, the whole history (PRs still included). The history of the
+ * snapshot is counted afresh from these on every fetch (docs/DESIGN.md 4.1).
+ */
+export async function fetchIssues(gh: GhRunner, repo: string): Promise<RawIssue[]> {
   const [open, closed] = await bothOrThrow(
     ghApiProjected(gh, `repos/${repo}/issues?state=open&${PER_PAGE}`, ISSUE_PROJECTION),
-    ghApiProjected(
-      gh,
-      `repos/${repo}/issues?state=closed&since=${sinceParam}&${PER_PAGE}`,
-      ISSUE_PROJECTION,
-    ),
+    ghApiProjected(gh, `repos/${repo}/issues?state=closed&${PER_PAGE}`, ISSUE_PROJECTION),
   );
   return parseOrThrow(z.array(rawIssueSchema), [...open, ...closed]);
 }

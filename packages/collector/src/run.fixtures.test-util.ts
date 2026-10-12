@@ -13,6 +13,7 @@ const ISSUE = {
   number: 1,
   title: SECRET_TITLE,
   state: 'open',
+  state_reason: null,
   labels: ['経理'],
   created_at: '2026-10-10T00:00:00Z',
   updated_at: '2026-10-11T00:00:00Z',
@@ -24,8 +25,11 @@ const OLD_CLOSED_ISSUE = {
   ...ISSUE,
   number: 3,
   state: 'closed',
+  state_reason: 'completed',
   closed_at: '2026-09-01T00:00:00Z',
 };
+/** Closed long ago as not planned: counted as opened, never as completed. */
+const NOT_PLANNED_ISSUE = { ...OLD_CLOSED_ISSUE, number: 5, state_reason: 'not_planned' };
 const OPEN_PR = {
   number: 2,
   title: SECRET_TITLE,
@@ -43,10 +47,10 @@ const MERGED_PR = {
   closed_at: '2026-10-11T00:00:00Z',
 };
 
-/** Projected items per endpoint, one array per page; issues and files span two pages. */
+/** Projected items per endpoint, one array per page; issues, closed issues and files span two pages. */
 const OUTPUTS: Record<string, unknown[][]> = {
   'issues?state=open': [[ISSUE], [PR_AS_ISSUE]],
-  'issues?state=closed': [[OLD_CLOSED_ISSUE]],
+  'issues?state=closed': [[OLD_CLOSED_ISSUE], [NOT_PLANNED_ISSUE]],
   'pulls?state=open': [[OPEN_PR]],
   'pulls?state=closed': [[MERGED_PR]],
   'pulls/2/files': [['a/CLAUDE.md'], ['b.md']],

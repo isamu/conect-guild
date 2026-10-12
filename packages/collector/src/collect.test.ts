@@ -40,7 +40,7 @@ describe('collectSnapshot', () => {
       inFlight -= 1;
       return lines(['a.md']);
     };
-    const snapshot = await collectSnapshot(gh, REPO, new Date('2026-10-12T00:00:00.000Z'));
+    const snapshot = await collectSnapshot(gh, REPO, new Date('2026-10-12T00:00:00.000Z'), []);
     expect(fileCalls).toBe(OPEN_PR_COUNT);
     expect(peak).toBe(CHANGED_FILES_CONCURRENCY);
     expect(snapshot.prs.every((pr) => pr.changedFiles.length === 1)).toBe(true);
@@ -59,9 +59,9 @@ describe('collectSnapshot', () => {
         inFlight -= 1;
       }
     };
-    await expect(collectSnapshot(gh, REPO, new Date('2026-10-12T00:00:00.000Z'))).rejects.toThrow(
-      'gh failed',
-    );
+    await expect(
+      collectSnapshot(gh, REPO, new Date('2026-10-12T00:00:00.000Z'), []),
+    ).rejects.toThrow('gh failed');
     expect(inFlight).toBe(0);
   });
 });
