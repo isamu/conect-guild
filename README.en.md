@@ -8,7 +8,7 @@ At [conect-management](https://github.com/yukihiroyamaguchi569/conect-management
 
 ![The demo mode (made-up data)](assets/screenshots/demo-overview.png)
 
-The demo mode with made-up data. The original concept art is [assets/concept/rpg-company-ui.png](assets/concept/rpg-company-ui.png).
+The demo mode with made-up data.
 
 | Company | Game |
 |---|---|

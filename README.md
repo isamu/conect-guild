@@ -8,7 +8,7 @@ AI だけで動く小さな会社を、レトロ RPG のギルド画面として
 
 ![デモモードの画面（架空のデータ）](assets/screenshots/demo-overview.png)
 
-デモモード（架空のデータ）の画面。最初に描いたコンセプト画は [assets/concept/rpg-company-ui.png](assets/concept/rpg-company-ui.png)。
+デモモード（架空のデータ）の画面。
 
 | 会社 | ゲーム |
 |---|---|
