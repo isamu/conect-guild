@@ -225,6 +225,19 @@ export function papersAt(phaseMs: number, now: number): PapersLook {
   };
 }
 
+export interface SheetRect extends Point {
+  readonly w: number;
+  readonly h: number;
+}
+
+/**
+ * Where the floating sheet is drawn, px of the stack's picture: lying on the top sheet at
+ * `float` (0, 0), so it leaves from and lands on the stack, and moved by `float` in the air.
+ */
+export function floatingSheet(float: Point): SheetRect {
+  return { x: FILE_TOP.x + 2 + float.x, y: FILE_TOP.y + 1 + float.y, w: FILE_TOP.w - 4, h: 2 };
+}
+
 /** The hourglass's neck and lower bulb: the stream runs from `top` to `bottom` at `x`. */
 export const SAND_STREAM = { x: 15, top: 19, bottom: 25 } as const;
 

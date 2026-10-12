@@ -8,6 +8,7 @@ import {
   activeSince,
   catStretchAt,
   FILE_TOP,
+  floatingSheet,
   GLINT_POINTS,
   GLOBE_BODY,
   glintAt,
@@ -19,6 +20,7 @@ import {
   waveAt,
   type DecorCues,
   type Note,
+  type SheetRect,
 } from './trinkets';
 
 /**
@@ -167,15 +169,8 @@ function drawSpin(d: Drawing, thing: Thing): void {
   d.ctx.restore();
 }
 
-interface Rect {
-  readonly x: number;
-  readonly y: number;
-  readonly w: number;
-  readonly h: number;
-}
-
 /** A white sheet with a dark outline around `r`, and a line of writing when it is tall enough. */
-function drawSheet(ctx: CanvasRenderingContext2D, r: Rect): void {
+function drawSheet(ctx: CanvasRenderingContext2D, r: SheetRect): void {
   ctx.fillStyle = '#3a2a1a';
   ctx.fillRect(r.x - 1, r.y - 1, r.w + 2, r.h + 2);
   ctx.fillStyle = '#f6f1e2';
@@ -195,16 +190,14 @@ function drawPapers(d: Drawing, thing: Thing): void {
   const x = thing.x + FILE_TOP.x + slide;
   const y = thing.y + FILE_TOP.y;
   const flat = curl ? FILE_TOP.w - CURL_W : FILE_TOP.w;
+  d.ctx.save();
   drawSheet(d.ctx, { x, y, w: flat, h: FILE_TOP.h });
   if (curl) drawSheet(d.ctx, { x: x + flat, y: y - 2, w: CURL_W, h: FILE_TOP.h - 1 });
   if (float !== null) {
-    drawSheet(d.ctx, {
-      x: thing.x + FILE_TOP.x + 2 + float.x,
-      y: y - 3 + float.y,
-      w: FILE_TOP.w - 4,
-      h: 2,
-    });
+    const sheet = floatingSheet(float);
+    drawSheet(d.ctx, { ...sheet, x: thing.x + sheet.x, y: thing.y + sheet.y });
   }
+  d.ctx.restore();
 }
 
 /** A thin stream of sand through the neck, with a brighter grain falling down it. */
