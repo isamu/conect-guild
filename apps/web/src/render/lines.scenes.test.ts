@@ -378,3 +378,19 @@ describe('lines of scenes queued for the same member', () => {
     expect(said).toEqual([linesOf('minori', 'clear')[0], linesOf('minori', 'clear')[1]]);
   });
 });
+
+describe('a clear while the member walks in another scene', () => {
+  it('says the clear line over the member where they walk (the confetti stays over the seat)', () => {
+    const { pick } = firstLines();
+    const walking = schedule(event('pr-merged', '企画'), context(pick));
+    // On her way back from the counter, her own line of the chest over.
+    const t = (trackOf(walking.tracks, 'hirame').segments[4]?.start ?? 0) + 200;
+    const both = schedule(event('issue-closed', '企画'), context(pick), t, walking);
+    const frame = frameAt(both, t, DEFAULT_SEATS);
+    const hirame = frame.members.find((m) => m.id === 'hirame');
+    expect(frame.lines.hirame).toBe(linesOf('hirame', 'clear')[0]);
+    // Away from the seat: the line goes with her, as the king's call answer does (4.10).
+    expect(hirame?.atSeat).toBe(false);
+    expect(frame.confetti).toHaveLength(1);
+  });
+});
