@@ -3,7 +3,7 @@
  * (docs/DESIGN.md 6 章 M4). A score is a list of notes; `toTones` turns it into timed tones.
  */
 
-export type SoundCue = 'scroll' | 'chest' | 'clear' | 'permission' | 'summon' | 'text';
+export type SoundCue = 'scroll' | 'chest' | 'clear' | 'levelup' | 'permission' | 'summon' | 'text';
 
 export type Wave = 'square' | 'triangle';
 
@@ -47,6 +47,27 @@ export const SCORES: Readonly<Record<SoundCue, Score>> = {
       n(81, 60),
       n(86, 60),
       n(88, 360),
+    ],
+  },
+  // レベルアップ (Issue #19): an original tune, longer and brighter than the clear. An F major run
+  // up to F6, a step up E6 F6 G6 to A6, then G6 A6 and a held C7, the highest note.
+  levelup: {
+    wave: 'square',
+    gain: 0.8,
+    notes: [
+      n(77, 60),
+      n(81, 60),
+      n(84, 60),
+      n(89, 60),
+      n(null, 40),
+      n(88, 60),
+      n(89, 60),
+      n(91, 60),
+      n(93, 120),
+      n(null, 40),
+      n(91, 60),
+      n(93, 60),
+      n(96, 330),
     ],
   },
   // 許可待ち: two notes, high then low (ピンポン), to draw attention.

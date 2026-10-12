@@ -8,7 +8,15 @@ import {
   type SoundCue,
 } from './scores';
 
-const CUES: readonly SoundCue[] = ['scroll', 'chest', 'clear', 'permission', 'summon', 'text'];
+const CUES: readonly SoundCue[] = [
+  'scroll',
+  'chest',
+  'clear',
+  'levelup',
+  'permission',
+  'summon',
+  'text',
+];
 
 const pitches = (cue: SoundCue) => SCORES[cue].notes.flatMap((note) => note.midi ?? []);
 
@@ -55,6 +63,18 @@ describe('SCORES', () => {
     expect(p.slice(0, 4)).toEqual(p.slice(0, 4).toSorted((a, b) => a - b));
     expect(p.slice(4, 8)).toEqual(p.slice(4, 8).toSorted((a, b) => a - b));
     expect(p.at(-1)).toBe(Math.max(...p));
+  });
+
+  it('levelup is longer than the clear and ends on its highest note, held longest', () => {
+    const notes = SCORES.levelup.notes;
+    expect(scoreLengthMs(SCORES.levelup)).toBeGreaterThan(scoreLengthMs(SCORES.clear));
+    expect(notes.at(-1)?.midi).toBe(Math.max(...pitches('levelup')));
+    expect(notes.at(-1)?.ms).toBe(Math.max(...notes.map((note) => note.ms)));
+  });
+
+  it('levelup is a tune of its own, not the clear again', () => {
+    expect(pitches('levelup')).not.toEqual(pitches('clear'));
+    expect(pitches('levelup').slice(0, 4)).toEqual([77, 81, 84, 89]);
   });
 
   it('permission is exactly two notes, high then low', () => {

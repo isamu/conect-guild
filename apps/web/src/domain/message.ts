@@ -20,14 +20,18 @@ function titleOf(
   return items.find((item) => item.number === event.number)?.title;
 }
 
-/** One line for the message window, e.g. `ささえは クエスト#98「…」を クリアした！`. */
+/**
+ * One line for the message window, e.g. `ささえは クエスト#98「…」を クリアした！`. A level-up has
+ * no title or number: `みのりは レベル 10 に あがった！`.
+ */
 export function eventMessage(
   event: GuildEvent,
   snapshot: Pick<Snapshot, 'issues' | 'prs'>,
 ): string {
   const n = String(event.number);
-  const title = quoted(titleOf(event, snapshot));
   const actor = actorName(event.department);
+  if (event.kind === 'level-up') return `${actor}は レベル ${n} に あがった！`;
+  const title = quoted(titleOf(event, snapshot));
   const kaname = MEMBERS.kaname.name;
   switch (event.kind) {
     case 'issue-closed':

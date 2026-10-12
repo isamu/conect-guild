@@ -38,6 +38,11 @@ export interface Segment {
   /** One tile for a stay, two or more for a walk. */
   readonly path: TilePath;
   readonly held: Held | null;
+  /**
+   * A stay that is one hop, up and down, this high (logical px; levelUp.ts). Only the drawing goes
+   * up (director.frameAt): the feet stay on the tile, so the seat and the depth do not change.
+   */
+  readonly hopPx?: number;
 }
 
 export interface Pose {
@@ -81,6 +86,14 @@ function facesLeft(path: readonly TilePos[], step: number): boolean {
     return to.col < from.col;
   }
   return false;
+}
+
+/** How high a hopping stay lifts the member at `t`: a parabola, 0 at both ends, `hopPx` halfway. */
+export function hopLift(segment: Segment, t: number): number {
+  const length = segment.end - segment.start;
+  if (segment.hopPx === undefined || length <= 0) return 0;
+  const p = Math.min(Math.max((t - segment.start) / length, 0), 1);
+  return 4 * segment.hopPx * p * (1 - p);
 }
 
 /** Pose on a segment at time `t` (clamped to the segment). */

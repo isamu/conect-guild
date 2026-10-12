@@ -29,6 +29,7 @@ const {
   nextMessage,
   clearBaseline,
   setStageShown,
+  setStage,
 } = useGuild(demo?.guildOptions);
 const {
   settings: soundSettings,
@@ -63,6 +64,7 @@ function onStageShown(shown: boolean): void {
         :halted="state.halted"
         :last-active-storage="demo?.storage"
         @stage-shown="onStageShown"
+        @stage="setStage"
         @call-started="callStarted"
         @idle-since="setIdleSince"
         @ready="demo?.markReady()"
