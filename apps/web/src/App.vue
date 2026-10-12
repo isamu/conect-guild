@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { useGuild } from './app/useGuild';
+import { useSound } from './app/useSound';
 import FetchStatus from './ui/FetchStatus.vue';
 import GuildCanvas from './ui/GuildCanvas.vue';
 import KingBubble from './ui/KingBubble.vue';
 import MessageWindow from './ui/MessageWindow.vue';
 import PartyStatus from './ui/PartyStatus.vue';
 import QuestBoard from './ui/QuestBoard.vue';
+import SoundControl from './ui/SoundControl.vue';
 
 const {
   state,
@@ -19,6 +21,11 @@ const {
   clearBaseline,
   setStageShown,
 } = useGuild();
+const {
+  settings: soundSettings,
+  toggleSound,
+  cycleVolume,
+} = useSound({ message, party, halted: () => state.halted });
 </script>
 
 <template>
@@ -46,7 +53,13 @@ const {
           :effects-available="state.effectsAvailable"
           :baseline-notice="state.baselineNotice"
           @clear-baseline="clearBaseline"
-        />
+        >
+          <SoundControl
+            :settings="soundSettings"
+            @toggle="toggleSound"
+            @cycle-volume="cycleVolume"
+          />
+        </FetchStatus>
       </div>
     </div>
   </main>
