@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { loadSnapshot, validateSnapshot, defaultSnapshotUrl, type FetchFn } from './snapshot';
+import { GUILD_SETTINGS } from '@conect-guild/snapshot/settings';
+import {
+  defaultExpectedRepo,
+  defaultSnapshotUrl,
+  loadSnapshot,
+  validateSnapshot,
+  type FetchFn,
+} from './snapshot';
 
 const validSnapshot = {
   schemaVersion: 2,
@@ -191,5 +198,54 @@ describe('defaultSnapshotUrl', () => {
   it('reads only the fictional sample in a build', () => {
     vi.stubEnv('DEV', false);
     expect(defaultSnapshotUrl()).toBe('/snapshot.sample.json');
+  });
+});
+
+describe('repository check', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('reports a snapshot of another repository as repo-mismatch', () => {
+    expect(validateSnapshot(validSnapshot, 'new-team/company')).toEqual({
+      ok: false,
+      reason: 'repo-mismatch',
+    });
+  });
+
+  it('accepts the expected repository, and anything when none is expected', () => {
+    expect(validateSnapshot(validSnapshot, 'example/guild').ok).toBe(true);
+    expect(validateSnapshot(validSnapshot, null).ok).toBe(true);
+  });
+
+  it('still reports schema-version and invalid first', () => {
+    const old = { ...validSnapshot, schemaVersion: 1 };
+    expect(validateSnapshot(old, 'new-team/company')).toEqual({
+      ok: false,
+      reason: 'schema-version',
+    });
+    expect(validateSnapshot({ ...validSnapshot, issues: 1 }, 'new-team/company')).toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
+  });
+
+  it('checks the repository when loading', async () => {
+    const result = await loadSnapshot({
+      url: '/s.json',
+      fetchFn: respondWith(JSON.stringify(validSnapshot)),
+      expectedRepo: 'new-team/company',
+    });
+    expect(result).toEqual({ ok: false, reason: 'repo-mismatch' });
+  });
+
+  it('expects the settings repository for the real data in dev mode', () => {
+    vi.stubEnv('DEV', true);
+    expect(defaultExpectedRepo()).toBe(GUILD_SETTINGS.repo);
+  });
+
+  it('expects none for the fictional sample in a build', () => {
+    vi.stubEnv('DEV', false);
+    expect(defaultExpectedRepo()).toBeNull();
   });
 });

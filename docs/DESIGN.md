@@ -156,6 +156,7 @@ packages/collector ──検証して一時ファイルに書き rename──▶
 
 - 画面は 5 秒ごとに `/snapshot.json` を `cache: 'no-store'` で fetch する（M3 で 30 秒から短くした。手元の no-store の読み込みなので軽い）。ネットワークエラーと HTTP エラーの両方を扱い、失敗したら前回の表示を残して小さく「取得失敗」と出す
 - `schemaVersion` が画面の想定と違えば、表示を止めて「収集スクリプトを更新してください」と出す
+- 開発時（実データ）は snapshot の `repo` が `guild.settings.ts` の `repo` と違えば、表示を止めて「収集の対象と設定が違います」と出す（設定を変えた直後、新しいリポジトリの収集が成功するまで前のチームのデータを新しい名前・部門で出さないため）。build のダミーは照合しない
 - `fetchedAt`（GitHub の取得時刻）が 5 分より古ければ「情報が古い」の印を出す（collector が止まっている合図）。セッションの状態の古さは別に `sessions.checkedAt` で見る（4.7）
 - 開発時だけ、Vite の自作プラグイン（`configureServer` のミドルウェア。依存なし）が `/snapshot.json` を `apps/web/.data/snapshot.json` から返す。ファイルが無ければ 404。`.data/` は `public/` の外なので、Vite の public 監視による再読み込みは起きない
 

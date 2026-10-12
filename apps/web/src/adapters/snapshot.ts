@@ -1,9 +1,10 @@
 import { SNAPSHOT_SCHEMA_VERSION, snapshotSchema, type Snapshot } from '@conect-guild/snapshot';
+import { GUILD_SETTINGS } from '@conect-guild/snapshot/settings';
 import { z } from 'zod';
 
 /** Why a snapshot could not be loaded. The adapter never throws; it returns one of these. */
 export type SnapshotLoadFailure =
-  'network' | 'timeout' | 'http' | 'parse' | 'schema-version' | 'invalid';
+  'network' | 'timeout' | 'http' | 'parse' | 'schema-version' | 'invalid' | 'repo-mismatch';
 
 export type SnapshotLoadResult =
   | { readonly ok: true; readonly snapshot: Snapshot }
@@ -19,6 +20,8 @@ export interface LoadSnapshotOptions {
   readonly fetchFn?: FetchFn;
   /** Covers both the request and reading the body. */
   readonly timeoutMs?: number;
+  /** The repository the snapshot must be of; null (the default) checks none. */
+  readonly expectedRepo?: string | null;
 }
 
 export const DEFAULT_SNAPSHOT_TIMEOUT_MS = 10_000;
@@ -32,6 +35,15 @@ export function defaultSnapshotUrl(): string {
   return `${import.meta.env.BASE_URL}${file}`;
 }
 
+/**
+ * The real data must be of the repository in guild.settings.ts: after the settings change, the
+ * old snapshot stays until the collector succeeds for the new one. The fictional sample of a build
+ * is of no real repository, so it is not checked.
+ */
+export function defaultExpectedRepo(): string | null {
+  return import.meta.env.DEV ? GUILD_SETTINGS.repo : null;
+}
+
 const versionProbeSchema = z.looseObject({ schemaVersion: z.number() });
 
 function parseJson(text: string): { ok: true; value: unknown } | { ok: false } {
@@ -43,14 +55,24 @@ function parseJson(text: string): { ok: true; value: unknown } | { ok: false } {
   }
 }
 
-/** Validates already-parsed JSON. Exported for tests and for callers that read JSON elsewhere. */
-export function validateSnapshot(value: unknown): SnapshotLoadResult {
+/**
+ * Validates already-parsed JSON, and its repository when `expectedRepo` is given. Exported for
+ * tests and for callers that read JSON elsewhere.
+ */
+export function validateSnapshot(
+  value: unknown,
+  expectedRepo: string | null = null,
+): SnapshotLoadResult {
   const probe = versionProbeSchema.safeParse(value);
   if (probe.success && probe.data.schemaVersion !== SNAPSHOT_SCHEMA_VERSION) {
     return { ok: false, reason: 'schema-version' };
   }
   const parsed = snapshotSchema.safeParse(value);
-  return parsed.success ? { ok: true, snapshot: parsed.data } : { ok: false, reason: 'invalid' };
+  if (!parsed.success) return { ok: false, reason: 'invalid' };
+  if (expectedRepo !== null && parsed.data.repo !== expectedRepo) {
+    return { ok: false, reason: 'repo-mismatch' };
+  }
+  return { ok: true, snapshot: parsed.data };
 }
 
 async function fetchText(
@@ -85,7 +107,8 @@ export async function loadSnapshot(options: LoadSnapshotOptions = {}): Promise<S
     const fetched = await fetchText(url, fetchFn, controller.signal);
     if (!fetched.ok) return fetched;
     const json = parseJson(fetched.text);
-    return json.ok ? validateSnapshot(json.value) : { ok: false, reason: 'parse' };
+    if (!json.ok) return { ok: false, reason: 'parse' };
+    return validateSnapshot(json.value, options.expectedRepo ?? null);
   } finally {
     clearTimeout(timer);
   }

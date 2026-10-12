@@ -260,6 +260,7 @@ const FAILURE_LABELS: Readonly<Record<SnapshotLoadFailure, string>> = {
   parse: 'データが壊れています',
   invalid: 'データの形が違います',
   'schema-version': '収集スクリプトを更新してください',
+  'repo-mismatch': '収集の対象と設定が違います',
 };
 
 export interface FetchStatusView {

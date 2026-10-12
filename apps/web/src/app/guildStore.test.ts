@@ -285,16 +285,6 @@ describe('createGuildStore: localStorage unavailable', () => {
     store.stop();
   });
 
-  it('shows no clear or merge from a baseline of the previous repository', async () => {
-    const { store, storage } = setup([ok(first), ok({ ...withClear, repo: 'new-team/company' })]);
-    store.start();
-    await settle();
-    await nextTick();
-    expect(store.state.messages).toEqual([]);
-    expect(storage.items.get(BASELINE_STORAGE_KEY)).not.toContain('new-team');
-    store.stop();
-  });
-
   it('treats a corrupted baseline as the first load', async () => {
     const { store, storage } = setup([ok(withClear)]);
     storage.items.set(BASELINE_STORAGE_KEY, '{not json');

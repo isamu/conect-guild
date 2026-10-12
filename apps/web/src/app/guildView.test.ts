@@ -263,7 +263,15 @@ describe('buildFetchStatus', () => {
   });
 
   it('labels every failure reason', () => {
-    const reasons = ['network', 'timeout', 'http', 'parse', 'invalid', 'schema-version'] as const;
+    const reasons = [
+      'network',
+      'timeout',
+      'http',
+      'parse',
+      'invalid',
+      'schema-version',
+      'repo-mismatch',
+    ] as const;
     for (const reason of reasons) {
       expect(buildFetchStatus(null, reason, 0).failure).toMatch(/^取得失敗（.+）$/);
     }

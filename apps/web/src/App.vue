@@ -26,8 +26,18 @@ const {
     <div class="stage" :class="{ 'stage--halted': state.halted }">
       <GuildCanvas class="stage__art" :party="party" :cue="cue" @stage-shown="setStageShown" />
       <section v-if="state.halted" class="rpg-window stage__halt" role="alert">
-        <h2 class="rpg-window__title">収集スクリプトを更新してください</h2>
-        <p>snapshot.json の形（schemaVersion）が画面の想定と違うため、表示を止めています。</p>
+        <template v-if="state.haltReason === 'repo-mismatch'">
+          <h2 class="rpg-window__title">収集の対象と設定が違います</h2>
+          <p>
+            snapshot.json のリポジトリが guild.settings.ts の repo
+            と違うため、表示を止めています。collector
+            を起動し直して、新しいリポジトリの収集が終わるのを待ってください。
+          </p>
+        </template>
+        <template v-else>
+          <h2 class="rpg-window__title">収集スクリプトを更新してください</h2>
+          <p>snapshot.json の形（schemaVersion）が画面の想定と違うため、表示を止めています。</p>
+        </template>
       </section>
       <template v-else>
         <QuestBoard class="stage__board" :groups="board" :loaded="state.snapshot !== null" />
