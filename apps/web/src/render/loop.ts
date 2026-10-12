@@ -11,7 +11,6 @@ import {
   frameAt,
   isAnimating,
   prune,
-  scheduleEvent,
   type Director,
   type StageFrame,
 } from './director';
@@ -30,8 +29,8 @@ import { BACK_ANIMATED_DECOR, FRONT_LAYERS } from './layers';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './map';
 import { AMBIENT } from './metrics';
 import type { IdleSince } from './idle';
-import { createIdleCrew, type IdleCrew } from './idleCrew';
-import { castOf, DEFAULT_SEATS } from './scenes';
+import { createIdleCrew, playEvent, type IdleCrew } from './idleCrew';
+import { DEFAULT_SEATS } from './scenes';
 import { decorCuesOf, type DecorCues } from './trinkets';
 
 /**
@@ -322,9 +321,9 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   refresh();
   return {
     play(event) {
-      // The cast comes back from play first; the scene waits for them (scheduleEvent).
-      const back = cast.crew.callCast(director, castOf(event), stageNow());
-      director = scheduleEvent(back, event, stageNow(), { seats: DEFAULT_SEATS, random });
+      // Members out playing come back first; the scene waits for them (idleCrew.playEvent).
+      const context = { seats: DEFAULT_SEATS, random };
+      director = playEvent(cast.crew, director, event, { t: stageNow(), context });
       refresh();
     },
     setParty(party) {

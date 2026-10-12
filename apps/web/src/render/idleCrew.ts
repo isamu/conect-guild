@@ -1,8 +1,9 @@
 import type { MemberId } from '../guild.config';
 import type { Random } from './confetti';
-import { inScene, sendHome, type Director } from './director';
+import type { GuildEvent } from '../domain/events';
+import { inScene, scheduleEvent, sendHome, type Director } from './director';
 import { createIdleSeeds, homeWalk, idlePosesAt, type IdlePoses, type IdleSince } from './idle';
-import { DEFAULT_SEATS } from './scenes';
+import { actorOf, castOf, DEFAULT_SEATS, type SceneContext } from './scenes';
 
 /**
  * The render loop's memory of the long idle spells (idle.ts): since when each member has had
@@ -90,4 +91,26 @@ export function createIdleCrew(options: IdleCrewOptions): IdleCrew {
       return moved;
     },
   };
+}
+
+/**
+ * Schedules the scene for an event once its members are back from play. A handover's cast walks
+ * back first and the scene waits for them (scheduleEvent). For a cleared quest the member under
+ * the confetti walks back too, and the confetti starts over the seat once they are there; when they
+ * were at the seat (or already in a scene) it starts at once, as before.
+ */
+export function playEvent(
+  crew: IdleCrew,
+  director: Director,
+  event: GuildEvent,
+  at: { t: number; context: SceneContext },
+): Director {
+  if (event.kind !== 'issue-closed') {
+    return scheduleEvent(crew.callCast(director, castOf(event), at.t), event, at.t, at.context);
+  }
+  const actor = actorOf(event);
+  const back = crew.callCast(director, [actor], at.t);
+  const home = back.busyUntil[actor];
+  const walked = home !== undefined && home !== director.busyUntil[actor];
+  return scheduleEvent(back, event, walked ? Math.max(at.t, home) : at.t, at.context);
 }
