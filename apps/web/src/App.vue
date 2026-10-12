@@ -45,6 +45,7 @@ const { narration, next, idleSeeds, setIdleSince } = useNarration({
         :party="party"
         :cue="cue"
         :idle-seeds="idleSeeds"
+        :summons="summons"
         @stage-shown="setStageShown"
         @idle-since="setIdleSince"
       />
