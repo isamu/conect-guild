@@ -249,7 +249,9 @@ export const TOSS = {
  * over the head and wider than the gap to the bubble's left edge, so only lifting it past the
  * item's top clears it (the chest showed under the bubble's left end on screenshots; overhead.test.ts
  * checks every member). Words that would meet a 「Lv N」 tag on a desk go up until they are
- * `tagGapPx` over it (overhead.overheadLift). Times are ms, distances logical px.
+ * `tagGapPx` over it (overhead.overheadLift). A member who starts waiting on someone (the waiting
+ * bubble is new) says a line `remarkMs` long only when the injected random number is under
+ * `remarkChance` (remarks.ts: now and then, not every time). Times are ms, distances logical px.
  */
 export const LINES = {
   giveMs: 1_500,
@@ -258,6 +260,8 @@ export const LINES = {
   clearMs: 2_000,
   kingGapMs: 400,
   kingMs: 1_600,
+  remarkMs: 2_000,
+  remarkChance: 0.3,
   recentLines: 2,
   raisedLiftPx: 36,
   tagGapPx: 2,

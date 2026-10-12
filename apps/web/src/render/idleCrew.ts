@@ -24,6 +24,8 @@ export interface IdleCrew {
    * returns the poses of the members in a long idle spell.
    */
   frame(director: Director, t: number): IdlePoses;
+  /** The poses of the long idle spells now, like `frame` but noting nobody active. */
+  poses(): IdlePoses;
   /** New idle times; members whose time changed walk back if they are away. */
   setSince(director: Director, next: IdleSince, t: number): Director;
   /** The cast of a scene about to be scheduled: they walk back if away, and are active now. */
@@ -86,6 +88,9 @@ export function createIdleCrew(options: IdleCrewOptions): IdleCrew {
       for (const id of ids) sceneSeen[id] = wall;
       if (ids.length > 0) onActive?.(ids, wall);
       return idlePosesAt(current(), seeds, wall);
+    },
+    poses() {
+      return idlePosesAt(current(), seeds, wallNow());
     },
     setSince(director, next, t) {
       const changed = MEMBER_IDS.filter((id) => next[id] !== since[id]);

@@ -220,3 +220,25 @@ describe('line bubbles and level tags when scenes overlap', () => {
     },
   );
 });
+
+const WAITS = ['awaitPresident', 'awaitKaname', 'awaitPermission'] as const;
+
+describe('lines on starting to wait and level tags (remarks.ts)', () => {
+  const seated = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS).members;
+
+  it.each(EVERYONE)('%s at the seat: the longest line of each wait meets no tag', (id) => {
+    const member = seated.find((m) => m.id === id);
+    if (member === undefined) throw new Error(`no ${id}`);
+    let checked = 0;
+    for (const scene of WAITS) {
+      // The longest line of the wait, the worst case for the width.
+      const line = linesOf(id, scene).toSorted(
+        (a, b) => Array.from(b).length - Array.from(a).length,
+      )[0];
+      if (line === undefined) continue;
+      expectClear(member, line, 0);
+      checked += 1;
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+});

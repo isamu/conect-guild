@@ -1,20 +1,12 @@
 import { documentVisibility, type PageVisibility } from '../adapters/visibility';
 import type { GuildEvent } from '../domain/events';
 import type { MemberId } from '../guild.config';
-import { createAmbientSeeds, type AmbientMoods } from './ambient';
+import type { AmbientMoods } from './ambient';
 import type { GuildArt } from './art';
 import type { Bubbles } from './bubbles';
 import { RUNNING_CLOCK, stageTime, withPaused, type StageClock } from './clock';
 import type { Random } from './confetti';
-import {
-  EMPTY_DIRECTOR,
-  frameAt,
-  hushed,
-  isAnimating,
-  prune,
-  type Director,
-  type StageFrame,
-} from './director';
+import { EMPTY_DIRECTOR, prune, type Director, type StageFrame } from './director';
 import { daylightAt, hourOf, lampLights } from './daylight';
 import { ANIMATED_DECOR } from './animatedDecor';
 import {
@@ -32,13 +24,13 @@ import { BACK_ANIMATED_DECOR, FRONT_LAYERS } from './layers';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './map';
 import { AMBIENT } from './metrics';
 import type { IdleSeeds, IdleSince } from './idle';
-import { createIdleCrew, playEvent, recallHome, type HomeIn, type IdleCrew } from './idleCrew';
+import { playEvent, recallHome, type HomeIn } from './idleCrew';
 import { levelTags, type Levels } from './levelTags';
-import { createLinePicker, seenLines, type LinePicker } from './lines';
+import { createLinePicker, seenLines, type LinePicker, type SpokenLines } from './lines';
+import { createCast, stageAt, talkOf, type Cast } from './cast';
 import { DEFAULT_SEATS, type SceneContext } from './scenes';
-import { createCalls, type CallView, type Calls } from './calls';
 import type { Speeches } from './summons';
-import { decorCuesOf, type DecorCues } from './trinkets';
+import type { DecorCues } from './trinkets';
 
 /**
  * The requestAnimationFrame loop. It runs every frame while a scene plays; between scenes it
@@ -91,15 +83,24 @@ export interface StageParty {
   readonly idleSince: IdleSince;
   /**
    * The screen is halted (not live): the king's calls are dropped, to come or playing, and so are
-   * the lines of the scenes (lines.ts).
+   * the lines of the scenes (lines.ts) and on starting to wait (remarks.ts).
    */
   readonly halted: boolean;
+  /** False before the first snapshot: nobody has started waiting by its empty party (remarks.ts). */
+  readonly known: boolean;
   /** The members' levels, shown small under their seats (levelTags.ts). */
   readonly levels: Levels;
 }
 
 /** Before the first party: no bubbles, no moves, no levels. */
-const NO_PARTY: StageParty = { bubbles: {}, moods: {}, idleSince: {}, halted: false, levels: {} };
+const NO_PARTY: StageParty = {
+  bubbles: {},
+  moods: {},
+  idleSince: {},
+  halted: false,
+  known: false,
+  levels: {},
+};
 
 export interface RenderLoop {
   /** Starts the scene for an event now (or when its cast is free); dropped while not shown. */
@@ -260,6 +261,7 @@ interface Moment {
   readonly frame: StageFrame;
   readonly bubbles: Bubbles;
   readonly speeches: Speeches;
+  readonly remarks: SpokenLines;
   readonly cues: DecorCues;
   readonly levels: Levels;
 }
@@ -293,56 +295,10 @@ function createPainter(ctx: CanvasRenderingContext2D, art: GuildArt): Painter {
   return { ctx, scratch: { ctx: context2d(image), image }, background, front, art };
 }
 
-interface Cast {
-  readonly crew: IdleCrew;
-  readonly calls: Calls;
-  frame(director: Director, t: number, moods: AmbientMoods): StageFrame;
-  /** Takes a new party: the idle times (members whose time changed walk back) and the halt. */
-  receive(director: Director, party: StageParty, t: number): Director;
-}
-
-/** The members' small moves and long idle spells over the director's scenes, and the king's calls. */
-function createCast(
-  art: GuildArt,
-  random: Random,
-  options: Pick<RenderLoopOptions, 'wallNow' | 'onActive' | 'onCallStart' | 'idleSeeds'>,
-): Cast {
-  const seeds = createAmbientSeeds(random);
-  const hasHoldFrames = (id: MemberId): boolean => art.sprites.hasHoldFrames(id);
-  const crew = createIdleCrew({
-    random,
-    seeds: options.idleSeeds,
-    wallNow: options.wallNow ?? (() => Date.now()),
-    onActive: options.onActive,
-  });
-  const calls = createCalls(options);
-  return {
-    crew,
-    calls,
-    receive: (director, party, t) => {
-      calls.setHalted(party.halted);
-      return crew.setSince(party.halted ? hushed(director) : director, party.idleSince, t);
-    },
-    frame: (director, t, moods) =>
-      frameAt(director, t, DEFAULT_SEATS, {
-        moods,
-        seeds,
-        hasHoldFrames,
-        idle: crew.frame(director, t),
-      }),
-  };
-}
-
-/** What the stage shows at `t`: the members with the king's call, its words, the small things. */
-function stageAt(
-  cast: Cast,
-  director: Director,
-  t: number,
-  moods: AmbientMoods,
-): CallView & { readonly cues: DecorCues } {
-  // The king woken by the end of a call (onActive) never leaves the throne: `director` stays good.
-  const view = cast.calls.view(() => cast.frame(director, t, moods), t);
-  return { ...view, cues: decorCuesOf(moods, director.bursts, t, view.frame.members) };
+/** The scenes and the remarks to keep: none while the canvas is out of sight (scenesShown). */
+function keepShown(cast: Cast, director: Director, cssWidth: number): Director {
+  if (!isShown(cssWidth)) cast.silence();
+  return scenesShown(director, cssWidth);
 }
 
 /**
@@ -412,7 +368,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   const { canvas, art } = options;
   const { now, localHour, context } = loopSources(options);
   const painter = createPainter(context2d(canvas), art);
-  const cast = createCast(art, context.random, options);
+  const cast = createCast(art, context.random, options, talkOf(options, context));
   const visibility = options.visibility ?? documentVisibility;
   // Narrow screens hide the canvas (display: none): its width is 0 and nothing is drawn.
   let cssWidth = 1;
@@ -425,12 +381,12 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
 
   function draw(): void {
     const t = stageNow();
-    const { frame, speeches, calling, cues } = stageAt(cast, director, t, party.moods);
-    paint(painter, scale, { ...party, now: t, hour: localHour(), frame, speeches, cues });
-    director = seenAndPruned(context, director, { t, speeches });
+    const { calling, ...stage } = stageAt(cast, director, t, party.moods);
+    paint(painter, scale, { ...party, ...stage, now: t, hour: localHour() });
+    director = seenAndPruned(context, director, { t, speeches: stage.speeches });
     // A call needs no more than the ambient pace: its words and turns change every few hundred ms.
     const ambient = Object.keys(party.moods).length > 0 || ANIMATED_DECOR.length > 0 || calling;
-    follow(schedule, nextDraw({ hidden: paused(), animating: isAnimating(director, t), ambient }));
+    follow(schedule, nextDraw({ hidden: paused(), animating: stage.animating, ambient }));
   }
 
   const paused = () => isPaused(visibility.isHidden(), cssWidth);
@@ -440,7 +396,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
    * draws (or not) to match.
    */
   function refresh(): void {
-    director = scenesShown(director, cssWidth);
+    director = keepShown(cast, director, cssWidth);
     clock = withPaused(clock, paused(), now());
     schedule.refresh();
   }
@@ -463,7 +419,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
     },
     setParty(next) {
       party = next;
-      director = cast.receive(director, party, stageNow());
+      director = cast.receive(director, party, { t: stageNow(), quiet: paused() });
       schedule.now();
     },
     resize(nextCssWidth, pixelRatio) {

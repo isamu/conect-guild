@@ -11,6 +11,9 @@ const SCENES: readonly LineScene[] = [
   'takeChest',
   'clear',
   'seeClear',
+  'awaitPresident',
+  'awaitKaname',
+  'awaitPermission',
 ];
 
 /** Every (member, moment, lines) in the book. */
@@ -57,17 +60,32 @@ describe('line book: each moment', () => {
     expect(new Set(lines).size).toBe(lines.length);
   });
 
-  it('gives かなめ the reception and handover moments', () => {
+  it('gives かなめ the reception and handover moments, the review and the permission', () => {
     expect(new Set(Object.keys(LINE_BOOK.kaname))).toEqual(
-      new Set(['clear', 'handOver', 'takeChest', 'takeScroll', 'toss']),
+      new Set([
+        'clear',
+        'handOver',
+        'takeChest',
+        'takeScroll',
+        'toss',
+        'awaitKaname',
+        'awaitPermission',
+      ]),
     );
   });
 
   it.each(['minori', 'hibiki', 'hirame', 'sasae'] as const)(
-    'gives %s the moments of a department',
+    'gives %s the moments of a department and its three waits',
     (id) => {
       expect(new Set(Object.keys(LINE_BOOK[id]))).toEqual(
-        new Set(['clear', 'deliverChest', 'takeScroll']),
+        new Set([
+          'clear',
+          'deliverChest',
+          'takeScroll',
+          'awaitPresident',
+          'awaitKaname',
+          'awaitPermission',
+        ]),
       );
     },
   );
@@ -88,6 +106,9 @@ describe('line book: each moment', () => {
     expect(linesOf('yukihiro', 'handOver')).toEqual([]);
     expect(linesOf('minori', 'toss')).toEqual([]);
     expect(linesOf('kaname', 'seeClear')).toEqual([]);
+    // かなめ never waits for the president's approval, and the king has no waiting bubble here.
+    expect(linesOf('kaname', 'awaitPresident')).toEqual([]);
+    expect(linesOf('yukihiro', 'awaitPermission')).toEqual([]);
   });
 });
 

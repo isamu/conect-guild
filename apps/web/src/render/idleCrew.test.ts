@@ -169,3 +169,25 @@ describe('createIdleCrew: shared salts (Issue #30)', () => {
     expect(crew.frame(director, 1_000).minori?.feet).toEqual(tileToPoint(outing.spot.tile));
   });
 });
+
+describe('createIdleCrew: poses (Issue #47)', () => {
+  it('gives the same poses as a frame, out at the spot while idle', () => {
+    const { crew, director, outing } = playing('minori');
+    expect(crew.poses().minori?.feet).toEqual(tileToPoint(outing.spot.tile));
+    expect(crew.poses()).toEqual(crew.frame(director, 1_000));
+  });
+
+  it('notes nobody active, even with a scene running (no call back into the loop)', () => {
+    const { crew, active } = setup(CYCLE_START);
+    const scene = scheduleEvent(EMPTY_DIRECTOR, createIssueEvent('経理'), 0, {
+      seats: DEFAULT_SEATS,
+      random: () => 0.5,
+      tossRandom: () => 0.99,
+    });
+    expect(inScene(scene, 'minori', 100)).toBe(true);
+    crew.poses();
+    expect(active).toEqual([]);
+    crew.frame(scene, 100);
+    expect(active).not.toEqual([]);
+  });
+});
