@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { GuildEvent, GuildEventKind } from '../domain/events';
 import type { DepartmentLabel, MemberId, TilePos } from '../guild.config';
+import { heldLook } from './hands';
 import { contains, isUnderWindow, isWalkable, MAP_OBJECTS, PLACES } from './map';
+import { TILE_SIZE } from './metrics';
 import { carry, poseOnSegment, raise, type Prop, type Segment } from './motion';
-import { pointToTile } from './path';
+import { pointToTile, type Point } from './path';
+import { seatedPoint } from './seating';
 import {
   actorOf,
   castOf,
@@ -12,6 +15,7 @@ import {
   HOLD_UP_MS,
   PICK_UP_MS,
   planScene,
+  RECEIVE_MS,
   RECEPTION_MS,
   type Scene,
   type Track,
@@ -73,6 +77,41 @@ function handoverTime(receiver: Track, prop: Prop): number {
   if (segment === undefined) throw new Error('the item never changes hands');
   return segment.start;
 }
+
+/** Where the held item is drawn at `t` (seated like the director draws it), with or without holding frames. */
+function itemAt(track: Track, t: number, withHoldFrames: boolean): Point {
+  const pose = poseOnSegment(segmentAt(track, t), t);
+  if (pose.held === null) throw new Error(`${track.actor} holds nothing at ${String(t)}`);
+  const seated = { ...pose, point: seatedPoint(pose.point) };
+  return heldLook(track.actor, seated, pose.held, withHoldFrames).item;
+}
+
+/** How far the item may move at the moment it changes hands: across the counter, not over heads. */
+const HANDOVER_GAP_PX = 2.5 * TILE_SIZE;
+
+describe.each([
+  ['issue-opened', 'scroll', 'kaname', 'member'],
+  ['pr-merged', 'chest', 'member', 'kaname'],
+] as const)('planScene: %s handover moment', (kind, prop, giverRole, receiverRole) => {
+  it.each(DEPARTMENTS)('keeps the %s item where it was, then raises it', (department, id) => {
+    const scene = planScene(event(kind, department), 0, context);
+    const giver = trackOf(scene, giverRole === 'kaname' ? 'kaname' : id);
+    const receiver = trackOf(scene, receiverRole === 'kaname' ? 'kaname' : id);
+    const handover = handoverTime(receiver, prop);
+    // Taken in the arms first, the way it was brought ...
+    expect(segmentAt(receiver, handover).held).toEqual(carry(prop));
+    for (const withHoldFrames of [true, false]) {
+      const from = itemAt(giver, handover - 1, withHoldFrames);
+      const to = itemAt(receiver, handover, withHoldFrames);
+      expect(Math.hypot(to.x - from.x, to.y - from.y)).toBeLessThanOrEqual(HANDOVER_GAP_PX);
+    }
+    // ... and raised over the head a little later, at the same place.
+    const raising = handover + RECEIVE_MS;
+    expect(segmentAt(receiver, raising).held).toEqual(raise(prop));
+    expect(segmentAt(receiver, raising).end - raising).toBe(HOLD_UP_MS);
+    expect(tileAt(receiver, raising)).toEqual(tileAt(receiver, handover));
+  });
+});
 
 const isNextTo = (a: TilePos, b: TilePos) =>
   Math.abs(a.col - b.col) + Math.abs(a.row - b.row) === 1;
@@ -151,8 +190,8 @@ describe('planScene: issue-opened (かなめ brings the scroll to the seat)', ()
     expect(tileAt(kaname, handover + HANDOVER_MS / 2 - 1)).toEqual(tileAt(kaname, handover));
     expect([propAt(kaname, handover - 1), propAt(member, handover - 1)]).toEqual(['scroll', null]);
     expect([propAt(kaname, handover), propAt(member, handover)]).toEqual([null, 'scroll']);
-    // かなめ carries it in her arms; the member raises it once it is theirs.
-    expect([holdAt(kaname, handover - 1), holdAt(member, handover)]).toEqual(['carry', 'raise']);
+    // かなめ carries it in her arms; the member takes it in theirs (raised later).
+    expect([holdAt(kaname, handover - 1), holdAt(member, handover)]).toEqual(['carry', 'carry']);
   });
 
   it('has かなめ take up the scroll at the counter first, the member wait at the seat', () => {
@@ -164,12 +203,10 @@ describe('planScene: issue-opened (かなめ brings the scroll to the seat)', ()
       [DEFAULT_SEATS.kaname],
     ]);
     expect(toSeat?.held).toEqual(carry('scroll'));
-    const [waiting, holding] = trackOf(scene, 'hirame').segments;
+    const [waiting, receiving, holding] = trackOf(scene, 'hirame').segments;
     expect([waiting?.held, waiting?.path]).toEqual([null, [DEFAULT_SEATS.hirame]]);
-    expect([holding?.held, holding && holding.end - holding.start]).toEqual([
-      raise('scroll'),
-      HOLD_UP_MS,
-    ]);
+    // Taken in the arms, then raised (how long each lasts: the handover moment tests).
+    expect([receiving?.held, holding?.held]).toEqual([carry('scroll'), raise('scroll')]);
   });
 
   it('walks かなめ back empty-handed', () => {
@@ -203,8 +240,9 @@ describe('planScene: pr-merged (the member brings the chest to the reception)', 
     expect(tileAt(kaname, handover)).toEqual(DEFAULT_SEATS.kaname);
     expect([propAt(member, handover - 1), propAt(kaname, handover - 1)]).toEqual(['chest', null]);
     expect([propAt(member, handover), propAt(kaname, handover)]).toEqual([null, 'chest']);
-    expect(segmentAt(kaname, handover).end - handover).toBe(HOLD_UP_MS);
-    expect([holdAt(member, handover - 1), holdAt(kaname, handover)]).toEqual(['carry', 'raise']);
+    expect(segmentAt(kaname, handover).end - handover).toBe(RECEIVE_MS);
+    expect([holdAt(member, handover - 1), holdAt(kaname, handover)]).toEqual(['carry', 'carry']);
+    expect(holdAt(kaname, handover + RECEIVE_MS)).toBe('raise');
   });
 
   it('meets across the counter: same column, only counter between them', () => {

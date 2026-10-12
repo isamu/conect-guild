@@ -18,7 +18,8 @@ import { findPath, type TilePath } from './path';
  * source are passed in, and the result is plain data the director plays back. Nobody leaves the
  * room: かなめ goes between the members and the reception (decided by the president, 2026-10-12).
  *
- * Whoever brings the item carries it in their arms; whoever receives it raises it over their head.
+ * Whoever brings the item carries it in their arms; whoever receives it takes it in their arms the
+ * same way (so it does not jump from one to the other), then raises it over their head.
  *
  * - issue-opened: かなめ takes up a scroll, walks out from behind the counter to the member's seat
  *   and hands it over; the member holds it up a while at the seat, かなめ walks back
@@ -34,8 +35,10 @@ import { findPath, type TilePath } from './path';
 export const PICK_UP_MS = 2_000;
 /** Giver and receiver side by side; the item changes hands halfway. */
 export const HANDOVER_MS = 3_000;
-/** The receiver raises the item over their head after taking it. */
-export const HOLD_UP_MS = 5_500;
+/** The receiver holds the item in their arms a moment after taking it ... */
+export const RECEIVE_MS = 600;
+/** ... then raises it over their head. */
+export const HOLD_UP_MS = 5_000;
 export const RECEPTION_MS = 2_500;
 
 /** One member's part in a scene: back-to-back segments. */
@@ -150,8 +153,8 @@ interface Delivery {
 
 /**
  * The giver takes up the item at their seat and carries it in their arms to `to`, hands it over
- * halfway through the stop and walks back; the receiver waits at their seat, then raises the item
- * over their head a while.
+ * halfway through the stop and walks back; the receiver waits at their seat, takes the item in
+ * their arms, then raises it over their head a while.
  */
 function deliver(item: Delivery, start: number, seats: SceneContext['seats']): Track[] {
   const { giver, receiver, to, prop } = item;
@@ -165,6 +168,7 @@ function deliver(item: Delivery, start: number, seats: SceneContext['seats']): T
     .walk(seats[giver]);
   const receiving = new TrackBuilder(receiver, start, seats[receiver])
     .stay(handover - start)
+    .stay(RECEIVE_MS, carry(prop))
     .stay(HOLD_UP_MS, raise(prop));
   return [giving.build(), receiving.build()];
 }
