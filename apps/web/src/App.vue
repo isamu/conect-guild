@@ -22,6 +22,7 @@ const {
   nextMessage,
   clearBaseline,
   setStageShown,
+  setStage,
 } = useGuild();
 const {
   settings: soundSettings,
@@ -49,6 +50,7 @@ const { narration, next, idleSeeds, setIdleSince } = useNarration({
         :summons="summons"
         :halted="state.halted"
         @stage-shown="setStageShown"
+        @stage="setStage"
         @call-started="callStarted"
         @idle-since="setIdleSince"
       />

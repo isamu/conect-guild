@@ -8,7 +8,10 @@ import {
   scheduleEvent,
   type Director,
 } from '../render/director';
-import { DEFAULT_SEATS } from '../render/scenes';
+import type { HomeIn } from '../render/idleCrew';
+import { actorOf, DEFAULT_SEATS } from '../render/scenes';
+import { memberIdSchema } from '@conect-guild/snapshot/settings';
+import type { MemberId } from '../guild.config';
 import type { Cancel, Scheduler } from './scheduler';
 
 export interface GuildMessage {
@@ -41,6 +44,17 @@ export interface MessageQueue {
    * and nobody waits for them: messages go on every `holdMs`, as the canvas drops those scenes too.
    */
   setStageShown(shown: boolean): void;
+  /** The canvas's stage once it runs (null before and after): it calls members back to their seat. */
+  setStage(stage: StageRecall | null): void;
+}
+
+/**
+ * What the queue asks of the canvas (render/loop.ts RenderLoop.recall): call members out playing
+ * back to their seat now, and say how long until each is free there (ms on the stage's clock,
+ * which stops with the queue's while the page is hidden).
+ */
+export interface StageRecall {
+  recall(members: readonly MemberId[]): HomeIn;
 }
 
 export interface MessageQueueOptions {
@@ -75,6 +89,26 @@ function nextShowAt(
   return next.event === null ? holdEnd : castFreeAt(director, next.event, holdEnd);
 }
 
+/**
+ * Members a level-up message will need at their seat (Issue #19). They are called back as soon as
+ * it is queued, and the message waits until they are there, so the message, its sound and the
+ * hops start together. Other scenes keep starting with their message (their walk back comes
+ * after it, docs/DESIGN.md 8 章 #23).
+ */
+function levelUpCast(messages: readonly GuildMessage[]): MemberId[] {
+  return messages.flatMap((m) => (m.event?.kind === 'level-up' ? [actorOf(m.event)] : []));
+}
+
+/** The scenes with each member busy until they are back at their seat (`homeIn` from `t`). */
+function withReturns(director: Director, homeIn: HomeIn, t: number): Director {
+  const busyUntil = { ...director.busyUntil };
+  for (const id of memberIdSchema.options) {
+    const ms = homeIn[id];
+    if (ms !== undefined) busyUntil[id] = Math.max(busyUntil[id] ?? t, t + ms);
+  }
+  return { ...director, busyUntil };
+}
+
 /** The scenes once `head` reaches the window at `t`: the canvas starts its scene then. */
 function withHeadScene(director: Director, head: GuildMessage, t: number): Director {
   if (head.event === null) return director;
@@ -88,6 +122,11 @@ function withHeadScene(director: Director, head: GuildMessage, t: number): Direc
 interface Pacer {
   /** `head` reached the window: its hold starts now, and so does its scene on the canvas. */
   headShown(head: GuildMessage): void;
+  /** Ms until `head`, not shown yet, may show (its cast free); null while stopped. */
+  headDelay(head: GuildMessage): number | null;
+  /** New messages were queued: members of their level-ups walk back to their seat now. */
+  recall(added: readonly GuildMessage[]): void;
+  setStage(stage: StageRecall | null): void;
   /**
    * Ms until `next` may show (nextShowAt), or until the head closes when it is the last one; null
    * while stopped (hidden page or halted screen).
@@ -109,6 +148,7 @@ function createPacer(
   let clock: StageClock = RUNNING_CLOCK;
   let director: Director = EMPTY_DIRECTOR;
   let stageShown = true;
+  let stage: StageRecall | null = null;
   let halted = false;
   /** Queue time when the head's hold began (when it showed); null after a halt (starts over). */
   let holdStart: number | null = null;
@@ -117,6 +157,18 @@ function createPacer(
     headShown(head) {
       holdStart = now();
       if (stageShown) director = withHeadScene(director, head, now());
+    },
+    headDelay(head) {
+      if (halted || clock.pausedAt !== null) return null;
+      return Math.max(nextShowAt(director, now(), head) - now(), 0);
+    },
+    recall(added) {
+      const members = levelUpCast(added);
+      if (stage === null || !stageShown || members.length === 0) return;
+      director = withReturns(director, stage.recall(members), now());
+    },
+    setStage(next) {
+      stage = next;
     },
     delayFor(next) {
       if (halted || clock.pausedAt !== null) return null;
@@ -146,24 +198,59 @@ function createPacer(
   };
 }
 
+/** The queued messages, and what of them the window shows. */
+interface Line {
+  readonly messages: readonly GuildMessage[];
+  /**
+   * True while the head waits for its cast before it shows (a level-up whose member walks back
+   * from play): the window shows none of the queue until then.
+   */
+  readonly held: boolean;
+  /** Replaces the queue; a new head shows now, or is held while its cast is not free. */
+  set(next: readonly GuildMessage[]): void;
+  /** The held head shows now. */
+  release(): void;
+}
+
+function createLine(pacer: Pacer, publish: MessageQueueOptions['publish']): Line {
+  let messages: readonly GuildMessage[] = [];
+  let held = false;
+  return {
+    get messages() {
+      return messages;
+    },
+    get held() {
+      return held;
+    },
+    set(next) {
+      const head = next[0];
+      const fresh = head !== undefined && head.id !== messages[0]?.id;
+      messages = next;
+      held = fresh && (pacer.headDelay(head) ?? 0) > 0;
+      if (fresh && !held) pacer.headShown(head);
+      publish(held ? [] : messages);
+    },
+    release() {
+      held = false;
+      const head = messages[0];
+      if (head !== undefined) pacer.headShown(head);
+      publish(messages);
+    },
+  };
+}
+
 /**
  * The message window's queue. Each message shows once: the head stays at least `holdMs`, and the
  * next one waits until its scene can start (nextShowAt); the last one closes after `lastHoldMs`
- * (or on `next()`), unless another one is pushed meanwhile. Every change is handed to `publish` as a new array.
+ * (or on `next()`), unless another one is pushed meanwhile. A new head whose cast is away (a
+ * level-up's member walking back from play) waits for them before it shows. Every change is
+ * handed to `publish` as a new array.
  */
 export function createMessageQueue(options: MessageQueueOptions): MessageQueue {
-  const { scheduler, publish } = options;
   const pacer = createPacer(options.now, options);
-  let messages: readonly GuildMessage[] = [];
+  const line = createLine(pacer, options.publish);
   let cancelHold: Cancel | null = null;
   let nextId = 1;
-
-  function set(next: readonly GuildMessage[]): void {
-    const head = next[0];
-    if (head !== undefined && head.id !== messages[0]?.id) pacer.headShown(head);
-    messages = next;
-    publish(messages);
-  }
 
   function dispose(): void {
     cancelHold?.();
@@ -171,15 +258,18 @@ export function createMessageQueue(options: MessageQueueOptions): MessageQueue {
   }
 
   function scheduleHold(): void {
-    if (cancelHold !== null || messages.length === 0) return;
-    const delay = pacer.delayFor(messages[1]);
+    const [head, next] = line.messages;
+    if (cancelHold !== null || head === undefined) return;
+    const delay = line.held ? pacer.headDelay(head) : pacer.delayFor(next);
     // advance() clears the handle (cancelling a timer that has fired does nothing).
-    if (delay !== null) cancelHold = scheduler.after(delay, advance);
+    if (delay !== null) cancelHold = options.scheduler.after(delay, advance);
   }
 
+  /** The wait is over: a held head shows, else the next message takes the head's place. */
   function advance(): void {
     dispose();
-    set(messages.slice(1));
+    if (line.held) line.release();
+    else line.set(line.messages.slice(1));
     scheduleHold();
   }
 
@@ -192,12 +282,15 @@ export function createMessageQueue(options: MessageQueueOptions): MessageQueue {
   return {
     push(entries) {
       if (entries.length === 0) return;
-      set([...messages, ...entries.map((entry) => ({ id: nextId++, ...entry }))]);
+      const added = entries.map((entry) => ({ id: nextId++, ...entry }));
+      pacer.recall(added);
+      line.set([...line.messages, ...added]);
       // The last one's closing gives way to the hold before the new ones.
       reschedule();
     },
     next() {
-      if (pacer.skipHold(messages[1])) advance();
+      if (line.held) return;
+      if (pacer.skipHold(line.messages[1])) advance();
       else reschedule();
     },
     dispose,
@@ -216,6 +309,9 @@ export function createMessageQueue(options: MessageQueueOptions): MessageQueue {
     setStageShown(shown) {
       pacer.setStageShown(shown);
       reschedule();
+    },
+    setStage(stage) {
+      pacer.setStage(stage);
     },
   };
 }

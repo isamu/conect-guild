@@ -8,6 +8,7 @@ import {
   type SceneCue,
 } from '../app/guildView';
 import type { Summons } from '../app/guildStore';
+import type { StageRecall } from '../app/messageQueue';
 import { createLastActiveTracker } from '../app/lastActive';
 import { ambientMoodsOf } from '../render/ambient';
 import type { GuildArt } from '../render/art';
@@ -38,6 +39,8 @@ const emit = defineEmits<{
   idleSince: [since: IdleSince];
   /** A call of the king starts on the stage now (its sound rings with it, Issue #28). */
   callStarted: [];
+  /** The stage once the loop runs, null when it stops: the message queue calls members back. */
+  stage: [stage: StageRecall | null];
 }>();
 
 const canvas = useTemplateRef<HTMLCanvasElement>('canvas');
@@ -98,6 +101,7 @@ function start(element: HTMLCanvasElement, art: GuildArt): void {
     },
   });
   loop = running;
+  emit('stage', running);
   setIdleSince(lastActive.observe(props.party, Date.now()));
   running.setParty(stageParty(props.party));
   running.resize(cssWidth ?? element.clientWidth, globalThis.devicePixelRatio);
@@ -133,6 +137,7 @@ onBeforeUnmount(() => {
   observer?.disconnect();
   loop?.stop();
   loop = null;
+  emit('stage', null);
 });
 
 watch(

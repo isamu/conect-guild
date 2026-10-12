@@ -31,7 +31,7 @@ import { BACK_ANIMATED_DECOR, FRONT_LAYERS } from './layers';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './map';
 import { AMBIENT } from './metrics';
 import type { IdleSeeds, IdleSince } from './idle';
-import { createIdleCrew, playEvent, type IdleCrew } from './idleCrew';
+import { createIdleCrew, playEvent, recallHome, type HomeIn, type IdleCrew } from './idleCrew';
 import { levelTags, type Levels } from './levelTags';
 import { DEFAULT_SEATS } from './scenes';
 import { createCalls, type CallView, type Calls } from './calls';
@@ -97,6 +97,11 @@ const NO_PARTY: StageParty = { bubbles: {}, moods: {}, idleSince: {}, halted: fa
 export interface RenderLoop {
   /** Starts the scene for an event now (or when its cast is free); dropped while not shown. */
   play(event: GuildEvent): void;
+  /**
+   * Calls members out playing back to their seat now, ahead of their scene (a level-up), and says
+   * how long until each is free there (stage ms). Nothing while drawing would not be seen.
+   */
+  recall(members: readonly MemberId[]): HomeIn;
   /**
    * The king calls the members the president gave an order to (summons.ts, Issue #28), now or
    * after the call still playing. Dropped while the page is hidden or the canvas not shown: the
@@ -332,14 +337,28 @@ function stageAt(
   return { ...view, cues: decorCuesOf(moods, director.bursts, t, view.frame.members) };
 }
 
+/** Asks for the next draw as `next` says. */
+function follow(schedule: Scheduler, next: NextDraw): void {
+  if (next === 'frame') schedule.now();
+  if (next === 'ambient') schedule.later();
+}
+
+/** The clocks and the random sources of the loop: the injected ones, else the browser's. */
+function loopSources(options: RenderLoopOptions) {
+  const random = options.random ?? Math.random;
+  return {
+    now: options.now ?? (() => performance.now()),
+    localHour: options.localHour ?? (() => hourOf(new Date())),
+    random,
+    // Never the injected `random`: an injected (reproducible) sequence keeps its confetti. Both
+    // default to Math.random, which has no sequence anyone could reproduce, so sharing it is harmless.
+    context: { seats: DEFAULT_SEATS, random, tossRandom: options.tossRandom ?? Math.random },
+  };
+}
+
 export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   const { canvas, art } = options;
-  const now = options.now ?? (() => performance.now());
-  const localHour = options.localHour ?? (() => hourOf(new Date()));
-  const random = options.random ?? Math.random;
-  // Never the injected `random`: an injected (reproducible) sequence keeps its confetti. Both
-  // default to Math.random, which has no sequence anyone could reproduce, so sharing it is harmless.
-  const tossRandom = options.tossRandom ?? Math.random;
+  const { now, localHour, random, context } = loopSources(options);
   const painter = createPainter(context2d(canvas), art);
   const cast = createCast(art, random, options);
   const visibility = options.visibility ?? documentVisibility;
@@ -359,9 +378,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
     director = prune(director, t);
     // A call needs no more than the ambient pace: its words and turns change every few hundred ms.
     const ambient = Object.keys(moods).length > 0 || ANIMATED_DECOR.length > 0 || calling;
-    const next = nextDraw({ hidden: paused(), animating: isAnimating(director, t), ambient });
-    if (next === 'frame') schedule.now();
-    if (next === 'ambient') schedule.later();
+    follow(schedule, nextDraw({ hidden: paused(), animating: isAnimating(director, t), ambient }));
   }
 
   const paused = () => isPaused(visibility.isHidden(), cssWidth);
@@ -380,9 +397,14 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   return {
     play(event) {
       // Members out playing come back first; the scene waits for them (idleCrew.playEvent).
-      const context = { seats: DEFAULT_SEATS, random, tossRandom };
       director = playEvent(cast.crew, director, event, { t: stageNow(), context });
       refresh();
+    },
+    recall(members) {
+      const recalled = recallHome(cast.crew, director, paused() ? [] : members, stageNow());
+      director = recalled.director;
+      refresh();
+      return recalled.homeIn;
     },
     summon(members) {
       if (cast.calls.add(members, paused() ? null : stageNow())) schedule.now();

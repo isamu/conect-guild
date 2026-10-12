@@ -1,6 +1,7 @@
 import { computed, onBeforeUnmount, onMounted } from 'vue';
 import { documentVisibility } from '../adapters/visibility';
 import { createGuildStore, type GuildStoreOptions } from './guildStore';
+import type { StageRecall } from './messageQueue';
 import { buildBoard, buildFetchStatus, buildKingBubble, buildParty, sceneCue } from './guildView';
 
 /** Binds the guild store to a component's lifetime and exposes what the windows render. */
@@ -53,6 +54,9 @@ export function useGuild(options: GuildStoreOptions = {}) {
     },
     setStageShown: (shown: boolean) => {
       store.setStageShown(shown);
+    },
+    setStage: (stage: StageRecall | null) => {
+      store.setStage(stage);
     },
     clearBaseline: () => {
       store.clearBaseline();
