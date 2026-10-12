@@ -90,7 +90,7 @@ conect-guild/
 ├── packages/snapshot/        collector と画面が共有する型と zod の schema
 │   └── src/
 │       ├── index.ts          snapshot.json の schema（4.2）
-│       └── settings.ts       guild.settings.ts の schema。読み込んだ時点で検証し、合わなければ項目を挙げて止める
+│       └── settings.ts       guild.settings.ts の schema。読み込んだ時点で検証し、合わなければ項目を挙げて止める。ブランチ接頭辞 → 部門の判定もここに置き、collector と画面で共有する
 ├── packages/collector/       収集スクリプト（TS。Node の型除去で直接実行）
 │   ├── collector.config.ts   guild.settings.ts から対象リポジトリと会社のセッションの起動ディレクトリ（`~` をホームに展開）を受け取り、間隔、MulmoTerminal のファイルのパス、出力先を足す
 │   └── src/main.ts           `gh api` で Issue・PR を取り、MulmoTerminal のファイルからセッションの状態を読み、検証して .data/snapshot.json を原子的に書く
@@ -125,25 +125,36 @@ packages/collector ──検証して一時ファイルに書き rename──▶
 - **対象リポジトリ**: `guild.settings.ts` の `repo` に固定する（既定 `yukihiroyamaguchi569/conect-management`）。コマンドライン引数や環境変数では変えられず、設定ファイルを書き換えて変える
 - **`gh` の呼び方**: `child_process.execFile('gh', [引数の配列])`。シェル文字列は組まない。認証はユーザーの `gh` のものをそのまま使う
 - **ページ送り**: `gh api --paginate --jq '<射影> | @json'` で、要るフィールドだけに絞った要素を 1 行 1 JSON で受け、行ごとに zod で検証する（`--slurp` は `--jq` と併用できない）。差分の中身や Issue の本文は gh の段階で落とす。ページが配列でなければ jq でエラーにし、空の一覧と取り違えない。`execFile` の `maxBuffer` は 64 MB にし、超えたら失敗として扱う。テストは複数ページの出力で行う
-- **Issue**: 全ページ取る。open は全部、closed は直近 7 日（`since` で絞り、`closed_at` で確かめる）。GitHub の Issue 一覧には PR が混ざるので、`pull_request` キーを持つものは除く
-- **PR**: open は全部、closed / merged は直近 7 日のもの。全ページ取る
+- **Issue**: 全ページ取る。open も closed も全履歴を取る（closed を `since` で絞らない。累積の経験値の履歴を毎回数え直すため。Issue #19）。snapshot の `issues` に入れる closed は今までどおり直近 7 日（`closed_at` で確かめる）。閉じた理由（`state_reason`）も受ける。GitHub が後で理由の種類を足しても止まらないよう、文字列か null として検証する。GitHub の Issue 一覧には PR が混ざるので、`pull_request` キーを持つものは除く
+- **PR**: open は全部、closed / merged は直近 7 日のもの。全ページ取る（pulls の API に `since` が無いので、closed はもともと全履歴が届いている）
+- **履歴（`history`、Issue #19）**: 取った全履歴から毎回数え直す。差分で足し込まないので、取りこぼし・再オープン・ラベルの付け替えは次の取得でそのまま正しくなる。入れるのは番号と部門だけ（4.2）
+  - 開かれた Issue の総数（`openedIssueCount`）: open と closed の Issue の件数（PR を除く）。閉じた理由を問わない。かなめの「受付で配った巻物」（4.6）は、Issue が開かれた時点で受付が配ったものなので、あとで「Close as not planned」や重複で閉じたものも含める
+  - completed で閉じた Issue（`completedIssues`）: `state_reason` が `completed` のものだけ。部門ラベルだけを固定の順で残す。not planned・duplicate・理由なし・再オープン中のものは入れない
+  - マージ済みの PR（`mergedPrs`）: `merged_at` があるものだけ。リンクした Issue の番号（上の結び付けと同じ規則）と、ブランチ名を `branchPrefixes` に当てて引いた部門（当たらなければ null）。ブランチ名そのものは collector の中で部門に変えて捨て、履歴には入れない
+  - 同じ番号が open と closed の両方の一覧に出たら（取得の間に閉じた）、closed の方を使う。番号の順に並べる
+- **API の呼び出し回数**（2026-10-12 に件数だけを確かめた: closed の Issue 109 件、closed の PR 198 件、open の Issue 2 件、open の PR 0 件）: 1 回の GitHub の取得で、open の Issue 1 回、closed の Issue（Issue 一覧には PR も混ざるので 109 + 198 = 307 件）4 回、open の PR 1 回、closed の PR 2 回、open PR ごとの変更ファイル 1 回ずつ。`since` を外す前は closed の Issue が 1 回だったので、増えるのは 3 回/分（約 180 回/時）。全体で約 8 回/分（約 480 回/時、open PR が無いとき）で、`gh` の上限 5000 回/時の 1 割に収まる。closed の Issue と PR が合わせて 100 件増えるごとに 1 回/分増える。合わせて 2000 件を超えたら（closed の Issue だけで 20 回/分）、履歴の取得だけを 10 分ごとに間引くことを考える。そのときも数え直しの考え方は変えない
 - **PR と Issue の結び付け**: PR の題名と本文から、同じリポジトリを指す参照（`#番号` と `<対象リポジトリ>#番号`）を正規表現で拾い、`linkedIssues: number[]` として持つ。別リポジトリの参照（`owner/other#番号`）は拾わない。`Closes`・`Fixes`・`Resolves` の後の参照が 1 つでもあれば、それだけを使う。本文そのものは保存しない
 - **変更ファイル**: open PR だけ、`gh api --paginate --jq` で `repos/<r>/pulls/<n>/files` の `filename` だけを取り、`changedFiles: string[]` として持つ（差分の中身は取らない）
 - **間隔**: GitHub は 60 秒ごと（`gh` のレート制限に十分収まる）。collector 自体は 5 秒ごとに回り、セッションの状態（4.7）を読むたびに、GitHub の最後の正常な結果と合わせて snapshot を書き直す。GitHub の取得は裏で走らせ、遅くてもセッションの 5 秒の周期を止めない（最初の 1 回だけは、書くものが無いので待つ）。周期は予定時刻から数え、1 回の処理の時間も 5 秒に含める。処理が予定を過ぎたら、取り戻そうと続けて回さず、次の予定まで飛ばす。`--once` で 1 回だけ（GitHub とセッションを 1 回ずつ）実行もできる
 - **書き込み**: 取得した結果を zod で検証してから、同じディレクトリの一時ファイルに 0600 で書き、`rename` で `apps/web/.data/snapshot.json` を原子的に置き換える。画面が書きかけの JSON を読むことはない
 - **失敗したとき**: GitHub の取得や検証に 1 つでも失敗したら、GitHub の部分は直前の正常なもの（`fetchedAt` も直前のまま）を使い、空の配列で上書きしない。起動してから GitHub が一度も成功していなければ snapshot を書かない。セッションの状態が読めないときは `sessions` を `unavailable` にし、GitHub の部分の書き込みは妨げない
-- **ログ**: 出すのは件数・時刻・エラーの種類だけ。題名・本文・ブランチ名・パス・セッション ID はログに出さない。セッションの行（`sessions=5 ok` / `sessions unavailable: parse-failed`）は 5 秒ごとには出さず、変わったときだけ出す
+- **ログ**: 出すのは件数・時刻・エラーの種類だけ（履歴は `history: opened=… completed=… merged=…` の件数だけ）。題名・本文・ブランチ名・パス・セッション ID はログに出さない。セッションの行（`sessions=5 ok` / `sessions unavailable: parse-failed`）は 5 秒ごとには出さず、変わったときだけ出す
 
 ### 4.2 snapshot.json の中身
 
 ```
 {
-  schemaVersion: 2,
+  schemaVersion: 3,
   fetchedAt: ISO 8601,                 // GitHub を取った時刻（60 秒ごと）
   repo: "owner/name",
   issues: [{ number, title, labels: string[], state, createdAt, updatedAt, closedAt | null }],
   prs:    [{ number, title, state, mergedAt | null, closedAt | null, headRef,
              linkedIssues: number[], changedFiles: string[] }],  // changedFiles は open PR だけ。closed は []
+  history: {                           // 全履歴（4.1）。番号と部門だけ
+    openedIssueCount: number,          // 開かれた Issue の総数（open + closed。閉じた理由を問わない）
+    completedIssues: [{ number, departments: ("経理" | "広報" | "企画" | "総務")[] }],   // completed で閉じたもの
+    mergedPrs: [{ number, linkedIssues: number[], branchDepartment: "経理" | … | null }]
+  },
   sessions: { status: "ok", checkedAt: ISO 8601,       // セッションを読んだ時刻（5 秒ごと）
               members: [{ department: "経理" | "広報" | "企画" | "総務" | null,   // null はかなめ
                           state: "awaiting-permission" | "working" | "resting" | "idle" }] }
@@ -153,7 +164,9 @@ packages/collector ──検証して一時ファイルに書き rename──▶
 
 本文とコメントは保存しない。MulmoTerminal のセッション ID とパスも保存しない（部門と状態だけ）。`members` はかなめと 4 部門のちょうど 5 件（セッションが無い席は `idle`）。
 
-`schemaVersion` は M3 で 2 に上げた（`sessions` を足したため）。v1 の snapshot（古い collector が書いたもの）は、画面が「収集スクリプトを更新してください」で止める。
+`history` には題名・部門以外のラベル・ブランチ名・日時を入れない（経験値を数えるのに日時は要らない）。番号は一覧の中で重ならず、completed の Issue の数は開かれた Issue の総数を超えない（schema で確かめる）。いまの規模で 1 件 30〜60 バイト × 約 300 件 ≒ 15 KB 増える。
+
+`schemaVersion` は M3 で 2 に上げた（`sessions` を足したため）。Issue #19 で 3 に上げた（`history` を足したため）。古い版の snapshot（古い collector が書いたもの）は、画面が「収集スクリプトを更新してください」で止める。
 
 ### 4.3 画面の取得と表示
 
@@ -208,7 +221,16 @@ packages/collector ──検証して一時ファイルに書き rename──▶
 
 M3 からは、セッションの状態（4.7）を混ぜる。優先順位は 許可待ち（リアルタイム） > 社長の承認まち > かなめの確認まち > いま作業中（リアルタイム） > working > done > idle。リアルタイムの 2 つは、パーティの窓に「許可待ち」「いま作業中」と点滅する印付きで出し、ツールチップに MulmoTerminal から読んだことを書く。一区切り（resting）と待機（idle）のセッションは GitHub だけで決める。かなめも同じ考えで、許可待ち > PR の確認 > いま作業中 > 受付 > 待機。社長にはセッションが無いので変わらない。セッションの状態が取れないか古いときは、M2 までと同じく GitHub だけで決める。
 
-「最近の成果」= 自分が担当の、直近 7 日にマージされた PR の数（domain/reward.ts。テストで固定）。取得範囲に合わせた値なので、時間がたつと減る。累積の経験値とレベルは全履歴の集計が要るので、M4 で別に設計する。
+「最近の成果」= 自分が担当の、直近 7 日にマージされた PR の数（domain/reward.ts。テストで固定）。取得範囲に合わせた値なので、時間がたつと減る。
+
+**累積の経験値とレベル**（M4、Issue #19。社長の判断、2026-10-12）。collector が全履歴を毎回数え直して snapshot の `history`（4.1、4.2）に入れ、経験値は画面の domain で数える。PR は 3 本に分ける: 1) collector と schema（済み）2) 経験値とレベルの表示 3) レベルアップの演出と E2E
+
+- 経験値: 担当の Issue のクリア（completed で閉じたもの）10、担当の PR のマージ 5。「Close as not planned」は数えない。担当の決め方は 4.5 と同じ（Issue は部門ラベルの固定の順の先頭、PR はリンクした Issue の部門 → ブランチの部門）。リンクした Issue の部門は、履歴の completed の Issue と今の `issues` から引く。not planned で閉じて 7 日を過ぎた Issue はどちらにも無いので、それだけにリンクした PR はブランチの部門（無ければかなめ）になる
+- かなめ: 受付で配った巻物（開かれた Issue。`openedIssueCount`）1 件につき 3 ＋ 担当なしの Issue のクリア 10（担当なしだけだとかなめのレベルが上がらないため）
+- 王様はレベルを持たない（「おうさま」と出す）
+- レベル L に要る累積の経験値は 5 × L × (L − 1)（上限 99）
+- 表示: パーティの窓に Lv と次のレベルまでのゲージ。Canvas にも席の足元に小さく薄く常時出す（控えめに）
+- レベルアップ: クリア等のメッセージの後に「〇〇は レベル N に あがった！」、効果音、席で跳ねて紙吹雪。初回・レベルが下がったときは出さない
 
 ### 4.7 セッションの状態（M3。domain/session.ts、packages/collector/src/sessions.ts）
 
@@ -381,6 +403,12 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 - 参考にしてよい OSS（すべて MIT）: pixel-agents（イベントの設計、hooks の受け方）、pixtuoid（ソケットと 0600 の扱い）。コードの丸写しはせず、仕組みを参考にする
 
 ## 変更履歴
+
+- **Issue #19 の 1 本目（2026-10-12）** 累積の経験値とレベルのため、collector が全履歴を取り、snapshot に番号と部門だけの `history` を足した（4.1、4.2、4.6。社長の判断）
+  - closed の Issue の取得から `since` を外し、`state_reason` を受ける。履歴は毎回数え直す。増える API の呼び出しは約 3 回/分（4.1）
+  - `schemaVersion` を 3 に上げた。v2 の snapshot は今までどおり「収集スクリプトを更新してください」で止める。画面は v3 を読めるようにしただけで、表示は 2 本目
+  - かなめの基準の「開かれた Issue の総数」には not planned で閉じた Issue も含める。受付で配った時点の数なので、あとの閉じ方を問わない（実装時の判断）
+  - ブランチ接頭辞 → 部門の判定を `packages/snapshot/src/settings.ts` に移し、collector と画面で共有した（3 章）
 
 - **Issue #39（2026-10-12）** 犬のところの遊びで、ナレーションを「〇〇は トイプードルと あそんでいる。」にし、Canvas ではメンバーがときどきかがみ、滞在中は犬が起きてお座りするようにした（4.9、8 章。社長の判断）
 - **Issue #34（2026-10-12）** Playwright で画面の E2E テストを入れた（7 章、9 章）。開発時の依存に `@playwright/test` を足した（社長の承認済み）
