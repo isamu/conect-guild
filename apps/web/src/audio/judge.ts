@@ -18,6 +18,15 @@ export function cueForMessage(message: { readonly event: GuildEvent | null }): S
   return message.event === null ? 'text' : EVENT_CUES[message.event.kind];
 }
 
+/**
+ * Whether the king's call rings when it starts on the stage at `now` (Issue #28): not while
+ * another sound still plays (until `otherEndsAt`, null when none has played), so two never sound
+ * together and the call gives way.
+ */
+export function callRings(now: number, otherEndsAt: number | null): boolean {
+  return otherEndsAt === null || now >= otherEndsAt;
+}
+
 export interface PartyMember {
   readonly id: MemberId;
   readonly state: MemberState;

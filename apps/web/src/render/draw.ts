@@ -10,6 +10,7 @@ import type { IdleMark } from './idle';
 import { BUBBLE_RISE, DETAIL_SCALE, IDLE, OVERHEAD_OFFSET, TILE_SIZE } from './metrics';
 import { heldLook } from './hands';
 import type { Point } from './path';
+import type { SpeechLine, Speeches } from './summons';
 import { flyingItemPoint } from './toss';
 import type { DecorCues } from './trinkets';
 
@@ -69,24 +70,41 @@ const IDLE_GLYPHS: Readonly<Record<'…' | '♪', Glyph>> = {
   '♪': { glyph: '♪', color: '#2a7a2a' },
 };
 
-/** A small bubble to the upper right of the head, drawn in detail pixels. */
-function drawBubble(ctx: CanvasRenderingContext2D, { glyph, color }: Glyph, feet: Point): void {
+/** A bubble's font and width in detail px; a null width fits the text (summons.ts words). */
+interface BubbleSize {
+  readonly font: string;
+  readonly width: number | null;
+}
+
+/** The waiting bubbles and the signs of a long idle spell: one glyph. */
+const SMALL_BUBBLE: BubbleSize = { font: 'bold 8px sans-serif', width: 11 };
+/** The words of the king's summons. */
+const SPEECH_BUBBLE: BubbleSize = { font: 'bold 7px sans-serif', width: null };
+
+/** A bubble to the upper right of the head, drawn in detail pixels. */
+function drawBubble(
+  ctx: CanvasRenderingContext2D,
+  { glyph, color }: Glyph,
+  feet: Point,
+  size: BubbleSize = SMALL_BUBBLE,
+): void {
   ctx.save();
   ctx.translate(Math.round(feet.x), Math.round(feet.y - OVERHEAD_OFFSET));
   ctx.scale(DETAIL_SCALE, DETAIL_SCALE);
+  ctx.font = size.font;
+  const width = size.width ?? Math.ceil(ctx.measureText(glyph).width) + 6;
   const x = 3;
   const y = -BUBBLE_RISE;
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(x, y, 11, 9);
+  ctx.fillRect(x, y, width, 9);
   ctx.fillRect(x + 1, y + 9, 2, 2);
   ctx.strokeStyle = '#222222';
   ctx.lineWidth = 1;
-  ctx.strokeRect(x + 0.5, y + 0.5, 10, 8);
+  ctx.strokeRect(x + 0.5, y + 0.5, width - 1, 8);
   ctx.fillStyle = color;
-  ctx.font = 'bold 8px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(glyph, x + 5.5, y + 5);
+  ctx.fillText(glyph, x + width / 2, y + 5);
   ctx.restore();
 }
 
@@ -108,6 +126,13 @@ function drawSleepZ(ctx: CanvasRenderingContext2D, rise: number, feet: Point): v
   ctx.fillText('Z', x, y);
   ctx.restore();
 }
+
+/** The words of the king's summons (summons.ts): fixed strings, never outside text. */
+const SPEECH_COLORS: Readonly<Record<SpeechLine, string>> = {
+  '！': '#b0103a',
+  ゴニョゴニョ: '#222222',
+  'はっ！': '#1a3a8a',
+};
 
 function drawMark(ctx: CanvasRenderingContext2D, mark: IdleMark, feet: Point): void {
   if (mark.kind === 'z') drawSleepZ(ctx, mark.rise, feet);
@@ -184,15 +209,20 @@ export function drawActors(
 
 /**
  * Over everything, after the shade of the night (drawDaylight.ts), so they read the same at any
- * hour: the bubbles of the members out of scenes (or the signs of a long idle spell), and confetti.
+ * hour: the words of the king's summons, else the bubbles of the members out of scenes (or the
+ * signs of a long idle spell), and confetti.
  */
 export function drawOverhead(
   ctx: CanvasRenderingContext2D,
-  stage: { readonly frame: StageFrame; readonly bubbles: Bubbles },
+  stage: { readonly frame: StageFrame; readonly bubbles: Bubbles; readonly speeches: Speeches },
 ): void {
   for (const member of stage.frame.members) {
+    const speech = stage.speeches[member.id];
     const bubble = bubbleShown(stage.bubbles, member);
-    if (bubble !== null) drawBubble(ctx, BUBBLE_GLYPHS[bubble], member.pose.point);
+    if (speech !== undefined) {
+      const glyph = { glyph: speech, color: SPEECH_COLORS[speech] };
+      drawBubble(ctx, glyph, member.pose.point, SPEECH_BUBBLE);
+    } else if (bubble !== null) drawBubble(ctx, BUBBLE_GLYPHS[bubble], member.pose.point);
     else if (member.mark !== null) drawMark(ctx, member.mark, member.pose.point);
   }
   for (const view of stage.frame.confetti) drawConfetti(ctx, view);

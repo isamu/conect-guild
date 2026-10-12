@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GuildEvent, GuildEventKind } from '../domain/events';
-import { cueForMessage, mayPlay, newlyAwaiting, type PartyMember } from './judge';
+import { callRings, cueForMessage, mayPlay, newlyAwaiting, type PartyMember } from './judge';
 
 const event = (kind: GuildEventKind): GuildEvent => ({
   id: `${kind}#1`,
@@ -28,6 +28,18 @@ const party = (...awaiting: PartyMember['id'][]): PartyMember[] =>
     id,
     state: awaiting.includes(id) ? 'awaiting-permission' : 'working',
   }));
+
+describe('callRings', () => {
+  it('rings when no other sound has played, or once the last one is over', () => {
+    expect(callRings(0, null)).toBe(true);
+    expect(callRings(1_000, 1_000)).toBe(true);
+    expect(callRings(1_001, 1_000)).toBe(true);
+  });
+
+  it('gives way while another sound still plays', () => {
+    expect(callRings(999, 1_000)).toBe(false);
+  });
+});
 
 describe('newlyAwaiting', () => {
   it('finds a member who starts waiting', () => {

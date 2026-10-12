@@ -65,5 +65,9 @@ export function useSound(sources: SoundSources) {
       controller.cycleVolume();
       settings.value = controller.settings();
     },
+    /** The canvas started a call of the king (Issue #28): its sound rings with it. */
+    callStarted: () => {
+      controller.callStarted();
+    },
   };
 }

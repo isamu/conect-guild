@@ -11,6 +11,13 @@ import { createKeyValueStore, type KeyValueStore } from '../adapters/storage';
 import { parseBaseline } from '../domain/baseline';
 import { diffSnapshot } from '../domain/events';
 import { diffEntries, type MessageEntry } from '../domain/message';
+import {
+  comparedReading,
+  readSessions,
+  summonedMembers,
+  type SessionReading,
+} from '../domain/summons';
+import type { MemberId } from '../guild.config';
 import { createMessageQueue, type GuildMessage, type MessageQueue } from './messageQueue';
 import { globalScheduler, type Cancel, type Scheduler } from './scheduler';
 
@@ -54,6 +61,19 @@ export interface GuildState {
   messages: readonly GuildMessage[];
   /** Result of the last "基準を消す". */
   baselineNotice: string | null;
+  /** The latest order of the president (Issue #28); null until the first one. */
+  summons: Summons | null;
+  /** The last session reading, which the next one is compared with; null after a halt. */
+  sessionReading: SessionReading | null;
+}
+
+/**
+ * Sessions that went from waiting to working in one fetch: the king calls them (Issue #28).
+ * A new id for every fetch that finds some, so the canvas and the sound take each one once.
+ */
+export interface Summons {
+  readonly id: number;
+  readonly members: readonly MemberId[];
 }
 
 export type HaltReason = Extract<SnapshotLoadFailure, 'schema-version' | 'repo-mismatch'>;
@@ -120,26 +140,49 @@ function initialState(): GuildState {
     checkedAt: null,
     messages: [],
     baselineNotice: null,
+    summons: null,
+    sessionReading: null,
   };
 }
 
-/** Applies one fetch result. Returns the messages (with their events) to queue. */
+/**
+ * Compares the session reading of a fetch with the last one and publishes the president's
+ * orders (Issue #28). A halt forgets the reading, so the first one after it only starts over.
+ */
+function noteSessions(state: GuildState, result: SnapshotLoadResult, now: number): void {
+  if (!result.ok) {
+    if (state.halted) state.sessionReading = null;
+    return;
+  }
+  const next = readSessions(result.snapshot.sessions, now);
+  const members = summonedMembers(state.sessionReading, next);
+  state.sessionReading = comparedReading(state.sessionReading, next);
+  if (members.length > 0) state.summons = { id: (state.summons?.id ?? 0) + 1, members };
+}
+
+/**
+ * Applies one fetch result, finished at `now` (epoch ms). Returns the messages (with their events)
+ * to queue.
+ */
 function applyResult(
   state: GuildState,
   storage: KeyValueStore,
   result: SnapshotLoadResult,
+  now: number,
 ): readonly MessageEntry[] {
   if (!result.ok) {
     state.failure = result.reason;
     // Once halted, only a snapshot of the expected version and repository resumes the screen.
     state.haltReason = haltReasonOf(result.reason) ?? state.haltReason;
     state.halted = state.haltReason !== null;
+    noteSessions(state, result, now);
     return [];
   }
   state.snapshot = result.snapshot;
   state.failure = null;
   state.halted = false;
   state.haltReason = null;
+  noteSessions(state, result, now);
   const outcome = syncBaseline(storage, result.snapshot);
   state.effectsAvailable = outcome.effectsAvailable;
   return outcome.entries;
@@ -182,7 +225,7 @@ export function createGuildStore(options: GuildStoreOptions = {}): GuildStore {
       const result = await load();
       if (started !== generation) return;
       state.checkedAt = now();
-      const entries = applyResult(state, storage, result);
+      const entries = applyResult(state, storage, result, now());
       // While halted the window is hidden: hold the messages (and their scenes) until it is back.
       if (state.halted) queue.pause();
       else queue.resume();
