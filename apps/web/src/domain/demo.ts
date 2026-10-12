@@ -18,6 +18,7 @@ import {
   DEMO_LANES,
   DEMO_LOOP_MS,
   DEMO_REPO,
+  DEMO_RECEPTION_TITLES,
   DEMO_SCRIPT,
   DEMO_TITLES,
   type DemoBeat,
@@ -82,6 +83,7 @@ export function laneStatesAt(
   script: readonly DemoBeat[] = DEMO_SCRIPT,
 ): Readonly<Record<DemoLane, LaneState>> {
   const lanes: Record<DemoLane, LaneState> = {
+    commander: START_LANE,
     quest1: START_LANE,
     quest2: START_LANE,
     helper1: START_LANE,
@@ -101,13 +103,14 @@ function departmentAt(index: number): DepartmentLabel {
 }
 
 /**
- * The departments of the lanes in a loop. Even loops: the 1st and 3rd departments (経理, 企画)
+ * The departments of the lanes in a loop; null for the commander (かなめ, the reception). Even loops: the 1st and 3rd departments (経理, 企画)
  * carry the quests and the 2nd and 4th (広報, 総務) help; odd loops swap them. Each pair has one
  * desk near かなめ (the scroll may be thrown) and one farther away.
  */
-export function laneDepartments(loop: number): Readonly<Record<DemoLane, DepartmentLabel>> {
+export function laneDepartments(loop: number): Readonly<Record<DemoLane, DepartmentLabel | null>> {
   const order = loop % 2 === 0 ? [0, 2, 1, 3] : [1, 3, 0, 2];
   return {
+    commander: null,
     quest1: departmentAt(order[0] ?? 0),
     quest2: departmentAt(order[1] ?? 0),
     helper1: departmentAt(order[2] ?? 0),
@@ -117,11 +120,14 @@ export function laneDepartments(loop: number): Readonly<Record<DemoLane, Departm
 
 /** Numbers grow with the loop, so a new loop's quests are new Issues, never reopened ones. */
 export function demoIssueNumber(loop: number, lane: DemoLane): number {
-  return 101 + 8 * loop + 2 * DEMO_LANES.indexOf(lane);
+  return 101 + 2 * DEMO_LANES.length * loop + 2 * DEMO_LANES.indexOf(lane);
 }
 
-function titlesOf(department: DepartmentLabel, loop: number): DemoQuestTitles {
-  const pool = DEMO_TITLES[DEPARTMENT_LABELS.indexOf(department)] ?? [];
+function titlesOf(department: DepartmentLabel | null, loop: number): DemoQuestTitles {
+  const pool =
+    department === null
+      ? DEMO_RECEPTION_TITLES
+      : (DEMO_TITLES[DEPARTMENT_LABELS.indexOf(department)] ?? []);
   // A department carries a quest every other loop: the next one is the next in its pool.
   const titles = pool[Math.floor(loop / 2) % Math.max(pool.length, 1)];
   return titles ?? { issue: '架空のクエスト', pr: '架空の成果' };
@@ -153,7 +159,7 @@ function issueOf(lane: LaneState, quest: QuestRef): SnapshotIssue {
   return {
     number: quest.number,
     title: quest.titles.issue,
-    labels: [quest.department],
+    labels: quest.department === null ? [] : [quest.department],
     state: closed ? 'closed' : 'open',
     createdAt: iso(quest.loopStart + lane.openedAt),
     updatedAt: iso(quest.loopStart + (closed ? lane.closedAt : lane.openedAt)),
@@ -180,7 +186,8 @@ function prOf(lane: LaneState, quest: QuestRef): SnapshotPr {
 interface QuestRef {
   /** The Issue's number; its PR is the next one. */
   readonly number: number;
-  readonly department: DepartmentLabel;
+  /** null: かなめ's reception. */
+  readonly department: DepartmentLabel | null;
   readonly titles: DemoQuestTitles;
   /** Wall time (epoch ms) when the loop started. */
   readonly loopStart: number;
@@ -244,14 +251,14 @@ function isDepartment(label: string): label is DepartmentLabel {
 function sessionsOf(loop: number, inLoopMs: number, nowMs: number): Snapshot['sessions'] {
   const lanes = laneStatesAt(inLoopMs);
   const departments = laneDepartments(loop);
-  const byDepartment = new Map<DepartmentLabel, SessionState>(
+  const byDepartment = new Map<DepartmentLabel | null, SessionState>(
     DEMO_LANES.map((lane) => [departments[lane], lanes[lane].session]),
   );
   return {
     status: 'ok',
     checkedAt: iso(nowMs),
     members: [
-      { department: null, state: 'idle' },
+      { department: null, state: byDepartment.get(null) ?? 'idle' },
       ...DEPARTMENT_LABELS.map((department) => ({
         department,
         state: byDepartment.get(department) ?? 'idle',
