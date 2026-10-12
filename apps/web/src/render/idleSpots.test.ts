@@ -5,6 +5,7 @@ import {
   chatTile,
   PET_DECOR,
   petTile,
+  turnsToPet,
   PLAY_SPOTS,
   teaTile,
   TEA_DECOR,
@@ -69,11 +70,33 @@ describe('PLAY_SPOTS', () => {
 });
 
 describe('the places', () => {
-  it('finds the pet by its one name, in front of it', () => {
+  it('finds the pet by its one name, and stands beside it (right of it, the throne is left)', () => {
     const pet = DECOR_PLACEMENTS.find((item) => item.name === PET_DECOR);
-    const tile = petTile();
+    expect(PET_DECOR).toBe('sleeping-poodle');
     expect(pet).toBeDefined();
-    expect(tile).toEqual({ col: pet?.col, row: (pet?.row ?? 0) + (pet?.h ?? 0) });
+    expect(petTile()).toEqual({ col: 19, row: 3 });
+  });
+
+  it('never stands on the pet’s picture or in front of it, so the pet stays in sight', () => {
+    const pet = DECOR_PLACEMENTS.find((item) => item.name === PET_DECOR);
+    if (pet === undefined) throw new Error('no pet');
+    for (const id of IDS) {
+      for (const spot of PLAY_SPOTS[id].filter((s) => s.kind === 'pet')) {
+        expect(contains(pet, spot.tile)).toBe(false);
+        // Beside it on the same row: a member below the pet would hide it.
+        expect(spot.tile.row).toBe(pet.row + pet.h - 1);
+        expect([pet.col - 1, pet.col + pet.w]).toContain(spot.tile.col);
+      }
+    }
+  });
+
+  it('turns toward the pet: flipped (facing left) on its right, not on its left', () => {
+    const pet = DECOR_PLACEMENTS.find((item) => item.name === PET_DECOR);
+    if (pet === undefined) throw new Error('no pet');
+    expect(turnsToPet({ col: pet.col + pet.w, row: pet.row })).toBe(true);
+    expect(turnsToPet({ col: pet.col - 1, row: pet.row })).toBe(false);
+    const tile = petTile();
+    expect(tile !== null && turnsToPet(tile)).toBe(true);
   });
 
   it('stands next to the mugs for tea', () => {

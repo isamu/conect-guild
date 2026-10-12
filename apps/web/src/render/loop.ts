@@ -35,7 +35,7 @@ import { decorCuesOf, type DecorCues } from './trinkets';
 
 /**
  * The requestAnimationFrame loop. It runs every frame while a scene plays; between scenes it
- * redraws only every AMBIENT.frameMs for the small moves (members, lamps, the cat, the other small
+ * redraws only every AMBIENT.frameMs for the small moves (members, lamps, the pet, the other small
  * things, and the light of the time of day, read from the local clock on each draw), and sleeps
  * when there are none until the bubbles change, a scene starts or the canvas is resized. While the
  * page is hidden or

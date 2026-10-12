@@ -262,20 +262,20 @@ describe('decorPose', () => {
     );
   });
 
-  it('lets the cat breathe: 1 px up for half of each breath, no light', () => {
+  it('lets the pet breathe: 1 px up for half of each breath, no light', () => {
     const half = AMBIENT.breathMs / 2;
     expect(decorPose('breath', 0, 0)).toEqual({ dy: 0, glow: 0 });
     expect(decorPose('breath', 0, half)).toEqual({ dy: -AMBIENT.breathPx, glow: 0 });
     expect(decorPose('breath', 0, AMBIENT.breathMs)).toEqual({ dy: 0, glow: 0 });
   });
 
-  it('moves the lamps, the cat and the departments’ things (Issue #11), nothing else', () => {
+  it('moves the lamps, the pet and the departments’ things (Issue #11), nothing else', () => {
     expect(DECOR_MOTION).toEqual({
       lantern: 'flame',
       sconce: 'flame',
       'pillar-lamp': 'flame',
       candlestick: 'flame',
-      'sleeping-cat': 'breath',
+      'sleeping-poodle': 'breath',
       abacus: 'glint',
       'coin-pile': 'glint',
       megaphone: 'notes',
