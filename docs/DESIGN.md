@@ -161,8 +161,8 @@ packages/collector ──検証して一時ファイルに書き rename──▶
 
 ### 4.4 差分 → イベント（domain/events.ts, domain/baseline.ts）
 
-- 差分の基準はブラウザの `localStorage` に置く。保存するのは `{ schemaVersion, fetchedAt, issues: [{ number, state, closedAt }], prs: [{ number, state, mergedAt }] }` だけ。題名・ラベル・ブランチ名は保存しない
-- **初回**（基準が無い、または `schemaVersion` が違う）は演出を出さず、基準だけ保存する
+- 差分の基準はブラウザの `localStorage` に置く。保存するのは `{ schemaVersion, fetchedAt, repo, issues: [{ number, state, closedAt }], prs: [{ number, state, mergedAt }] }` だけ。`repo` はリポジトリ名の FNV-1a（32 bit）の値で、名前そのものは保存しない。題名・ラベル・ブランチ名も保存しない
+- **初回**（基準が無い、`schemaVersion` が違う、または基準の `repo` が今回のリポジトリと違う。`guild.settings.ts` の `repo` を変えた直後など）は演出を出さず、基準だけ保存する。`repo` を足したので基準の `schemaVersion` を 2 にした（1 の基準は初回扱い）
 - **巻き戻さない**: 今回の `fetchedAt` が基準の `fetchedAt` 以前なら、イベントも基準の更新もしない
 - **空白が長いとき**: 基準の `fetchedAt` が 7 日（収集の取得範囲）より古ければ、取りこぼしがありうるので演出を出さず、基準だけ置き換えてメッセージ窓に「この期間の出来事は復元できません」と出す
 - **基準の更新**は、取得と検証に成功したときだけ行う。失敗した取得では基準を変えない

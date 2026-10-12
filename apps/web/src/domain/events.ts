@@ -1,6 +1,6 @@
 import type { Snapshot, SnapshotIssue, SnapshotPr } from '@conect-guild/snapshot';
 import { EVENT_GAP_LIMIT_MS, type DepartmentLabel } from '../guild.config';
-import { toBaseline, type Baseline } from './baseline';
+import { repoFingerprint, toBaseline, type Baseline } from './baseline';
 import { assignPr, indexIssues, type IssueIndex } from './party';
 import { pickDepartment } from './quest';
 
@@ -117,7 +117,10 @@ export function diffSnapshot(
   gapLimitMs: number = EVENT_GAP_LIMIT_MS,
 ): DiffResult {
   const replace: BaselineUpdate = { action: 'replace', baseline: toBaseline(snapshot) };
-  if (baseline === null) return { events: [], baselineUpdate: replace, notice: null };
+  // A baseline of another repository (guild.settings.ts changed) counts as the first load.
+  if (baseline?.repo !== repoFingerprint(snapshot.repo)) {
+    return { events: [], baselineUpdate: replace, notice: null };
+  }
   const gap = Date.parse(snapshot.fetchedAt) - Date.parse(baseline.fetchedAt);
   if (gap <= 0) return { events: [], baselineUpdate: { action: 'keep' }, notice: null };
   if (gap > gapLimitMs) {
