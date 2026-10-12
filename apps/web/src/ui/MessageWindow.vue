@@ -24,7 +24,9 @@ const emit = defineEmits<{ next: [] }>();
       :aria-label="remaining > 0 ? `つぎへ（あと ${remaining} 件）` : 'とじる'"
       @click="emit('next')"
     >
-      ▼<span v-if="remaining > 0" class="message__count">{{ remaining }}</span>
+      <span class="message__mark" aria-hidden="true"
+        >▼<span v-if="remaining > 0" class="message__count">{{ remaining }}</span></span
+      >
     </button>
   </section>
 </template>
@@ -53,21 +55,30 @@ const emit = defineEmits<{ next: [] }>();
   animation: none;
 }
 
+/* Covers the whole window so a click anywhere advances; the ▼ is only a mark inside it. */
 .message__next {
   position: absolute;
-  right: 0.6em;
-  bottom: 0.3em;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0 0.6em 0.3em 0;
   font: inherit;
-  font-size: 1.1em;
-  color: #fff;
+  color: inherit;
   background: none;
   border: none;
   cursor: pointer;
-  animation: blink 1s steps(2, start) infinite;
 }
 
 .message__next:focus-visible {
   outline: 0.1em solid var(--accent);
+  outline-offset: -0.15em;
+}
+
+.message__mark {
+  font-size: 1.1em;
+  color: #fff;
+  animation: blink 1s steps(2, start) infinite;
 }
 
 .message__count {
@@ -93,7 +104,7 @@ const emit = defineEmits<{ next: [] }>();
 
 @media (prefers-reduced-motion: reduce) {
   .message__text,
-  .message__next {
+  .message__mark {
     animation: none;
   }
 }
