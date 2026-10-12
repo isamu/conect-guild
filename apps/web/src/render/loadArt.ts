@@ -36,16 +36,28 @@ const SPRITE_URLS: Readonly<Record<MemberId, string>> = {
   yukihiro: yukihiroUrl,
 };
 
+/** How long one picture may take to arrive (as adapters/snapshot.ts). */
+export const PICTURE_TIMEOUT_MS = 10_000;
+
 /**
  * Fetched and revalidated, not through an <img>: in development the URLs carry no content hash, so
  * when the art is loaded again in the same page (a component remounted by HMR) an <img> of the same
  * URL comes from the page's image cache, and a 4-frame sheet stayed after the 7-frame one replaced
- * it (hands.hasHoldFrames: items raised without lifting the hands).
+ * it (hands.hasHoldFrames: items raised without lifting the hands). A picture that does not arrive
+ * within PICTURE_TIMEOUT_MS is given up, so its part falls back to the placeholders.
  */
 async function loadImage(url: string): Promise<ImageBitmap> {
-  const response = await fetch(url, { cache: 'no-cache' });
-  if (!response.ok) throw new Error(`picture: HTTP ${String(response.status)}`);
-  return createImageBitmap(await response.blob());
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, PICTURE_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { cache: 'no-cache', signal: controller.signal });
+    if (!response.ok) throw new Error(`picture: HTTP ${String(response.status)}`);
+    return await createImageBitmap(await response.blob());
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function loadTiles(): Promise<TileArt> {
