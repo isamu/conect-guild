@@ -26,10 +26,13 @@ const memberSchema = z.strictObject({
 
 /**
  * Where a company session is started, exactly as MulmoTerminal records it: `~` or `~/...` (under
- * the home directory) or an absolute path. No trailing `/`, no empty, `.` or `..` segments, since
- * the collector compares the paths as plain strings (docs/DESIGN.md 4.7).
+ * the home directory) or an absolute path. No surrounding whitespace, no trailing `/`, no empty,
+ * `.` or `..` segments, since the collector compares the paths as plain strings (docs/DESIGN.md
+ * 4.7).
  */
 export function isSessionDir(dir: string): boolean {
+  // The collector trims each cwd log line, so a path with surrounding whitespace never matches.
+  if (dir !== dir.trim()) return false;
   if (dir === '~') return true;
   const prefix = ['~/', '/'].find((p) => dir.startsWith(p));
   if (prefix === undefined || dir === prefix) return false;
@@ -39,7 +42,9 @@ export function isSessionDir(dir: string): boolean {
     .every((segment) => segment !== '' && segment !== '.' && segment !== '..');
 }
 
-const sessionDirSchema = z.string().refine(isSessionDir, '~, ~/... or /... without a trailing /');
+const sessionDirSchema = z
+  .string()
+  .refine(isSessionDir, '~, ~/... or /... without a trailing / or surrounding spaces');
 
 const departmentSchema = z.strictObject({
   /** The GitHub label. The order of `departments` is the fixed order used for several labels. */

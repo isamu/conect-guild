@@ -183,6 +183,7 @@ describe('guildSettingsSchema rules and paths', () => {
 
   it('rejects a commander session dir the collector could not compare', () => {
     expect(rejects({ ...settings(), commanderSessionDir: '~/conect-management/' })).toBe(true);
+    expect(rejects({ ...settings(), commanderSessionDir: '~/conect-management ' })).toBe(true);
   });
 });
 
@@ -203,6 +204,11 @@ describe('isSessionDir', () => {
     '~/a/./b',
     '~/a/../b',
     '/..',
+    '~/a ',
+    ' ~/a',
+    '/a\t',
+    '~/a\n',
+    '\u3000/a',
   ])('rejects %j', (dir) => {
     expect(isSessionDir(dir)).toBe(false);
   });
