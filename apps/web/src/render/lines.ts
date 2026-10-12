@@ -1,11 +1,11 @@
 import type { MemberId } from '../guild.config';
 import type { Random } from './confetti';
-import { hasOwnLines, linesOf, type LineScene, type SpokenLine } from './lineBook';
+import { hasOwnLines, linesOf, sceneOfLine, type LineScene, type SpokenLine } from './lineBook';
 import { LINES } from './metrics';
 
 /**
- * The members' lines at the moments of a scene (Issue #47, docs/DESIGN.md 4.11). Pure but for
- * createLinePicker, whose memory of the last lines is the only state: the times are passed in and
+ * The members' lines at the moments of a scene (Issue #47, docs/DESIGN.md 4.12). Pure but for
+ * createLinePicker, whose memory of the last lines seen is the only state: the times are passed in and
  * the random source is injected (`lineRandom` in render/loop.ts, apart from the confetti's and the
  * toss's, so their sequences stay as they were).
  *
@@ -29,8 +29,15 @@ export interface Utterance {
   readonly end: number;
 }
 
-/** Chooses what `actor` says at `scene`; null when they say nothing there. */
-export type PickLine = (actor: MemberId, scene: LineScene) => SpokenLine | null;
+/**
+ * Chooses what `actor` says at `scene`, other than the lines of theirs still to show or showing
+ * (`pending`); null when they say nothing there.
+ */
+export type PickLine = (
+  actor: MemberId,
+  scene: LineScene,
+  pending: readonly SpokenLine[],
+) => SpokenLine | null;
 
 /** Who says which line at a moment. */
 export type SpokenLines = Readonly<Partial<Record<MemberId, SpokenLine>>>;
@@ -71,11 +78,17 @@ function avoidedOf<L>(count: number, recent: readonly L[]): readonly L[] {
 }
 
 /**
- * One of `options` that is not among the last ones said (`recent`, oldest first), chosen evenly by
- * `random`; null when there are no options.
+ * One of `options` that is not among the last ones seen (`recent`, oldest first) nor still to show
+ * (`pending`), chosen evenly by `random`. Null when that leaves none (the member says nothing this
+ * time rather than a line said lately or about to be said) or there are none.
  */
-export function pickLine<L>(options: readonly L[], recent: readonly L[], random: Random): L | null {
-  const avoided = avoidedOf(options.length, recent);
+export function pickLine<L>(
+  options: readonly L[],
+  recent: readonly L[],
+  random: Random,
+  pending: readonly L[] = [],
+): L | null {
+  const avoided = [...avoidedOf(options.length, recent), ...pending];
   const fresh = options.filter((line) => !avoided.includes(line));
   // No number is drawn for nothing to say, so the sequence goes on as if it was never asked.
   if (fresh.length === 0) return null;
@@ -88,20 +101,57 @@ export function remember<L>(recent: readonly L[], line: L): L[] {
   return [...recent, line].slice(-LINES.recentLines);
 }
 
+export interface LinePicker {
+  readonly pick: PickLine;
+  /**
+   * The lines over the heads in the frame at `now` (seenLines): each is remembered once, from the
+   * first frame it is seen in, even if the king's call hides it a while and it shows again. A line
+   * dropped before it shows (halted, a hidden canvas) or hidden all along (the king's call) is
+   * never seen, so it is not among the last ones.
+   */
+  saw(lines: readonly Utterance[], now: number): void;
+}
+
 /**
- * Picks from the line book, remembering the last lines of each member at each moment; the shared
- * lines (lineBook.SHARED_LINES) are remembered for everyone at once, so one member does not say
- * again what another has just said there.
+ * Where the last lines seen of `actor` at `scene` are kept: per member and moment, but the shared
+ * lines (lineBook.SHARED_LINES) for everyone at once, so one member does not say again what another
+ * has just said there.
  */
-export function createLinePicker(random: Random): PickLine {
+function memoryKey(actor: MemberId, scene: LineScene): string {
+  return hasOwnLines(actor, scene) ? `${actor}:${scene}` : `shared:${scene}`;
+}
+
+/** Picks from the line book, remembering the last lines seen of each member at each moment. */
+export function createLinePicker(random: Random): LinePicker {
   const memory = new Map<string, readonly SpokenLine[]>();
-  return (actor, scene) => {
-    const key = hasOwnLines(actor, scene) ? `${actor}:${scene}` : `shared:${scene}`;
-    const recent = memory.get(key) ?? [];
-    const line = pickLine(linesOf(actor, scene), recent, random);
-    if (line !== null) memory.set(key, remember(recent, line));
-    return line;
+  /** The lines already remembered, by member and start (one member says one line at a time). */
+  const seen = new Map<string, number>();
+  return {
+    pick: (actor, scene, pending) =>
+      pickLine(linesOf(actor, scene), memory.get(memoryKey(actor, scene)) ?? [], random, pending),
+    saw(lines, now) {
+      for (const said of lines) {
+        const id = `${said.actor}@${String(said.start)}`;
+        const scene = sceneOfLine(said.actor, said.line);
+        if (seen.has(id) || scene === null) continue;
+        seen.set(id, said.end);
+        const key = memoryKey(said.actor, scene);
+        memory.set(key, remember(memory.get(key) ?? [], said.line));
+      }
+      for (const [id, end] of seen) if (end <= now) seen.delete(id);
+    },
   };
+}
+
+/** The lines seen over the heads at `now`: those showing, but where the king's call has the head. */
+export function seenLines(
+  lines: readonly Utterance[],
+  now: number,
+  speeches: Readonly<Partial<Record<MemberId, unknown>>>,
+): Utterance[] {
+  return lines.filter(
+    (said) => said.start <= now && now < said.end && speeches[said.actor] === undefined,
+  );
 }
 
 function overlaps(a: { start: number; end: number }, b: { start: number; end: number }): boolean {
@@ -126,7 +176,8 @@ export function speakInTurn(
     const start = Math.max(turn.at, free);
     const slot = { start, end: start + showMs(turn.scene) };
     const busy = said.some((other) => other.actor === turn.actor && overlaps(other, slot));
-    const line = busy ? null : pick(turn.actor, turn.scene);
+    const pending = said.filter((other) => other.actor === turn.actor).map((other) => other.line);
+    const line = busy ? null : pick(turn.actor, turn.scene, pending);
     if (line === null) continue;
     spoken.push({ actor: turn.actor, line, ...slot });
     free = slot.end;

@@ -9,7 +9,7 @@ import { linesAt, type PickLine, type SpokenLines, type Utterance } from './line
 import { LINES } from './metrics';
 
 /**
- * Murmurs while nothing happens (Issue #47, docs/DESIGN.md 4.11): one member of the whole guild at
+ * Murmurs while nothing happens (Issue #47, docs/DESIGN.md 4.12): one member of the whole guild at
  * a time says a line of what they are doing for `LINES.murmurMs`, `LINES.murmurGapMinMs` to
  * `LINES.murmurGapMaxMs` after the one before. A scene (a level-up too), the king's call and a
  * remark (remarks.ts) put the next one off. Pure: the stage time, the wall time, the hour, who
@@ -161,7 +161,7 @@ function utter(
   t: number,
   pick: PickLine | undefined,
 ): Utterance | null {
-  const line = pick?.(candidate.id, candidate.scene) ?? null;
+  const line = pick?.(candidate.id, candidate.scene, []) ?? null;
   return line === null ? null : { actor: candidate.id, line, start: t, end: t + LINES.murmurMs };
 }
 
@@ -218,6 +218,25 @@ export function murmurMoment(
   const { t, hour, party, members, busy } = frame;
   const candidates = () => murmurCandidates(members, { ...party, ...idle(), hour });
   return { t, off: party.halted || !party.known, busy, candidates, ...talk };
+}
+
+/**
+ * The murmur seen over the head at `frame.t`: showing, and nothing above it there (the member in a
+ * scene, the king's call, a waiting bubble). Only a murmur seen counts as said for not repeating a
+ * line (lines.createLinePicker).
+ */
+export function seenMurmurs(
+  murmurs: Murmurs,
+  frame: Pick<MurmurFrame, 't' | 'members'> & { readonly party: Pick<MurmurParty, 'bubbles'> },
+  view: { readonly speeches: Readonly<Partial<Record<MemberId, unknown>>> },
+): Utterance[] {
+  const { said } = murmurs;
+  const { t, party, members } = frame;
+  if (said === null || t < said.start || said.end <= t) return [];
+  const { actor } = said;
+  const inScene = members.some((member) => member.id === actor && member.inScene);
+  const covered = view.speeches[actor] !== undefined || party.bubbles[actor] !== undefined;
+  return inScene || covered ? [] : [said];
 }
 
 /** Who murmurs at `t`. */

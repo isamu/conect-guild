@@ -18,7 +18,12 @@ import {
   type SessionReading,
 } from '../domain/summons';
 import type { MemberId } from '../guild.config';
-import { createMessageQueue, type GuildMessage, type MessageQueue } from './messageQueue';
+import {
+  createMessageQueue,
+  type GuildMessage,
+  type MessageQueue,
+  type StageRecall,
+} from './messageQueue';
 import { globalScheduler, type Cancel, type Scheduler } from './scheduler';
 
 export type { GuildMessage } from './messageQueue';
@@ -105,6 +110,8 @@ export interface GuildStore {
   setHidden(hidden: boolean): void;
   /** Whether the canvas is on screen; while it is not, messages do not wait for scenes. */
   setStageShown(shown: boolean): void;
+  /** The canvas's stage once it runs (null when it stops): a level-up's member walks back first. */
+  setStage(stage: StageRecall | null): void;
   /** Removes the stored baseline; the next fetch counts as the first one (no events). */
   clearBaseline(): void;
 }
@@ -204,6 +211,14 @@ function queueInto(
   });
 }
 
+/** "基準を消す": the next fetch counts as the first one; the result is noted for the window. */
+function clearStoredBaseline(state: GuildState, storage: KeyValueStore): void {
+  const removed = storage.remove(BASELINE_STORAGE_KEY);
+  state.baselineNotice = removed.ok
+    ? '基準を消しました'
+    : '基準を消せませんでした（localStorage が使えません）';
+}
+
 export function createGuildStore(options: GuildStoreOptions = {}): GuildStore {
   const load =
     options.loadSnapshot ?? (() => loadSnapshot({ expectedRepo: defaultExpectedRepo() }));
@@ -260,11 +275,11 @@ export function createGuildStore(options: GuildStoreOptions = {}): GuildStore {
     setStageShown(shown) {
       queue.setStageShown(shown);
     },
+    setStage(stage) {
+      queue.setStage(stage);
+    },
     clearBaseline() {
-      const removed = storage.remove(BASELINE_STORAGE_KEY);
-      state.baselineNotice = removed.ok
-        ? '基準を消しました'
-        : '基準を消せませんでした（localStorage が使えません）';
+      clearStoredBaseline(state, storage);
     },
   };
 }

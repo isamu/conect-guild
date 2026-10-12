@@ -1,20 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { MemberId } from '../guild.config';
-import type { IdleActivity } from './idle';
-import { PLAY_SPOTS, type PlayKind } from './idleSpots';
-import { linesOf, type LineScene } from './lineBook';
+import { linesOf } from './lineBook';
 import { createLinePicker, type PickLine } from './lines';
 import { LINES } from './metrics';
-import { walkSegment } from './motion';
 import {
-  chooseSpeaker,
-  murmurCandidates,
-  murmurGap,
   murmurMoment,
   murmursAt,
-  murmurSceneOf,
   NO_MURMURS,
-  playScene,
+  seenMurmurs,
   stepMurmurs,
   type MurmurCandidate,
   type MurmurMember,
@@ -52,170 +45,6 @@ const WALL = 1_000_000;
 const PARTY: MurmurParty = { bubbles: {}, idleSince: {}, activities: {}, wall: WALL, hour: NOON };
 
 const seat = (id: MemberId): MurmurMember => ({ id, inScene: false, atSeat: true });
-
-/** An outing of `id` to their `kind` spot: out from `start`, staying 10 s, then back. */
-function outing(id: MemberId, kind: PlayKind, start: number): IdleActivity {
-  const spot = PLAY_SPOTS[id].find((s) => s.kind === kind);
-  if (spot === undefined) throw new Error(`${id} has no ${kind} spot`);
-  const out = walkSegment(spot.path, start);
-  return { kind: 'play', outing: { spot, out, back: walkSegment(spot.path, out.end + 10_000) } };
-}
-
-describe('playScene', () => {
-  it.each<[PlayKind, LineScene]>([
-    ['tea', 'tea'],
-    ['pet', 'pet'],
-    ['chat', 'chat'],
-  ])('%s: the lines of the spot at any hour', (kind, scene) => {
-    for (const hour of [0, 6, 12, 18]) expect(playScene(kind, hour)).toBe(scene);
-  });
-
-  it.each<[number, LineScene]>([
-    [4.99, 'windowNight'],
-    [5, 'windowMorning'],
-    [8.99, 'windowMorning'],
-    [9, 'windowDay'],
-    [16.49, 'windowDay'],
-    [16.5, 'windowEvening'],
-    [18.99, 'windowEvening'],
-    [19, 'windowNight'],
-    [23.5, 'windowNight'],
-  ])('the window at %f h: %s', (hour, scene) => {
-    expect(playScene('window', hour)).toBe(scene);
-  });
-});
-
-describe('murmurSceneOf', () => {
-  it('desk work for a member with work at the seat, idle talk for one with nothing to do', () => {
-    expect(murmurSceneOf(seat('minori'), PARTY)).toBe('work');
-    expect(murmurSceneOf(seat('minori'), { ...PARTY, idleSince: { minori: 0 } })).toBe('idle');
-    expect(murmurSceneOf(seat('kaname'), { ...PARTY, idleSince: { kaname: 0 } })).toBe('idle');
-  });
-
-  it('says nothing in a scene, with a waiting bubble, or away from the seat on no outing', () => {
-    expect(murmurSceneOf({ ...seat('hibiki'), inScene: true }, PARTY)).toBeNull();
-    const waiting = { ...PARTY, bubbles: { hibiki: 'awaiting-permission' as const } };
-    expect(murmurSceneOf(seat('hibiki'), waiting)).toBeNull();
-    expect(murmurSceneOf({ ...seat('hibiki'), atSeat: false }, PARTY)).toBeNull();
-  });
-
-  it('lets the king murmur only with nothing to approve (his 承認まち bubble is up otherwise)', () => {
-    expect(murmurSceneOf(seat('yukihiro'), PARTY)).toBeNull();
-    expect(murmurSceneOf(seat('yukihiro'), { ...PARTY, idleSince: { yukihiro: 0 } })).toBe('idle');
-  });
-
-  it('dozing and sleeping members (the king too) doze and talk in their sleep', () => {
-    const party: MurmurParty = {
-      ...PARTY,
-      idleSince: { sasae: 0, yukihiro: 0 },
-      activities: { sasae: { kind: 'doze' }, yukihiro: { kind: 'sleep' } },
-    };
-    expect(murmurSceneOf(seat('sasae'), party)).toBe('doze');
-    expect(murmurSceneOf(seat('yukihiro'), party)).toBe('sleepTalk');
-  });
-
-  it('a member out playing murmurs only while staying at the spot, not on the way', () => {
-    const play = outing('hirame', 'tea', WALL);
-    if (play.kind !== 'play') throw new Error('not an outing');
-    const { out, back } = play.outing;
-    const at = (wall: number) =>
-      murmurSceneOf(
-        { id: 'hirame', inScene: false, atSeat: false },
-        { ...PARTY, idleSince: { hirame: 0 }, activities: { hirame: play }, wall },
-      );
-    expect(at(out.start)).toBeNull();
-    expect(at(out.end - 1)).toBeNull();
-    expect(at(out.end)).toBe('tea');
-    expect(at(back.start - 1)).toBe('tea');
-    expect(at(back.start)).toBeNull();
-  });
-
-  it('under the window, by the hour', () => {
-    const play = outing('minori', 'window', 0);
-    if (play.kind !== 'play') throw new Error('not an outing');
-    const party = (hour: number): MurmurParty => ({
-      ...PARTY,
-      idleSince: { minori: 0 },
-      activities: { minori: play },
-      wall: play.outing.out.end,
-      hour,
-    });
-    expect(murmurSceneOf(seat('minori'), party(7))).toBe('windowMorning');
-    expect(murmurSceneOf(seat('minori'), party(22))).toBe('windowNight');
-  });
-});
-
-describe('murmurCandidates', () => {
-  it('keeps those who may murmur, in order, with what they would say', () => {
-    const members = (['kaname', 'minori', 'hibiki', 'yukihiro'] as const).map(seat);
-    const party: MurmurParty = {
-      ...PARTY,
-      bubbles: { minori: 'awaiting-kaname' },
-      idleSince: { hibiki: 0 },
-    };
-    expect(murmurCandidates(members, party)).toEqual([
-      { id: 'kaname', scene: 'work' },
-      { id: 'hibiki', scene: 'idle' },
-    ]);
-  });
-});
-
-describe('chooseSpeaker', () => {
-  const awake: MurmurCandidate = { id: 'hibiki', scene: 'idle' };
-  const asleep: MurmurCandidate = { id: 'sasae', scene: 'sleepTalk' };
-  const working: MurmurCandidate = { id: 'minori', scene: 'work' };
-
-  it('chooses evenly among those awake', () => {
-    const all = [working, awake];
-    expect(chooseSpeaker(all, null, () => 0)).toBe(working);
-    expect(chooseSpeaker(all, null, () => 0.49)).toBe(working);
-    expect(chooseSpeaker(all, null, () => 0.5)).toBe(awake);
-    expect(chooseSpeaker(all, null, () => 0.9999)).toBe(awake);
-  });
-
-  it('weighs a sleeper LINES.sleepTalkWeight against 1 for anyone awake', () => {
-    const all = [asleep, awake];
-    // 1.3 in all: under 0.3 is the sleeper's.
-    expect(chooseSpeaker(all, null, () => 0.29 / 1.3)).toBe(asleep);
-    expect(chooseSpeaker(all, null, () => 0.31 / 1.3)).toBe(awake);
-  });
-
-  it('a sleeper comes about 0.3 times as often as one awake over a long run', () => {
-    const random = seeded(3);
-    let sleeps = 0;
-    for (let i = 0; i < 13_000; i += 1) {
-      if (chooseSpeaker([asleep, awake], null, random) === asleep) sleeps += 1;
-    }
-    expect(sleeps / 13_000).toBeCloseTo(0.3 / 1.3, 1);
-  });
-
-  it('never the one who murmured last', () => {
-    for (const value of [0, 0.5, 0.9999]) {
-      expect(chooseSpeaker([working, awake], 'minori', () => value)).toBe(awake);
-    }
-  });
-
-  it('nobody, and no number drawn, when nobody else may', () => {
-    const { random, draws } = counting(0);
-    expect(chooseSpeaker([working], 'minori', random)).toBeNull();
-    expect(chooseSpeaker([], null, random)).toBeNull();
-    expect(draws()).toBe(0);
-  });
-
-  it('never past the last one, even for a random number of 1', () => {
-    expect(chooseSpeaker([working, awake], null, () => 1)).toBe(awake);
-  });
-});
-
-describe('murmurGap', () => {
-  it('waits LINES.murmurGapMinMs to LINES.murmurGapMaxMs', () => {
-    expect([LINES.murmurGapMinMs, LINES.murmurGapMaxMs]).toEqual([40_000, 90_000]);
-    expect(murmurGap(() => 0)).toBe(40_000);
-    expect(murmurGap(() => 0.5)).toBe(65_000);
-    expect(murmurGap(() => 0.99999)).toBe(90_000);
-    expect(murmurGap(() => 1)).toBe(90_000);
-  });
-});
 
 const say: PickLine = (actor, scene) => linesOf(actor, scene)[0] ?? null;
 
@@ -406,6 +235,46 @@ describe('murmurMoment', () => {
   });
 });
 
+describe('seenMurmurs: only a murmur seen counts as said', () => {
+  const said = stepMurmurs(due(1_000), moment(1_000));
+  const frame = (t: number, extra: Partial<MurmurParty> = {}, inScene = false) => ({
+    t,
+    party: { ...PARTY, ...extra },
+    members: [{ ...seat('minori'), inScene }],
+  });
+  const none = { speeches: {} };
+
+  it('sees the murmur while it shows over the head, and not before or after', () => {
+    expect(seenMurmurs(said, frame(999), none)).toEqual([]);
+    expect(seenMurmurs(said, frame(1_000), none)).toEqual([said.said]);
+    expect(seenMurmurs(said, frame(1_000 + LINES.murmurMs - 1), none)).toEqual([said.said]);
+    expect(seenMurmurs(said, frame(1_000 + LINES.murmurMs), none)).toEqual([]);
+    expect(seenMurmurs(NO_MURMURS, frame(1_000), none)).toEqual([]);
+  });
+
+  it('does not see it under what is over it: a scene, the king’s call, a waiting bubble', () => {
+    expect(seenMurmurs(said, frame(1_500, {}, true), none)).toEqual([]);
+    expect(seenMurmurs(said, frame(1_500), { speeches: { minori: 'はっ！' } })).toEqual([]);
+    const waiting = frame(1_500, { bubbles: { minori: 'awaiting-permission' } });
+    expect(seenMurmurs(said, waiting, none)).toEqual([]);
+    // Someone else's bubble hides nothing of hers.
+    expect(
+      seenMurmurs(said, frame(1_500, { bubbles: { hibiki: 'awaiting-permission' } }), none),
+    ).toEqual([said.said]);
+  });
+
+  it('a murmur nobody saw may be said again next time', () => {
+    const picker = createLinePicker(() => 0);
+    const first = picker.pick('minori', 'work', []);
+    // Hidden all along by a waiting bubble: never seen.
+    picker.saw([], 1_000);
+    expect(picker.pick('minori', 'work', [])).toBe(first);
+    if (first === null) throw new Error('no line');
+    picker.saw([{ actor: 'minori', line: first, start: 2_000, end: 4_400 }], 2_000);
+    expect(picker.pick('minori', 'work', [])).not.toBe(first);
+  });
+});
+
 describe('stepMurmurs: a long run', () => {
   const MEMBERS: readonly MemberId[] = ['kaname', 'minori', 'hibiki', 'hirame', 'sasae'];
   const everyone = () => MEMBERS.map((id): MurmurCandidate => ({ id, scene: 'work' }));
@@ -414,12 +283,16 @@ describe('stepMurmurs: a long run', () => {
     'seed %i: gaps of 40 to 90 s, one at a time, never the same member or line twice in a row',
     (seed) => {
       const random = seeded(seed);
-      const pick = createLinePicker(random);
+      const picker = createLinePicker(random);
       let murmurs = NO_MURMURS;
       const said: { actor: MemberId; line: string; start: number }[] = [];
       for (let t = 0; t < 3 * 3_600_000; t += 140) {
-        murmurs = stepMurmurs(murmurs, moment(t, { candidates: everyone, random, pick }));
+        murmurs = stepMurmurs(
+          murmurs,
+          moment(t, { candidates: everyone, random, pick: picker.pick }),
+        );
         const now = murmurs.said;
+        picker.saw(now === null ? [] : [now], t);
         if (now !== null && now.start === t) said.push(now);
         expect(Object.keys(murmursAt(murmurs, t)).length).toBeLessThanOrEqual(1);
       }

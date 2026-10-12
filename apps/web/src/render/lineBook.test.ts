@@ -4,6 +4,7 @@ import {
   hasOwnLines,
   LINE_BOOK,
   linesOf,
+  sceneOfLine,
   SHARED_LINES,
   type LineScene,
   type SpokenLine,
@@ -111,6 +112,14 @@ describe('line book: each moment', () => {
       );
     },
   );
+
+  it.each(MEMBERS)('gives %s no line at two moments (a line tells its moment)', (id) => {
+    const own = ENTRIES.filter((entry) => entry.id === id).flatMap((entry) => entry.lines);
+    expect(new Set(own).size).toBe(own.length);
+    for (const entry of ENTRIES.filter((e) => e.id === id)) {
+      for (const line of entry.lines) expect(sceneOfLine(id, line)).toBe(entry.scene);
+    }
+  });
 
   it('lets the king react only to a clear, and murmur on the throne and in his sleep', () => {
     expect(Object.keys(LINE_BOOK.yukihiro)).toEqual(['seeClear', 'idle', 'sleepTalk']);
