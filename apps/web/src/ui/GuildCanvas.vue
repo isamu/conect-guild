@@ -7,6 +7,7 @@ import {
   type PartyRow,
   type SceneCue,
 } from '../app/guildView';
+import type { KeyValueStore } from '../adapters/storage';
 import { createLastActiveTracker } from '../app/lastActive';
 import { ambientMoodsOf } from '../render/ambient';
 import type { GuildArt } from '../render/art';
@@ -23,6 +24,8 @@ const props = defineProps<{
   cue: SceneCue | null;
   /** Per-member salts of the idle spells, shared with the narration (Issue #30). */
   idleSeeds: IdleSeeds;
+  /** Where the idle times are kept; localStorage when absent (the demo keeps them in memory). */
+  lastActiveStorage?: KeyValueStore;
 }>();
 
 const emit = defineEmits<{
@@ -41,7 +44,7 @@ let cssWidth: number | null = null;
 /** Cues seen so far; those that arrive while the pictures load wait for the loop. */
 let cues = EMPTY_CUE_QUEUE;
 /** When each member last had work (localStorage), for dozing, sleeping and playing (Issue #23). */
-const lastActive = createLastActiveTracker();
+const lastActive = createLastActiveTracker(props.lastActiveStorage);
 let idleSince: IdleSince = {};
 
 function setIdleSince(next: IdleSince): void {

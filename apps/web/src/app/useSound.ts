@@ -1,5 +1,5 @@
 import { onBeforeUnmount, onMounted, shallowRef, watch, type Ref } from 'vue';
-import { createKeyValueStore } from '../adapters/storage';
+import { createKeyValueStore, type KeyValueStore } from '../adapters/storage';
 import { documentVisibility } from '../adapters/visibility';
 import { createSoundController } from '../audio/controller';
 import type { PartyMember } from '../audio/judge';
@@ -16,12 +16,12 @@ export interface SoundSources {
 /** Events that count as the viewer acting, which lets the browser start audio. */
 const UNLOCK_EVENTS = ['pointerdown', 'keydown'] as const;
 
-/** Binds the sound effects to what the guild screen shows, for a component's lifetime. */
-export function useSound(sources: SoundSources) {
-  const controller = createSoundController({
-    player: createTonePlayer(),
-    storage: createKeyValueStore(),
-  });
+/**
+ * Binds the sound effects to what the guild screen shows, for a component's lifetime. The settings
+ * are kept in `storage` (localStorage by default; the demo mode keeps them in memory).
+ */
+export function useSound(sources: SoundSources, storage: KeyValueStore = createKeyValueStore()) {
+  const controller = createSoundController({ player: createTonePlayer(), storage });
   const settings = shallowRef(controller.settings());
   const syncHidden = () => {
     controller.setHidden(documentVisibility.isHidden());
