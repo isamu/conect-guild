@@ -97,7 +97,8 @@ conect-guild/
 ├── assets/                   コンセプト画、スプライト、タイル（出所とライセンスを README に書く）
 ├── docs/DESIGN.md            この文書
 ├── LICENSE                   MIT
-└── .github/workflows/ci.yml  npm ci → lint / typecheck / test / build（サンプルデータのみ）
+├── scoria.config.json        scoria（コードの健康状態の計測）の設定。.scoria/baseline.json が基準の記録
+└── .github/workflows/ci.yml  npm ci → lint / typecheck / test / build（サンプルデータのみ）。scoria.yml は scoria の計測（9 章）
 ```
 
 画面の重ね方: 一番下に Canvas（社屋とキャラ）、その上に Vue の窓（掲示板・パーティ・メッセージ）。文字は HTML で出すので日本語がきれいに出る。
@@ -296,7 +297,7 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 ## 7. 依存の方針（具体）
 
 - 実行時: `vue`、`zod`
-- 開発時: `vite`、`typescript`、`vue-tsc`、`vitest`、`eslint` + `eslint-plugin-vue` + `eslint-plugin-sonarjs` + `typescript-eslint`、`prettier`。E2E は M2 以降に `@playwright/test`
+- 開発時: `vite`、`typescript`、`vue-tsc`、`vitest`、`eslint` + `eslint-plugin-vue` + `eslint-plugin-sonarjs` + `typescript-eslint`、`prettier`、`@vitest/coverage-v8`（scoria にカバレッジを渡すため。Issue #33）。E2E は M2 以降に `@playwright/test`
 - 入れ方:
   1. `npm install <pkg> --ignore-scripts --before=<7 日前の日付>` で npm に版を決めさせる（記憶から版を書かない）。`--before` で推移依存も含めて 7 日より前に公開された版だけになり、`--ignore-scripts` で確かめる前にスクリプトが走らない
   2. `npm view <pkg> time --json` で入った版の公開日を確かめる
@@ -332,6 +333,7 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 - collector は、複数ページの出力を平坦化できること、`gh` の出力の検証失敗時に snapshot を書き換えないことを確かめる
 - ESLint（sonarjs の複雑度・ネスト・引数）をエラー、`max-lines` 400 / `max-lines-per-function` 60 を warning で入れる
 - `npm run verify` = lint + typecheck + test。CI は push と PR で `npm ci --ignore-scripts` → verify → build（サンプルデータのみ）
+- scoria でコードの健康状態を測る（Issue #33）。`.github/workflows/scoria.yml` が PR と main への push で `npm run test:coverage`（`coverage/lcov.info` を出す。遅いので verify には入れない）→ `npx -y scoria@0.3.0` を動かし、`.scoria/baseline.json` からの変化をジョブのサマリーに、指摘を SARIF で code scanning に出す。`mode: report` なので CI は落とさない。scoria は package.json に入れない（scoria 自身の依存の npm audit の警告がこのリポジトリのものに見えるため）
 
 ## 10. 決めたこと（2026-10-12）
 
@@ -361,6 +363,8 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 - 参考にしてよい OSS（すべて MIT）: pixel-agents（イベントの設計、hooks の受け方）、pixtuoid（ソケットと 0600 の扱い）。コードの丸写しはせず、仕組みを参考にする
 
 ## 変更履歴
+
+- **Issue #33（2026-10-12）** scoria でコードの健康状態を測るようにした（3 章、7 章、9 章）。開発時の依存に `@vitest/coverage-v8` を足した（社長の承認済み）
 
 - **ペットの差し替え（2026-10-12）** 玉座の横の眠るネコをトイプードルにした（8 章。社長の希望、猫アレルギーのため）
   - 寝息はそのままで、ときどき起きて伸びをする（拡大縮小）動きを、起きてお座りする絵への差し替えにした
