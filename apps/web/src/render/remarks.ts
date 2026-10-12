@@ -111,7 +111,8 @@ export interface RemarkMoment {
  */
 export function receiveParty(remarks: Remarks, party: RemarkParty, moment: RemarkMoment): Remarks {
   if (party.halted) return NO_REMARKS;
-  if (!party.known) return { ...remarks, previous: null };
+  // No snapshot behind the party: nothing to compare with, and no wait to speak of.
+  if (!party.known) return NO_REMARKS;
   const kept = stillWaiting(remarks.said, party.bubbles);
   const changes = newlyWaiting(remarks.previous, party.bubbles);
   if (moment.quiet || changes.length === 0) return { previous: party.bubbles, said: kept };
