@@ -89,7 +89,10 @@ export const HOLD = {
 
 /**
  * Confetti over a member when a quest is cleared (confetti.ts): squares of `smallPx` or `largePx`,
- * thrown up and out, falling for `durationMs`. Velocities are logical px / s.
+ * thrown up and out, then drifting down slowly (light paper, low gravity) for `durationMs`.
+ * Velocities are logical px / s. Chosen so that over every seat the squares stay on screen and
+ * above the message window until the end: the fastest rise stays under the top of the room from
+ * the upper seats, and the slowest one has not fallen past the message window from the lower ones.
  */
 export const CONFETTI = {
   durationMs: 2_600,
@@ -99,10 +102,10 @@ export const CONFETTI = {
   /** Share of the large squares. */
   largeShare: 0.4,
   /** Sideways speed, -spread/2 to +spread/2. */
-  spreadPx: 150 * DETAIL_SCALE,
-  riseMinPx: 70 * DETAIL_SCALE,
-  riseMaxPx: 170 * DETAIL_SCALE,
-  gravityPx: 180 * DETAIL_SCALE,
+  spreadPx: 60 * DETAIL_SCALE,
+  riseMinPx: 25 * DETAIL_SCALE,
+  riseMaxPx: 60 * DETAIL_SCALE,
+  gravityPx: 40 * DETAIL_SCALE,
 } as const;
 
 /**

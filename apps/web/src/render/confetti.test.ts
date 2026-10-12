@@ -7,7 +7,11 @@ import {
   createConfetti,
   type Random,
 } from './confetti';
+import { LOGICAL_WIDTH, WINDOW_EXTENTS } from './map';
 import { CONFETTI, DETAIL_SCALE, OVERHEAD_OFFSET } from './metrics';
+import { standingPose } from './motion';
+import { DEFAULT_SEATS } from './scenes';
+import { seatedPoint } from './seating';
 
 /** Deterministic random numbers in [0, 1). */
 function seeded(seed: number): Random {
@@ -67,10 +71,10 @@ describe('confettiAt', () => {
 
   it('rises first, then falls back under gravity', () => {
     const [up] = confettiAt(particles, 200);
-    const [down] = confettiAt(particles, 1_500);
+    const [down] = confettiAt(particles, 2_500);
     expect(up?.y).toBeLessThan(0);
     expect(down?.y).toBeGreaterThan(up?.y ?? 0);
-    expect(down?.x).toBeCloseTo(15);
+    expect(down?.x).toBeCloseTo(25);
   });
 
   it('shows nothing before the burst or once it is over', () => {
@@ -84,5 +88,34 @@ describe('confettiAt', () => {
 describe('burstOrigin', () => {
   it('centres over the head', () => {
     expect(burstOrigin({ x: 100, y: 200 })).toEqual({ x: 100, y: 200 - OVERHEAD_OFFSET });
+  });
+});
+
+describe('confetti over every seat', () => {
+  const seats = ['kaname', 'minori', 'hibiki', 'hirame', 'sasae'] as const;
+  const times = Array.from({ length: CONFETTI_MS / 50 }, (_, i) => i * 50).concat(CONFETTI_MS - 1);
+  /** Every square thrown with the slowest, middle and fastest numbers, at every time. */
+  const flights = [0, 0.5, 0.999].flatMap((value) =>
+    times.flatMap((t) =>
+      confettiAt(
+        createConfetti(() => value, 1),
+        t,
+      ),
+    ),
+  );
+
+  it('stays on screen and above the message window until it ends, rising or falling', () => {
+    const top = WINDOW_EXTENTS.message.top;
+    for (const id of seats) {
+      const origin = burstOrigin(seatedPoint(standingPose(DEFAULT_SEATS[id]).point));
+      for (const p of flights) {
+        const x = origin.x + p.x;
+        const y = origin.y + p.y;
+        expect(x).toBeGreaterThanOrEqual(0);
+        expect(x + p.size).toBeLessThanOrEqual(LOGICAL_WIDTH);
+        expect(y).toBeGreaterThanOrEqual(0);
+        expect(y + p.size).toBeLessThanOrEqual(top);
+      }
+    }
   });
 });
