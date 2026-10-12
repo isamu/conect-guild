@@ -69,6 +69,7 @@ describe('guildSettingsSchema', () => {
     'owner/.',
     '-owner/name',
     'own_er/name',
+    'owner/name\n',
   ])('rejects repo %j', (repo) => {
     expect(rejects({ ...settings(), repo })).toBe(true);
   });
