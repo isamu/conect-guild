@@ -20,8 +20,8 @@ function moment(over: Partial<RemarkMoment> = {}): RemarkMoment {
   return { t: 1_000, quiet: false, free: () => true, random: () => 0, pick: first, ...over };
 }
 
-function party(bubbles: Bubbles): RemarkParty {
-  return { bubbles, known: true, halted: false };
+function party(bubbles: Bubbles, known = true): RemarkParty {
+  return { bubbles, known, halted: false };
 }
 
 const NOTHING_SEEN: Remarks = { previous: {}, said: [] };
@@ -84,5 +84,10 @@ describe('receiveParty: a wait that ends or changes before its remark is over', 
     expect(
       stillWaiting(queued.said, { kaname: 'awaiting-kaname', minori: 'awaiting-kaname' }),
     ).toEqual(queued.said.filter((said) => said.actor === 'minori'));
+  });
+
+  it('drops them, and forgets the waits seen, for a party with no snapshot behind it', () => {
+    const next = receiveParty(queued, party({}, false), moment({ t: 1_500 }));
+    expect(next).toEqual({ previous: null, said: [] });
   });
 });
