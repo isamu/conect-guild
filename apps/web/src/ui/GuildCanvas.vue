@@ -10,6 +10,7 @@ import {
 import type { KeyValueStore } from '../adapters/storage';
 import type { Summons } from '../app/guildStore';
 import { createLastActiveTracker } from '../app/lastActive';
+import { bootStage, cueAction, type StageState } from '../app/stageBoot';
 import { ambientMoodsOf } from '../render/ambient';
 import type { GuildArt } from '../render/art';
 import { bubblesOf } from '../render/bubbles';
@@ -75,19 +76,20 @@ function stageParty(rows: readonly PartyRow[]): StageParty {
   };
 }
 
-/** True when the stage could not start: there is no loop to wait for, cues are dropped. */
-let stageFailed = false;
+/** Loading its pictures, running, or failed to start (app/stageBoot.ts). */
+let stage: StageState = 'loading';
 
 /**
  * Starts the queued scenes in order, once the loop runs. While the canvas is out of sight they are
- * dropped, so they never play late (the message queue does not wait for them either).
+ * dropped, so they never play late (the message queue does not wait for them either); so they are
+ * when the stage failed to start.
  */
 function playCues(): void {
-  const hidden = cssWidth !== null && !isShown(cssWidth);
-  if (loop === null && !hidden && !stageFailed) return;
+  const action = cueAction(stage, cssWidth !== null && !isShown(cssWidth));
+  if (action === 'wait') return;
   const taken = takeCues(cues);
   cues = taken.queue;
-  if (hidden) return;
+  if (action === 'drop') return;
   for (const cue of taken.play) loop?.play(cue.event);
 }
 
@@ -109,6 +111,7 @@ function start(element: HTMLCanvasElement, art: GuildArt): void {
     },
   });
   loop = running;
+  stage = 'running';
   setIdleSince(lastActive.observe(props.party, Date.now()));
   running.setParty(stageParty(props.party));
   running.resize(cssWidth ?? element.clientWidth, globalThis.devicePixelRatio);
@@ -135,16 +138,22 @@ onMounted(() => {
   void loadArt().then((art) => {
     const element = canvas.value;
     if (unmounted || element === null) return;
-    try {
-      start(element, art);
-    } catch (error: unknown) {
-      // No 2D context, for one: the windows (board, party, messages, sounds) still work without
-      // the room, so the screen and the demo go on.
-      globalThis.console.error('the stage could not start', error);
-      stageFailed = true;
-      playCues();
-    }
-    emit('ready');
+    // A stage that cannot start (no 2D context, for one) leaves the windows, messages and sounds
+    // going without the room; `ready` is sent either way (the demo's はじめる waits for it).
+    stage = bootStage(
+      () => {
+        start(element, art);
+      },
+      {
+        failed: (error) => {
+          globalThis.console.error('the stage could not start', error);
+        },
+        ready: () => {
+          emit('ready');
+        },
+      },
+    );
+    playCues();
   });
 });
 
