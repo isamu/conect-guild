@@ -11,7 +11,7 @@ import { ambientMoodsOf } from '../render/ambient';
 import type { GuildArt } from '../render/art';
 import { bubblesOf } from '../render/bubbles';
 import { loadArt } from '../render/loadArt';
-import { startRenderLoop, type RenderLoop } from '../render/loop';
+import { isShown, startRenderLoop, type RenderLoop } from '../render/loop';
 
 const props = defineProps<{
   /** Party rows; members who wait on someone get a bubble over their seat. */
@@ -20,19 +20,29 @@ const props = defineProps<{
   cue: SceneCue | null;
 }>();
 
+/** Whether the canvas is on screen (narrow screens hide it); sent on every change. */
+const emit = defineEmits<{ stageShown: [shown: boolean] }>();
+
 const canvas = useTemplateRef<HTMLCanvasElement>('canvas');
 let loop: RenderLoop | null = null;
 let observer: ResizeObserver | null = null;
 let unmounted = false;
+/** The latest displayed width (CSS px); null until the first observation. */
+let cssWidth: number | null = null;
 /** Cues seen so far; those that arrive while the pictures load wait for the loop. */
 let cues = EMPTY_CUE_QUEUE;
 
-/** Starts the queued scenes in order, once the loop runs. */
+/**
+ * Starts the queued scenes in order, once the loop runs. While the canvas is out of sight they are
+ * dropped, so they never play late (the message queue does not wait for them either).
+ */
 function playCues(): void {
-  if (loop === null) return;
+  const hidden = cssWidth !== null && !isShown(cssWidth);
+  if (loop === null && !hidden) return;
   const taken = takeCues(cues);
   cues = taken.queue;
-  for (const cue of taken.play) loop.play(cue.event);
+  if (hidden) return;
+  for (const cue of taken.play) loop?.play(cue.event);
 }
 
 function start(element: HTMLCanvasElement, art: GuildArt): void {
@@ -40,16 +50,26 @@ function start(element: HTMLCanvasElement, art: GuildArt): void {
   loop = running;
   running.setBubbles(bubblesOf(props.party));
   running.setMoods(ambientMoodsOf(props.party));
-  observer = new ResizeObserver((entries) => {
-    const width = entries[0]?.contentRect.width ?? element.clientWidth;
-    running.resize(width, globalThis.devicePixelRatio);
-  });
-  observer.observe(element);
+  running.resize(cssWidth ?? element.clientWidth, globalThis.devicePixelRatio);
   // Messages may have reached the window while the pictures were loading.
   playCues();
 }
 
+/** Follows the displayed width, from mount on, so the message queue knows it before the art. */
+function observe(element: HTMLCanvasElement): void {
+  observer = new ResizeObserver((entries) => {
+    const width = entries[0]?.contentRect.width ?? element.clientWidth;
+    if (cssWidth === null || isShown(width) !== isShown(cssWidth))
+      emit('stageShown', isShown(width));
+    cssWidth = width;
+    loop?.resize(width, globalThis.devicePixelRatio);
+    playCues();
+  });
+  observer.observe(element);
+}
+
 onMounted(() => {
+  if (canvas.value !== null) observe(canvas.value);
   // The loop starts once the pictures are in, so the cached background has them.
   void loadArt().then((art) => {
     const element = canvas.value;
