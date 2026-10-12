@@ -54,7 +54,11 @@ export interface MessageQueueOptions {
   readonly publish: (messages: readonly GuildMessage[]) => void;
 }
 
-/** Only the timing of the scenes matters here; the random numbers shape confetti, not its time. */
+/**
+ * Only the timing of the scenes matters here; the random numbers shape confetti, not its time.
+ * With no source for tosses (render/toss.ts) the queue always counts the walk: a toss ends sooner,
+ * so whichever the canvas plays, its cast is free by then and the next scene starts with its message.
+ */
 const PACING_CONTEXT = { seats: DEFAULT_SEATS, random: () => 0 };
 
 /**
