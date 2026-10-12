@@ -207,6 +207,21 @@ describe('createLinePicker: only what is seen counts', () => {
   });
 });
 
+describe('createLinePicker: when nothing is left to say', () => {
+  it('says nothing (and draws no number) when the lines seen lately and those to show use up all', () => {
+    let draws = 0;
+    const picker = createLinePicker(() => {
+      draws += 1;
+      return 0;
+    });
+    const [a = 'かんりょう！', b = a, c = a] = linesOf('minori', 'clear');
+    picker.saw([{ actor: 'minori', line: a, start: 0, end: 1_000 }], 0);
+    picker.saw([{ actor: 'minori', line: b, start: 5_000, end: 6_000 }], 5_000);
+    expect(picker.pick('minori', 'clear', [c])).toBeNull();
+    expect(draws).toBe(0);
+  });
+});
+
 describe('pickLine with pending lines', () => {
   it('says nothing (and draws no number) when the recent and pending leave nothing', () => {
     let draws = 0;
