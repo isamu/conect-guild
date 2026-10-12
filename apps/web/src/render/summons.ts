@@ -2,6 +2,7 @@ import type { MemberId, TilePos } from '../guild.config';
 import type { MemberPose, StageFrame } from './director';
 import { SUMMONS } from './metrics';
 import type { MoveFrame } from './motion';
+import type { Point } from './path';
 
 /**
  * The king speaks to whom the president gave an order (Issue #28). Pure: stage time is passed in.
@@ -90,7 +91,9 @@ export function speechesAt(list: readonly Summons[], now: number): Speeches {
   if (summons === undefined) return {};
   const reply = replyStart(summons);
   if (now >= reply) {
-    return Object.fromEntries(summons.members.map((id) => [id, 'はっ！'] as const));
+    const answers: Partial<Record<MemberId, SpeechLine>> = {};
+    for (const id of summons.members) answers[id] = 'はっ！';
+    return answers;
   }
   return { [KING]: now < summons.start + SUMMONS.callMs ? '！' : 'ゴニョゴニョ' };
 }
@@ -102,15 +105,61 @@ export function faceThrone(seat: TilePos, throne: TilePos): { frame: MoveFrame; 
 }
 
 /**
- * A member at their seat in a still frame, `lift` px up from where they are drawn now (an ambient
- * offset or the sink of a doze stays, so nothing jumps when the call starts or ends). What they
+ * Where the call playing holds those who take part at their seat: the point each one was drawn at
+ * when their part began (the king from the start of the call to its end, a member at the seat from
+ * the reply), so a nod, a doze turning to sleep or a typing bob does not move them in the call.
+ */
+export interface Holds {
+  /** The start of the call they belong to; null when none plays. */
+  readonly start: number | null;
+  readonly points: Readonly<Partial<Record<MemberId, Point>>>;
+}
+
+export const NO_HOLDS: Holds = { start: null, points: {} };
+
+/** True while `member` takes part at the seat at `now`: the king all along, a member answering. */
+function heldAt(summons: Summons, member: MemberPose, now: number): boolean {
+  if (member.id === KING) return true;
+  return (
+    now >= replyStart(summons) &&
+    summons.members.includes(member.id) &&
+    member.atSeat &&
+    !member.inScene
+  );
+}
+
+/** The holds at `now`: those of `holds` for the same call, plus anyone whose part begins now. */
+export function holdsAt(
+  holds: Holds,
+  frame: StageFrame,
+  list: readonly Summons[],
+  now: number,
+): Holds {
+  const summons = playing(list, now);
+  if (summons === undefined) return NO_HOLDS;
+  // The next call of a row keeps the king where the one before held him (no gap between them).
+  const king = holds.points[KING];
+  let points: Partial<Record<MemberId, Point>> = {};
+  if (summons.start === holds.start) points = { ...holds.points };
+  else if (holds.start !== null && king !== undefined) points = { [KING]: king };
+  for (const member of frame.members) {
+    if (points[member.id] === undefined && heldAt(summons, member, now)) {
+      points[member.id] = member.pose.point;
+    }
+  }
+  return { start: summons.start, points };
+}
+
+/**
+ * A member at their seat in a still frame, `lift` px up from where they are held (holdsAt; where
+ * they are drawn now when not held), so nothing jumps when the call starts or ends. What they
  * handle at the desk is put down and the idle sign goes.
  */
 function sitting(
   member: MemberPose,
-  look: { frame: MoveFrame; flip: boolean; lift: number },
+  look: { frame: MoveFrame; flip: boolean; lift: number; at: Point | undefined },
 ): MemberPose {
-  const at = member.pose.point;
+  const at = look.at ?? member.pose.point;
   return {
     ...member,
     pose: {
@@ -128,33 +177,37 @@ function answering(
   member: MemberPose,
   seats: Readonly<Record<MemberId, TilePos>>,
   since: number,
+  at: Point | undefined,
 ): MemberPose {
   if (!member.atSeat || member.inScene) return member;
   const face = faceThrone(seats[member.id], seats[KING]);
   const hop = face.frame === 0 && since < SUMMONS.hopMs ? SUMMONS.hopPx : 0;
-  return sitting(member, { ...face, lift: hop });
+  return sitting(member, { ...face, lift: hop, at });
 }
 
 /**
- * The frame with the order playing at `now` applied: the king sitting up while he speaks, the
- * members turned to the throne while they answer. The depth order stays (nobody changes tile).
+ * The frame with the order playing at `now` applied: the king sitting up, awake, through the call
+ * (rising a little while he calls), the members turned to the throne while they answer, each held
+ * where `holds` keeps them (holdsAt). The depth order stays (nobody changes tile).
  */
 export function withSummons(
   frame: StageFrame,
   list: readonly Summons[],
   now: number,
-  seats: Readonly<Record<MemberId, TilePos>>,
+  context: { readonly seats: Readonly<Record<MemberId, TilePos>>; readonly holds: Holds },
 ): StageFrame {
   const summons = playing(list, now);
   if (summons === undefined) return frame;
   const reply = replyStart(summons);
+  const { seats, holds } = context;
   const members = frame.members.map((member) => {
-    if (now < reply) {
-      if (member.id !== KING) return member;
+    const at = holds.start === summons.start ? holds.points[member.id] : undefined;
+    if (member.id === KING) {
       const lift = now < summons.start + SUMMONS.callMs ? SUMMONS.kingRisePx : 0;
-      return sitting(member, { frame: 0, flip: false, lift });
+      return sitting(member, { frame: 0, flip: false, lift, at });
     }
-    return summons.members.includes(member.id) ? answering(member, seats, now - reply) : member;
+    if (now < reply || !summons.members.includes(member.id)) return member;
+    return answering(member, seats, now - reply, at);
   });
   return { ...frame, members };
 }

@@ -4,11 +4,14 @@ import { DEFAULT_SEATS } from './scenes';
 import {
   addSummons,
   endedSummons,
+  holdsAt,
   isSummoning,
   newCallStart,
   pruneSummons,
   speechesAt,
+  NO_HOLDS,
   withSummons,
+  type Holds,
   type Speeches,
   type Summons,
 } from './summons';
@@ -48,13 +51,15 @@ export interface Calls {
 export function createCalls(options: CallsOptions): Calls {
   let list: readonly Summons[] = [];
   let announced: number | null = null;
+  let holds: Holds = NO_HOLDS;
   return {
     add(members, t) {
       list = addSummons(list, members, t);
     },
     view(frame, t) {
       const speeches = speechesAt(list, t);
-      const applied = withSummons(frame, list, t, DEFAULT_SEATS);
+      holds = holdsAt(holds, frame, list, t);
+      const applied = withSummons(frame, list, t, { seats: DEFAULT_SEATS, holds });
       const started = newCallStart(list, t, announced);
       if (started !== null) {
         announced = started;

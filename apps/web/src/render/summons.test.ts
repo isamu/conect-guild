@@ -15,8 +15,10 @@ import {
   addSummons,
   endedSummons,
   faceThrone,
+  holdsAt,
   isSummoning,
   newCallStart,
+  NO_HOLDS,
   pruneSummons,
   replyStart,
   speechesAt,
@@ -28,6 +30,8 @@ import {
 const CALL_END = SUMMONS.callMs;
 const REPLY = SUMMONS.callMs + SUMMONS.murmurMs;
 const END = REPLY + SUMMONS.replyMs;
+
+const CTX = { seats: DEFAULT_SEATS, holds: NO_HOLDS };
 
 const order = (members: readonly MemberId[], start = 0): Summons => ({ start, members });
 
@@ -157,7 +161,7 @@ describe('withSummons: the king', () => {
   it('wakes the king and lifts him while he calls, then sits him still while he murmurs', () => {
     const frame = sleepyFrame();
     const list = [order(['hibiki'])];
-    const calling = member(withSummons(frame, list, 0, DEFAULT_SEATS), 'yukihiro');
+    const calling = member(withSummons(frame, list, 0, CTX), 'yukihiro');
     // Woken where he is drawn: nothing jumps when the call starts or ends.
     const at = sunk('yukihiro');
     expect(calling.pose).toEqual({
@@ -167,7 +171,7 @@ describe('withSummons: the king', () => {
       held: null,
     });
     expect(calling.mark).toBeNull();
-    const murmuring = member(withSummons(frame, list, CALL_END, DEFAULT_SEATS), 'yukihiro');
+    const murmuring = member(withSummons(frame, list, CALL_END, CTX), 'yukihiro');
     expect(murmuring.pose.point).toEqual(at);
     expect(murmuring.mark).toBeNull();
   });
@@ -175,26 +179,27 @@ describe('withSummons: the king', () => {
   it('leaves the members alone while the king speaks, and the frame as it was outside an order', () => {
     const frame = sleepyFrame();
     const list = [order(['minori'])];
-    expect(member(withSummons(frame, list, CALL_END, DEFAULT_SEATS), 'minori')).toEqual(
+    expect(member(withSummons(frame, list, CALL_END, CTX), 'minori')).toEqual(
       member(frame, 'minori'),
     );
-    expect(withSummons(frame, list, END, DEFAULT_SEATS)).toBe(frame);
-    expect(withSummons(frame, [], 0, DEFAULT_SEATS)).toBe(frame);
+    expect(withSummons(frame, list, END, CTX)).toBe(frame);
+    expect(withSummons(frame, [], 0, CTX)).toBe(frame);
   });
 });
 
 describe('withSummons: the answer', () => {
   it('turns members at their seat to the throne, awake, holding nothing', () => {
     const frame = sleepyFrame();
-    const next = withSummons(frame, [order(['minori', 'hibiki'])], REPLY, DEFAULT_SEATS);
+    const next = withSummons(frame, [order(['minori', 'hibiki'])], REPLY, CTX);
     const minori = member(next, 'minori');
     expect(minori.pose).toEqual({ point: sunk('minori'), frame: 1, flip: false, held: null });
     expect(minori.mark).toBeNull();
     expect(minori.hand).toBeNull();
     expect(member(next, 'hibiki').pose).toMatchObject({ frame: 1, flip: true });
-    // Those not called, and the king, are left as they were.
+    // Those not called are left as they were; the king stays awake, sitting, to the end.
     expect(member(next, 'sasae')).toEqual(member(frame, 'sasae'));
-    expect(member(next, 'yukihiro')).toEqual(member(frame, 'yukihiro'));
+    expect(member(next, 'yukihiro').pose).toMatchObject({ point: sunk('yukihiro'), frame: 0 });
+    expect(member(next, 'yukihiro').mark).toBeNull();
   });
 
   it('keeps an ambient offset where it is while turning (no jump)', () => {
@@ -207,7 +212,7 @@ describe('withSummons: the answer', () => {
           : m,
       ),
     };
-    const next = withSummons(shifted, [order(['sasae'])], REPLY, DEFAULT_SEATS);
+    const next = withSummons(shifted, [order(['sasae'])], REPLY, CTX);
     expect(member(next, 'sasae').pose.point).toEqual(member(shifted, 'sasae').pose.point);
   });
 
@@ -215,14 +220,14 @@ describe('withSummons: the answer', () => {
     const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS);
     const list = [order(['kaname'])];
     const at = seatPoint('kaname');
-    const hop = member(withSummons(frame, list, REPLY, DEFAULT_SEATS), 'kaname');
+    const hop = member(withSummons(frame, list, REPLY, CTX), 'kaname');
     expect(hop.pose).toEqual({
       point: { x: at.x, y: at.y - SUMMONS.hopPx },
       frame: 0,
       flip: false,
       held: null,
     });
-    const after = member(withSummons(frame, list, REPLY + SUMMONS.hopMs, DEFAULT_SEATS), 'kaname');
+    const after = member(withSummons(frame, list, REPLY + SUMMONS.hopMs, CTX), 'kaname');
     expect(after.pose.point).toEqual(at);
   });
 });
@@ -242,9 +247,7 @@ describe('withSummons: the answer away from the seat', () => {
     const frame = frameAt(director, t, DEFAULT_SEATS);
     const list = [order(['kaname'], t - REPLY)];
     expect(member(frame, 'kaname').inScene).toBe(true);
-    expect(member(withSummons(frame, list, t, DEFAULT_SEATS), 'kaname')).toEqual(
-      member(frame, 'kaname'),
-    );
+    expect(member(withSummons(frame, list, t, CTX), 'kaname')).toEqual(member(frame, 'kaname'));
     expect(speechesAt(list, t)).toEqual({ kaname: 'はっ！' });
   });
 
@@ -258,7 +261,7 @@ describe('withSummons: the answer away from the seat', () => {
           : m,
       ),
     };
-    const next = withSummons(away, [order(['hirame'])], REPLY, DEFAULT_SEATS);
+    const next = withSummons(away, [order(['hirame'])], REPLY, CTX);
     expect(member(next, 'hirame')).toEqual(member(away, 'hirame'));
   });
 });
@@ -266,7 +269,74 @@ describe('withSummons: the answer away from the seat', () => {
 describe('withSummons: the depth order', () => {
   it('keeps the back-to-front order', () => {
     const frame = sleepyFrame();
-    const next = withSummons(frame, [order(['kaname', 'sasae'])], REPLY, DEFAULT_SEATS);
+    const next = withSummons(frame, [order(['kaname', 'sasae'])], REPLY, CTX);
     expect(next.members.map((m) => m.id)).toEqual(frame.members.map((m) => m.id));
+  });
+});
+
+/** The frame with one member drawn `dy` px lower (a nod, a doze turning to sleep, a typing bob). */
+function moved(frame: StageFrame, id: MemberId, dy: number): StageFrame {
+  return {
+    ...frame,
+    members: frame.members.map((m) =>
+      m.id === id
+        ? { ...m, pose: { ...m.pose, point: { x: m.pose.point.x, y: m.pose.point.y + dy } } }
+        : m,
+    ),
+  };
+}
+
+describe('holdsAt: nobody moves in a call', () => {
+  it('holds the king where the call found him, to its end', () => {
+    const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS);
+    const list = [order(['minori'])];
+    const holds = holdsAt(NO_HOLDS, frame, list, 0);
+    // Later in the call his idle pose sinks (a doze turning to sleep): he stays where he was.
+    const later = moved(frame, 'yukihiro', 4);
+    const kept = holdsAt(holds, later, list, REPLY + 10);
+    const king = member(
+      withSummons(later, list, REPLY + 10, { seats: DEFAULT_SEATS, holds: kept }),
+      'yukihiro',
+    );
+    expect(king.pose.point).toEqual(seatPoint('yukihiro'));
+  });
+
+  it('holds a member answering at the seat from the reply on', () => {
+    const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS);
+    const list = [order(['minori'])];
+    let holds = holdsAt(NO_HOLDS, frame, list, 0);
+    expect(holds.points.minori).toBeUndefined();
+    holds = holdsAt(holds, frame, list, REPLY);
+    expect(holds.points.minori).toEqual(seatPoint('minori'));
+    const bobbed = moved(frame, 'minori', 2);
+    holds = holdsAt(holds, bobbed, list, REPLY + 100);
+    const minori = member(
+      withSummons(bobbed, list, REPLY + 100, { seats: DEFAULT_SEATS, holds }),
+      'minori',
+    );
+    expect(minori.pose.point).toEqual(seatPoint('minori'));
+  });
+
+  it('does not hold a member away from the seat (they go on where they are)', () => {
+    const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS);
+    const away: StageFrame = {
+      ...frame,
+      members: frame.members.map((m) => (m.id === 'hirame' ? { ...m, atSeat: false } : m)),
+    };
+    const holds = holdsAt(NO_HOLDS, away, [order(['hirame'])], REPLY);
+    expect(holds.points.hirame).toBeUndefined();
+  });
+
+  it('keeps the king where he was for the next call of a row, and forgets after a gap', () => {
+    const frame = frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS);
+    const row = addSummons(addSummons([], ['kaname'], 0), ['sasae'], 0);
+    const first = holdsAt(NO_HOLDS, frame, row, 0);
+    const sunkFrame = moved(frame, 'yukihiro', 4);
+    const second = holdsAt(first, sunkFrame, row, END);
+    expect(second).toEqual({ start: END, points: { yukihiro: seatPoint('yukihiro') } });
+    expect(holdsAt(first, sunkFrame, row, 3 * END)).toEqual(NO_HOLDS);
+    const later = [order(['sasae'], 2 * END)];
+    const afterGap = holdsAt(NO_HOLDS, sunkFrame, later, 2 * END);
+    expect(afterGap.points.yukihiro).toEqual(sunk('yukihiro'));
   });
 });
