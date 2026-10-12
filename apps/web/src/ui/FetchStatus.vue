@@ -45,6 +45,8 @@ const emit = defineEmits<{ 'clear-baseline': [] }>();
       >
         基準を消す
       </button>
+      <!-- Controls that sit on this line without making the window taller (the sound buttons). -->
+      <slot />
       <span v-if="baselineNotice !== null" class="fetch__note">{{ baselineNotice }}</span>
     </p>
   </section>
