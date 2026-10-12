@@ -1,5 +1,12 @@
 import { SNAPSHOT_SCHEMA_VERSION, githubPartSchema, type GithubPart } from '@conect-guild/snapshot';
-import { recentCutoff, selectRecentPrs, toSnapshotIssues, toSnapshotPr } from './build.ts';
+import type { BranchPrefixRule } from '@conect-guild/snapshot/settings';
+import {
+  recentCutoff,
+  selectRecentPrs,
+  toHistory,
+  toSnapshotIssues,
+  toSnapshotPr,
+} from './build.ts';
 import { parseOrThrow, type GhRunner } from './gh.ts';
 import { fetchChangedFiles, fetchIssues, fetchPrs } from './github.ts';
 import { bothOrThrow, mapWithConcurrency } from './limit.ts';
@@ -11,9 +18,14 @@ export const CHANGED_FILES_CONCURRENCY = 4;
  * Fetch issues and PRs of `repo` and build the validated GitHub part of the snapshot.
  * Throws a CollectorError if any request or validation fails.
  */
-export async function collectSnapshot(gh: GhRunner, repo: string, now: Date): Promise<GithubPart> {
+export async function collectSnapshot(
+  gh: GhRunner,
+  repo: string,
+  now: Date,
+  branchPrefixes: readonly BranchPrefixRule[],
+): Promise<GithubPart> {
   const cutoff = recentCutoff(now);
-  const [rawIssues, rawPrs] = await bothOrThrow(fetchIssues(gh, repo, cutoff), fetchPrs(gh, repo));
+  const [rawIssues, rawPrs] = await bothOrThrow(fetchIssues(gh, repo), fetchPrs(gh, repo));
   const prs = await mapWithConcurrency(
     selectRecentPrs(rawPrs, cutoff),
     CHANGED_FILES_CONCURRENCY,
@@ -30,5 +42,6 @@ export async function collectSnapshot(gh: GhRunner, repo: string, now: Date): Pr
     repo,
     issues: toSnapshotIssues(rawIssues, cutoff),
     prs,
+    history: toHistory(rawIssues, rawPrs, repo, branchPrefixes),
   });
 }

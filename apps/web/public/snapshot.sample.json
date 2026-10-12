@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "fetchedAt": "2026-10-12T09:00:00.000Z",
   "repo": "example-owner/example-company",
   "issues": [
@@ -81,6 +81,32 @@
       "changedFiles": []
     }
   ],
+  "history": {
+    "openedIssueCount": 24,
+    "completedIssues": [
+      { "number": 80, "departments": ["経理"] },
+      { "number": 82, "departments": ["総務"] },
+      { "number": 83, "departments": ["広報"] },
+      { "number": 85, "departments": [] },
+      { "number": 86, "departments": ["企画"] },
+      { "number": 88, "departments": ["経理", "総務"] },
+      { "number": 90, "departments": ["総務"] },
+      { "number": 91, "departments": ["広報"] },
+      { "number": 93, "departments": ["経理"] },
+      { "number": 95, "departments": [] },
+      { "number": 96, "departments": ["企画"] },
+      { "number": 98, "departments": ["総務"] }
+    ],
+    "mergedPrs": [
+      { "number": 84, "linkedIssues": [80], "branchDepartment": "経理" },
+      { "number": 87, "linkedIssues": [83], "branchDepartment": null },
+      { "number": 89, "linkedIssues": [], "branchDepartment": "企画" },
+      { "number": 92, "linkedIssues": [88], "branchDepartment": null },
+      { "number": 94, "linkedIssues": [], "branchDepartment": null },
+      { "number": 97, "linkedIssues": [91, 93], "branchDepartment": "広報" },
+      { "number": 108, "linkedIssues": [98], "branchDepartment": null }
+    ]
+  },
   "sessions": {
     "status": "ok",
     "checkedAt": "2026-10-12T09:00:00.000Z",
