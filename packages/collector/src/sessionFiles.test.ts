@@ -71,19 +71,25 @@ describe('readCompanySessions', () => {
   });
 
   it('reads a large log with many company relaunches in one pass', async () => {
-    const root = paths.seats[0]?.cwd ?? '';
+    // A fixed short root (matched as a string, never touched on disk) keeps the log size independent of TMPDIR.
+    const root = '/guild/conect-management';
+    const seats: CompanySeat[] = [
+      { department: null, cwd: root },
+      { department: '経理', cwd: `${root}/accounting` },
+    ];
     const id = (i: number) => `aaaaaaaa-0000-4000-8000-${String(i).padStart(12, '0')}`;
-    // ~15 MB: 200k lines, half of them new company sessions at かなめ's path.
+    // About 13 MB, well under the 16 MiB cap: 200k lines, half of them new company sessions at かなめ's path.
     const lines = Array.from({ length: 200_000 }, (_, i) =>
       i % 2 === 0 ? `${id(i)} ${root}` : `${OTHER} ${OTHER_PATH}/${'x'.repeat(i % 7)}`,
     );
     await writeFile(paths.cwdLogPath, lines.map((line) => `\n${line}`).join(''));
+    expect((await stat(paths.cwdLogPath)).size).toBeLessThan(15_000_000);
     await writeFile(
       paths.activityStatePath,
       JSON.stringify({ [id(199_998)]: { working: true, waiting: false, event: null } }),
     );
     const started = performance.now();
-    await expect(readCompanySessions(paths)).resolves.toMatchObject({
+    await expect(readCompanySessions({ ...paths, seats })).resolves.toMatchObject({
       ok: true,
       found: 1,
       members: [{ department: null, state: 'working' }, expect.anything()],
