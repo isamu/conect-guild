@@ -35,6 +35,14 @@ import { createIdleCrew, playEvent, type IdleCrew } from './idleCrew';
 import { levelTags, type Levels } from './levelTags';
 import { createLinePicker, type PickLine, type SpokenLines } from './lines';
 import {
+  murmurMoment,
+  murmursAt,
+  NO_MURMURS,
+  stepMurmurs,
+  type MurmurFrame,
+  type Murmurs,
+} from './murmurs';
+import {
   isFree,
   isRemarking,
   NO_REMARKS,
@@ -82,8 +90,8 @@ export interface RenderLoopOptions {
   /** Whether かなめ tosses a scroll (scenes.SceneContext.tossRandom); apart from `random`. */
   readonly tossRandom?: Random;
   /**
-   * Which line a member says in a scene (lines.ts, Issue #47) and whether they say one on starting
-   * to wait (remarks.ts); apart from the other two.
+   * Which line a member says in a scene (lines.ts, Issue #47), whether they say one on starting
+   * to wait (remarks.ts), and who murmurs what when (murmurs.ts); apart from the other two.
    */
   readonly lineRandom?: Random;
   readonly visibility?: PageVisibility;
@@ -103,10 +111,13 @@ export interface StageParty {
   readonly idleSince: IdleSince;
   /**
    * The screen is halted (not live): the king's calls are dropped, to come or playing, and so are
-   * the lines of the scenes (lines.ts) and on starting to wait (remarks.ts).
+   * the lines of the scenes (lines.ts), on starting to wait (remarks.ts) and the murmurs (murmurs.ts).
    */
   readonly halted: boolean;
-  /** False before the first snapshot: nobody has started waiting by its empty party (remarks.ts). */
+  /**
+   * False before the first snapshot: nobody has started waiting by its empty party (remarks.ts),
+   * and nobody murmurs (murmurs.ts).
+   */
   readonly known: boolean;
   /** The members' levels, shown small under their seats (levelTags.ts). */
   readonly levels: Levels;
@@ -277,6 +288,7 @@ interface Moment {
   readonly bubbles: Bubbles;
   readonly speeches: Speeches;
   readonly remarks: SpokenLines;
+  readonly murmurs: SpokenLines;
   readonly cues: DecorCues;
   readonly levels: Levels;
 }
@@ -320,7 +332,9 @@ interface Cast {
   receive(director: Director, party: StageParty, at: { t: number; quiet: boolean }): Director;
   /** The remarks at `t`, dropping those that are over, and whether any shows or is to come. */
   remarksAt(t: number): { readonly remarks: SpokenLines; readonly remarking: boolean };
-  /** Drops the remarks said and to come (the canvas is out of sight). */
+  /** The murmur of a frame (murmurs.ts), which a busy stage puts off. */
+  murmursAt(frame: MurmurFrame): SpokenLines;
+  /** Drops the remarks said and to come, and the murmurs start over (the canvas is out of sight). */
   silence(): void;
 }
 
@@ -347,6 +361,7 @@ function createCast(
   });
   const calls = createCalls(options);
   let remarks: Remarks = NO_REMARKS;
+  let murmurs: Murmurs = NO_MURMURS;
   return {
     crew,
     calls,
@@ -362,8 +377,14 @@ function createCast(
       remarks = pruneRemarks(remarks, t);
       return { remarks: remarksAt(remarks, t), remarking: isRemarking(remarks, t) };
     },
+    murmursAt: (frame) => {
+      const moment = murmurMoment(frame, () => crew.activities(), talk);
+      murmurs = stepMurmurs(murmurs, moment);
+      return murmursAt(murmurs, frame.t);
+    },
     silence: () => {
       remarks = silenced(remarks);
+      murmurs = NO_MURMURS;
     },
     frame: (director, t, moods) =>
       frameAt(director, t, DEFAULT_SEATS, {
@@ -376,24 +397,29 @@ function createCast(
 }
 
 /**
- * What the stage shows at `t`: the members with the king's call, its words, the remarks, the small
- * things.
+ * What the stage shows at `t` and `hour`: the members with the king's call, its words, the remarks,
+ * the murmurs, the small things.
  */
 function stageAt(
   cast: Cast,
   director: Director,
-  t: number,
-  moods: AmbientMoods,
+  at: { readonly t: number; readonly hour: number; readonly party: StageParty },
 ): CallView & {
+  readonly hour: number;
   readonly remarks: SpokenLines;
+  readonly murmurs: SpokenLines;
   readonly animating: boolean;
   readonly cues: DecorCues;
 } {
+  const { t, party } = at;
   // The king woken by the end of a call (onActive) never leaves the throne: `director` stays good.
-  const view = cast.calls.view(() => cast.frame(director, t, moods), t);
-  const cues = decorCuesOf(moods, director.bursts, t, view.frame.members);
+  const view = cast.calls.view(() => cast.frame(director, t, party.moods), t);
+  const cues = decorCuesOf(party.moods, director.bursts, t, view.frame.members);
   const { remarks, remarking } = cast.remarksAt(t);
-  return { ...view, remarks, animating: isAnimating(director, t) || remarking, cues };
+  const animating = isAnimating(director, t) || remarking;
+  const busy = animating || view.calling;
+  const murmurs = cast.murmursAt({ ...at, members: view.frame.members, busy });
+  return { ...view, hour: at.hour, remarks, murmurs, animating, cues };
 }
 
 /** The scenes and the remarks to keep: none while the canvas is out of sight (scenesShown). */
@@ -461,8 +487,8 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   function draw(): void {
     const t = stageNow();
     const { bubbles, moods, levels } = party;
-    const stage = stageAt(cast, director, t, moods);
-    paint(painter, scale, { ...stage, now: t, hour: localHour(), bubbles, levels });
+    const stage = stageAt(cast, director, { t, hour: localHour(), party });
+    paint(painter, scale, { ...stage, now: t, bubbles, levels });
     director = prune(director, t);
     // A call needs no more than the ambient pace: its words and turns change every few hundred ms.
     const ambient = Object.keys(moods).length > 0 || ANIMATED_DECOR.length > 0 || stage.calling;
