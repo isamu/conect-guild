@@ -2,12 +2,17 @@ import { createSSRApp } from 'vue';
 import { renderToString } from 'vue/server-renderer';
 import { describe, expect, it } from 'vitest';
 import type { GuildMessage } from '../app/messageQueue';
+import type { Narration } from '../app/narrator';
 import MessageWindow from './MessageWindow.vue';
 
 const message: GuildMessage = { id: 1, text: 'テスト', event: null };
 
-function render(msg: GuildMessage | null, remaining: number): Promise<string> {
-  return renderToString(createSSRApp(MessageWindow, { message: msg, remaining }));
+function render(
+  msg: GuildMessage | null,
+  remaining: number,
+  narration: Narration | null = null,
+): Promise<string> {
+  return renderToString(createSSRApp(MessageWindow, { message: msg, remaining, narration }));
 }
 
 describe('MessageWindow', () => {
@@ -29,5 +34,25 @@ describe('MessageWindow', () => {
     const html = await render(null, 0);
     expect(html).not.toContain('<button');
     expect(html).toContain('あたらしい できごとは まだ ない。');
+  });
+
+  it('tells the narration while nothing happened, with ▼ for the next one', async () => {
+    const html = await render(null, 0, { id: 1, text: 'みのりは うとうと している…' });
+    expect(html).toContain('みのりは うとうと している…');
+    expect(html).not.toContain('あたらしい できごとは まだ ない。');
+    expect(html).toContain('aria-label="つぎの ようす"');
+    expect(html.match(/<button/g)).toHaveLength(1);
+  });
+
+  it('shows the event message instead of the narration', async () => {
+    const html = await render(message, 0, { id: 1, text: 'みのりは うとうと している…' });
+    expect(html).toContain('テスト');
+    expect(html).not.toContain('うとうと');
+    expect(html).toContain('aria-label="とじる"');
+  });
+
+  it('writes the narration as text, not HTML', async () => {
+    const html = await render(null, 0, { id: 1, text: '<b>x</b>' });
+    expect(html).toContain('&lt;b&gt;x&lt;/b&gt;');
   });
 });
