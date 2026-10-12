@@ -1,8 +1,8 @@
 import type { MemberId } from '../guild.config';
 
 /**
- * What the members say over their heads at the moments of a scene (Issue #47, docs/DESIGN.md
- * 4.11). Fixed lines only: no title, label or branch name from a snapshot ever reaches a bubble,
+ * What the members say over their heads at the moments of a scene, and now and then when they
+ * start waiting on someone (Issue #47, docs/DESIGN.md 4.11). Fixed lines only: no title, label or branch name from a snapshot ever reaches a bubble,
  * and the types keep it so (a bubble takes a SpokenLine, a union of these literals). Hiragana and
  * katakana with a few signs, at most 7 characters (lines.test.ts checks every one); no names, so
  * renaming a member in guild.settings.ts never puts a wrong name in someone's mouth. Nothing that
@@ -24,7 +24,13 @@ export type LineScene =
   /** Confetti over the member whose quest was cleared. */
   | 'clear'
   /** The king, after the member's line on a clear. */
-  | 'seeClear';
+  | 'seeClear'
+  /** Now waiting for the president's approval (remarks.ts: now and then, at the seat). */
+  | 'awaitPresident'
+  /** Now waiting for かなめ's review; for かなめ, now with pull requests to review. */
+  | 'awaitKaname'
+  /** Now waiting for a permission in the session. */
+  | 'awaitPermission';
 
 /** At least one line for each moment a member has. */
 type Choices = readonly [string, ...string[]];
@@ -36,26 +42,40 @@ export const LINE_BOOK = {
     takeScroll: ['うけつけました', 'おあずかり！', 'きろく、よし'],
     takeChest: ['おつかれさま！', 'たしかに！', 'おみごとです', 'うけとりました'],
     clear: ['かんりょうです', 'やりましたね', 'クリアです！'],
+    awaitKaname: ['かくにんします', 'みておきますね', 'チェックします'],
+    awaitPermission: ['よろしいですか', 'ごかくにんを！', 'きょかを…'],
   },
   minori: {
     takeScroll: ['うけたまわり！', 'けいさんします', 'はい、きっちり', 'おまかせを'],
     deliverChest: ['できました！', 'そろいました', 'ぴったりです'],
     clear: ['かんりょう！', 'すっきり！', 'やりました！'],
+    awaitPresident: ['ごしょうにんを', 'はんこください', 'おねがいします'],
+    awaitKaname: ['みてください', 'かくにんを…', 'どうでしょう？'],
+    awaitPermission: ['よいですか？', 'きょか、まだ？', 'おうかがいを'],
   },
   hibiki: {
     takeScroll: ['まかせて！', 'きたきた！', 'いくよー！', 'よっしゃ！'],
     deliverChest: ['できたよ！', 'とどけ〜！', 'じしんさく！', 'みてみて！'],
     clear: ['やったー！', 'さいこう！', 'イェーイ！'],
+    awaitPresident: ['おうさま〜！', 'みてほしいな', 'しょうにん！'],
+    awaitKaname: ['みてみて〜', 'どうかな？', 'おねがい！'],
+    awaitPermission: ['いい？いい？', 'まだかな〜', 'ゴーサイン？'],
   },
   hirame: {
     takeScroll: ['おもしろそう', 'かんがえます', 'ふむ、なるほど', 'いいですね'],
     deliverChest: ['かたちに！', 'できたかも！', 'あんです！', 'どうぞ…！'],
     clear: ['やった…！', 'よそうどおり', 'うまくいった', 'つぎは〜'],
+    awaitPresident: ['おうさま、ぜひ', 'ごはんだんを', 'どうでしょう'],
+    awaitKaname: ['みてもらお', 'どきどき…', 'いかがかな'],
+    awaitPermission: ['いいのかな…', 'すすめても？', 'うーん、まつ'],
   },
   sasae: {
     takeScroll: ['まかせてね', 'しょうちです', 'やっておくね', 'はーい'],
     deliverChest: ['ととのえたよ', 'おまたせ', 'できました'],
     clear: ['ひとあんしん', 'よかったね', 'おつかれさま', 'ほっとした'],
+    awaitPresident: ['ごさいけつを', 'おねがいね', 'みてくださいね'],
+    awaitKaname: ['みておいてね', 'たしかめてね', 'おねがいします'],
+    awaitPermission: ['いいかしら？', 'まってますね', 'どうかしら？'],
   },
   yukihiro: {
     seeClear: ['みごとじゃ！', 'あっぱれ！', 'ほめてつかわす'],
