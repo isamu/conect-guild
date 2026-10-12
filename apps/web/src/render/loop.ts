@@ -27,11 +27,12 @@ import {
 import { drawAnimatedDecor } from './drawDecor';
 import { drawLightPatches, drawShade, drawWindowSun, type ShadeScratch } from './drawDaylight';
 import { drawLevelTags } from './drawLevelTags';
+import { drawLevelUpBanners } from './drawLevelUp';
 import { BACK_ANIMATED_DECOR, FRONT_LAYERS } from './layers';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './map';
 import { AMBIENT } from './metrics';
 import type { IdleSeeds, IdleSince } from './idle';
-import { createIdleCrew, playEvent, type IdleCrew } from './idleCrew';
+import { createIdleCrew, playEvent, recallHome, type HomeIn, type IdleCrew } from './idleCrew';
 import { levelTags, type Levels } from './levelTags';
 import { createLinePicker, seenLines, type LinePicker } from './lines';
 import { DEFAULT_SEATS, type SceneContext } from './scenes';
@@ -103,6 +104,11 @@ const NO_PARTY: StageParty = { bubbles: {}, moods: {}, idleSince: {}, halted: fa
 export interface RenderLoop {
   /** Starts the scene for an event now (or when its cast is free); dropped while not shown. */
   play(event: GuildEvent): void;
+  /**
+   * Calls members out playing back to their seat now, ahead of their scene (a level-up), and says
+   * how long until each is free there (stage ms). Nothing while drawing would not be seen.
+   */
+  recall(members: readonly MemberId[]): HomeIn;
   /**
    * The king calls the members the president gave an order to (summons.ts, Issue #28), now or
    * after the call still playing. Dropped while the page is hidden or the canvas not shown: the
@@ -277,6 +283,7 @@ function paint(painter: Painter, scale: number, moment: Moment): void {
   const tags = levelTags(moment.levels, DEFAULT_SEATS);
   drawLevelTags(ctx, tags);
   drawOverhead(ctx, { ...moment, tags });
+  drawLevelUpBanners(ctx, moment);
 }
 
 /** The canvas, the scenery drawn once and an empty canvas for the shade. */
@@ -372,11 +379,38 @@ export function sceneContextWhile(context: SceneContext, quiet: boolean): SceneC
   return quiet ? { ...context, pickLine: undefined } : context;
 }
 
+/** Asks for the next draw as `next` says. */
+function follow(schedule: Scheduler, next: NextDraw): void {
+  if (next === 'frame') schedule.now();
+  if (next === 'ambient') schedule.later();
+}
+
+/** The clocks and the random sources of the loop (sceneContext): the injected ones, else the browser's. */
+function loopSources(options: RenderLoopOptions) {
+  const context = sceneContext(options);
+  return {
+    now: options.now ?? (() => performance.now()),
+    localHour: options.localHour ?? (() => hourOf(new Date())),
+    context,
+  };
+}
+
+/**
+ * After a frame is painted: the lines it showed are seen (lines.createLinePicker remembers them),
+ * then what is over is pruned.
+ */
+function seenAndPruned(
+  context: { readonly sawLines: LinePicker['saw'] },
+  director: Director,
+  frame: { readonly t: number; readonly speeches: Speeches },
+): Director {
+  context.sawLines(seenLines(director.lines, frame.t, frame.speeches), frame.t);
+  return prune(director, frame.t);
+}
+
 export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   const { canvas, art } = options;
-  const now = options.now ?? (() => performance.now());
-  const localHour = options.localHour ?? (() => hourOf(new Date()));
-  const context = sceneContext(options);
+  const { now, localHour, context } = loopSources(options);
   const painter = createPainter(context2d(canvas), art);
   const cast = createCast(art, context.random, options);
   const visibility = options.visibility ?? documentVisibility;
@@ -387,19 +421,16 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   let scale = 1;
   let clock: StageClock = RUNNING_CLOCK;
   const stageNow = () => stageTime(clock, now());
+  const quiet = () => sceneContextWhile(context, isQuiet(party.halted, cssWidth));
 
   function draw(): void {
     const t = stageNow();
-    const { bubbles, moods, levels } = party;
-    const { frame, speeches, calling, cues } = stageAt(cast, director, t, moods);
-    paint(painter, scale, { now: t, hour: localHour(), frame, bubbles, speeches, cues, levels });
-    context.sawLines(seenLines(director.lines, t, speeches), t);
-    director = prune(director, t);
+    const { frame, speeches, calling, cues } = stageAt(cast, director, t, party.moods);
+    paint(painter, scale, { ...party, now: t, hour: localHour(), frame, speeches, cues });
+    director = seenAndPruned(context, director, { t, speeches });
     // A call needs no more than the ambient pace: its words and turns change every few hundred ms.
-    const ambient = Object.keys(moods).length > 0 || ANIMATED_DECOR.length > 0 || calling;
-    const next = nextDraw({ hidden: paused(), animating: isAnimating(director, t), ambient });
-    if (next === 'frame') schedule.now();
-    if (next === 'ambient') schedule.later();
+    const ambient = Object.keys(party.moods).length > 0 || ANIMATED_DECOR.length > 0 || calling;
+    follow(schedule, nextDraw({ hidden: paused(), animating: isAnimating(director, t), ambient }));
   }
 
   const paused = () => isPaused(visibility.isHidden(), cssWidth);
@@ -418,9 +449,14 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   return {
     play(event) {
       // Members out playing come back first; the scene waits for them (idleCrew.playEvent).
-      const quiet = sceneContextWhile(context, isQuiet(party.halted, cssWidth));
-      director = playEvent(cast.crew, director, event, { t: stageNow(), context: quiet });
+      director = playEvent(cast.crew, director, event, { t: stageNow(), context: quiet() });
       refresh();
+    },
+    recall(members) {
+      const recalled = recallHome(cast.crew, director, paused() ? [] : members, stageNow());
+      director = recalled.director;
+      refresh();
+      return recalled.homeIn;
     },
     summon(members) {
       if (cast.calls.add(members, paused() ? null : stageNow())) schedule.now();

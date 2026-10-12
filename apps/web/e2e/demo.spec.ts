@@ -129,3 +129,19 @@ test('on a narrow screen (the room hidden) はじめる waits until the screen i
   expect(snapshotRequests).toEqual([]);
   expect(errors).toEqual([]);
 });
+
+test('the first loop of the demo shows a level-up (Issue #19)', async ({ page, context }) => {
+  // かなめ goes up with her second scroll (13.5 s), and the message waits until she is back
+  // from handing it over: well within the first loop, with the room's scenes in real time.
+  test.setTimeout(90_000);
+  const { errors, snapshotRequests } = await openDemo(page, context);
+  await page.getByRole('button', { name: '▶ はじめる' }).click();
+  const message = page.getByRole('region', { name: 'メッセージ' });
+  await expect(message).toContainText('かなめは レベル 6 に あがった！', { timeout: 60_000 });
+  await expect.poll(() => drawnTexts(page)).toContain('LEVEL UP');
+  await expect(
+    page.getByRole('region', { name: 'パーティのようす' }).getByRole('listitem').nth(0),
+  ).toContainText('Lv 6');
+  expect(snapshotRequests).toEqual([]);
+  expect(errors).toEqual([]);
+});

@@ -9,6 +9,7 @@ import {
 } from '../app/guildView';
 import type { KeyValueStore } from '../adapters/storage';
 import type { Summons } from '../app/guildStore';
+import type { StageRecall } from '../app/messageQueue';
 import { createLastActiveTracker } from '../app/lastActive';
 import { bootStage, cueAction, type StageState } from '../app/stageBoot';
 import { ambientMoodsOf } from '../render/ambient';
@@ -42,6 +43,8 @@ const emit = defineEmits<{
   idleSince: [since: IdleSince];
   /** A call of the king starts on the stage now (its sound rings with it, Issue #28). */
   callStarted: [];
+  /** The stage once the loop runs, null when it stops: the message queue calls members back. */
+  stage: [stage: StageRecall | null];
   /**
    * The pictures are in and the stage runs: scenes and calls from now on are played. Sent once,
    * even when the stage failed to start, so that nothing waits on it for ever.
@@ -117,6 +120,8 @@ function start(element: HTMLCanvasElement, art: GuildArt): void {
   running.resize(cssWidth ?? element.clientWidth, globalThis.devicePixelRatio);
   // Messages may have reached the window while the pictures were loading.
   playCues();
+  // Only a loop that started in full calls members back for the message queue.
+  emit('stage', running);
 }
 
 /** Follows the displayed width, from mount on, so the message queue knows it before the art. */
@@ -151,6 +156,7 @@ onMounted(() => {
           // stops, and the stage counts as failed (its cues are dropped).
           loop?.stop();
           loop = null;
+          emit('stage', null);
         },
         ready: () => {
           emit('ready');
@@ -166,6 +172,7 @@ onBeforeUnmount(() => {
   observer?.disconnect();
   loop?.stop();
   loop = null;
+  emit('stage', null);
 });
 
 watch(

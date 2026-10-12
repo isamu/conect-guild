@@ -216,23 +216,51 @@ function loopItems(loop: number, inLoopMs: number, loopStart: number): LoopItems
   return items;
 }
 
-/** A made-up past, so the counts (and the levels of Issue #19) do not start from zero. */
-const PAST_OPENED = 40;
-const PAST_COMPLETED: readonly HistoryIssue[] = Array.from({ length: 30 }, (_, i) => ({
-  number: i + 1,
-  departments: [departmentAt(i % 4)],
-}));
-const PAST_MERGED: readonly HistoryPr[] = Array.from({ length: 28 }, (_, i) => ({
-  number: 31 + i,
-  linkedIssues: [i + 1],
-  branchDepartment: null,
-}));
+/**
+ * A made-up past, so the counts (and the levels of Issue #19) do not start from zero. Each
+ * department's clears and merges (in the settings' order: 経理, 広報, 企画, 総務 by default) and
+ * the Issues opened are picked so that the level-ups come one by one: in the first loop かなめ
+ * (her second scroll), the 1st department (its chest) and the 3rd (its clear); later only now and
+ * then (domain/demo.test.ts has the times).
+ */
+const PAST_WORK: readonly { readonly clears: number; readonly merges: number }[] = [
+  // 205 experience: Lv 7 (210) with the chest of the first loop.
+  { clears: 15, merges: 11 },
+  // 130: Lv 6 (150) with the chest of the 4th loop.
+  { clears: 9, merges: 8 },
+  // 140: Lv 6 (150) with the clear of the first loop, not with its chest.
+  { clears: 10, merges: 8 },
+  // 170: Lv 7 (210) with the clear of the 6th loop.
+  { clears: 12, merges: 10 },
+];
+/** 48 scrolls × 3 = 144: かなめ reaches Lv 6 (150) with the second scroll of the first loop. */
+const PAST_OPENED = 48;
+
+/** Past Issues are numbered from 1 and past PRs after them; the loops' numbers start at 101. */
+function pastHistory(): { completed: HistoryIssue[]; merged: HistoryPr[] } {
+  const completed: HistoryIssue[] = [];
+  const merged: HistoryPr[] = [];
+  PAST_WORK.forEach(({ clears, merges }, index) => {
+    const first = completed.length + 1;
+    for (let i = 0; i < clears; i += 1)
+      completed.push({ number: first + i, departments: [departmentAt(index)] });
+    for (let i = 0; i < merges; i += 1)
+      merged.push({ number: 0, linkedIssues: [first + i], branchDepartment: null });
+  });
+  const prStart = completed.length + 1;
+  return {
+    completed,
+    merged: merged.map((pr, i) => ({ ...pr, number: prStart + i })),
+  };
+}
+
+const PAST = pastHistory();
 
 /** The made-up past, then every loop so far (the current one up to `inLoopMs`). */
 function historyUntil(loop: number, inLoopMs: number): SnapshotHistory {
   let opened = PAST_OPENED;
-  const completed: HistoryIssue[] = [...PAST_COMPLETED];
-  const merged: HistoryPr[] = [...PAST_MERGED];
+  const completed: HistoryIssue[] = [...PAST.completed];
+  const merged: HistoryPr[] = [...PAST.merged];
   for (let j = 0; j <= loop; j += 1) {
     const { issues, prs } = loopItems(j, j < loop ? DEMO_LOOP_MS : inLoopMs, 0);
     opened += issues.length;

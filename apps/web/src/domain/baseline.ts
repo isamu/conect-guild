@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Snapshot } from '@conect-guild/snapshot';
+import { memberLevels, memberLevelsSchema } from './levelUp';
 
 /** Bump when the stored shape changes; a stored baseline with another version counts as absent. */
-export const BASELINE_SCHEMA_VERSION = 2;
+export const BASELINE_SCHEMA_VERSION = 3;
 
 const isoDateTime = z.iso.datetime({ offset: true });
 const stateSchema = z.enum(['open', 'closed']);
@@ -24,7 +25,7 @@ export function repoFingerprint(repo: string): string {
 /**
  * The diff baseline kept in localStorage. Numbers, states and times only: no titles, labels or
  * branch names, because Issue titles can carry client names. The repository is kept as its
- * fingerprint only.
+ * fingerprint only. `levels` is each member's level (Issue #19; the version went 2 → 3 with it).
  */
 const baselineSchema = z.strictObject({
   schemaVersion: z.literal(BASELINE_SCHEMA_VERSION),
@@ -36,6 +37,7 @@ const baselineSchema = z.strictObject({
   prs: z.array(
     z.strictObject({ number: issueNumber, state: stateSchema, mergedAt: isoDateTime.nullable() }),
   ),
+  levels: memberLevelsSchema,
 });
 
 export type Baseline = z.infer<typeof baselineSchema>;
@@ -53,5 +55,6 @@ export function toBaseline(snapshot: Snapshot): Baseline {
     repo: repoFingerprint(snapshot.repo),
     issues: snapshot.issues.map(({ number, state, closedAt }) => ({ number, state, closedAt })),
     prs: snapshot.prs.map(({ number, state, mergedAt }) => ({ number, state, mergedAt })),
+    levels: memberLevels(snapshot),
   };
 }

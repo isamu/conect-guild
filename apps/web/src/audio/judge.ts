@@ -8,6 +8,7 @@ const EVENT_CUES: Readonly<Record<GuildEventKind, SoundCue>> = {
   'issue-opened': 'scroll',
   'pr-merged': 'chest',
   'issue-closed': 'clear',
+  'level-up': 'levelup',
 };
 
 /**
