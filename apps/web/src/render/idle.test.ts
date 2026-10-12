@@ -206,6 +206,25 @@ describe('idleActivities', () => {
     expect(activities.minori?.kind).toBe('play');
     expect(activities.hibiki).toEqual({ kind: 'sleep' });
   });
+});
+
+describe('idleActivities between members', () => {
+  const longAgo = CYCLE_START - 60 * MIN;
+
+  it('does not change what the others do when one member gets work', () => {
+    const since = Object.fromEntries(IDS.map((id) => [id, longAgo]));
+    for (const busy of IDS) {
+      const rest = Object.fromEntries(IDS.filter((id) => id !== busy).map((id) => [id, longAgo]));
+      for (let i = 0; i < 300; i += 1) {
+        const now = CYCLE_START + i * 7_919;
+        const all = idleActivities(since, SEEDS, now);
+        const without = idleActivities(rest, SEEDS, now);
+        for (const id of IDS.filter((other) => other !== busy)) {
+          expect(without[id]).toEqual(all[id]);
+        }
+      }
+    }
+  });
 
   it('never has two members standing on one spot at any moment', () => {
     const since = Object.fromEntries(IDS.map((id) => [id, longAgo]));

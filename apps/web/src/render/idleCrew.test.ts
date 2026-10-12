@@ -2,26 +2,42 @@ import { describe, expect, it } from 'vitest';
 import type { GuildEvent } from '../domain/events';
 import type { DepartmentLabel, MemberId } from '../guild.config';
 import { EMPTY_DIRECTOR, frameAt, inScene, poseAt, scheduleEvent, trackEnd } from './director';
-import { plannedOuting, type Outing } from './idle';
+import { createIdleSeeds, cycleOutings, type Outing } from './idle';
 import { createIdleCrew } from './idleCrew';
 import { IDLE } from './metrics';
 import { tileToPoint } from './path';
 import { castOf, DEFAULT_SEATS } from './scenes';
 
 const MIN = 60_000;
-const CYCLE = 7_000_000;
+/** A fresh random source drawing a different salt for each member. */
+function randomSource(): () => number {
+  let n = 0;
+  return () => {
+    n += 1;
+    return (n * 0.618_034) % 1;
+  };
+}
+const SEEDS = createIdleSeeds(randomSource());
+/** A cycle in which every department member goes out (found from the seeds). */
+const CYCLE = findCycle();
 const CYCLE_START = CYCLE * IDLE.playCycleMs;
-/** The random source draws the same salt for everyone; with it ひびき goes to the pet. */
-const SALT_RANDOM = 0.25;
-const SALT = Math.floor(SALT_RANDOM * 2 ** 31);
+
+function findCycle(): number {
+  const ids = ['minori', 'hibiki'] as const;
+  for (let cycle = 7_000_000; cycle < 7_010_000; cycle += 1) {
+    const outings = cycleOutings(SEEDS, cycle);
+    if (ids.every((id) => outings[id] !== undefined)) return cycle;
+  }
+  throw new Error('no cycle');
+}
 
 function createIssueEvent(department: DepartmentLabel | null): GuildEvent {
   return { id: 'issue-opened#1', kind: 'issue-opened', number: 1, department };
 }
 
 function outingOf(id: MemberId): Outing {
-  const outing = plannedOuting(id, SALT, CYCLE);
-  if (outing === null) throw new Error(`no outing for ${id} with this salt`);
+  const outing = cycleOutings(SEEDS, CYCLE)[id];
+  if (outing === undefined) throw new Error(`no outing for ${id} in this cycle`);
   return outing;
 }
 
@@ -29,7 +45,7 @@ function setup(wall: number) {
   const clock = { wall };
   const active: { ids: readonly MemberId[]; at: number }[] = [];
   const crew = createIdleCrew({
-    random: () => SALT_RANDOM,
+    random: randomSource(),
     wallNow: () => clock.wall,
     onActive: (ids, at) => active.push({ ids, at }),
   });
@@ -41,7 +57,7 @@ function playing(id: MemberId) {
   const outing = outingOf(id);
   const wall = (outing.out.end + outing.back.start) / 2;
   const env = setup(wall);
-  const since = { [id]: CYCLE_START - 40 * MIN };
+  const since = { [id]: wall - 40 * MIN };
   const director = env.crew.setSince(EMPTY_DIRECTOR, since, 1_000);
   return { ...env, outing, director, since };
 }

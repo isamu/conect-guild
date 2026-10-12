@@ -97,9 +97,27 @@ const MEMBER_ORDER: readonly MemberId[] = [
 const keyOf = (tile: TilePos): string => `${String(tile.col)},${String(tile.row)}`;
 
 /**
+ * The outing each member may make in `cycle`: their planned one, unless a member earlier in the
+ * order plans the same tile. Decided from the salts alone, whoever is idle, so one member waking up
+ * never sends another one to a spot in the middle of a cycle.
+ */
+export function cycleOutings(seeds: IdleSeeds, cycle: number): Partial<Record<MemberId, Outing>> {
+  const taken = new Set<string>();
+  const outings: Partial<Record<MemberId, Outing>> = {};
+  for (const id of MEMBER_ORDER) {
+    const outing = plannedOuting(id, seeds[id], cycle);
+    if (outing === null) continue;
+    const key = keyOf(outing.spot.tile);
+    if (!taken.has(key)) outings[id] = outing;
+    taken.add(key);
+  }
+  return outings;
+}
+
+/**
  * What every idle member does at `now`. Members play only in cycles that start after their 30
- * minutes; two members never go to the same tile in one cycle (the later one in the order sleeps).
- * Outside the outing itself a member of the cycle sleeps at the seat.
+ * minutes; two members never go to the same tile in one cycle (cycleOutings). Outside the outing
+ * itself a member of the cycle sleeps at the seat.
  */
 export function idleActivities(
   since: IdleSince,
@@ -107,35 +125,18 @@ export function idleActivities(
   now: number,
 ): Partial<Record<MemberId, IdleActivity>> {
   const cycle = Math.floor(now / IDLE.playCycleMs);
-  const taken = new Set<string>();
+  const outings = cycleOutings(seeds, cycle);
   const activities: Partial<Record<MemberId, IdleActivity>> = {};
   for (const id of MEMBER_ORDER) {
     const from = since[id];
     const stage = from === undefined ? 'awake' : idleStage(from, now);
     if (from === undefined || stage === 'awake') continue;
-    const outing = outingOf(id, seeds[id], { from, stage, cycle }, taken);
-    const out = outing !== null && outing.out.start <= now && now < outing.back.end;
+    const eligible = stage === 'sleep' && cycle * IDLE.playCycleMs >= from + IDLE.sleepAfterMs;
+    const outing = eligible ? outings[id] : undefined;
+    const out = outing !== undefined && outing.out.start <= now && now < outing.back.end;
     activities[id] = out ? { kind: 'play', outing } : { kind: stage };
   }
   return activities;
-}
-
-/**
- * The member's outing in `cycle` when the whole cycle is past their 30 minutes and its tile is
- * still free (it is then taken); null otherwise.
- */
-function outingOf(
-  id: MemberId,
-  salt: number,
-  spell: { from: number; stage: Exclude<IdleStage, 'awake'>; cycle: number },
-  taken: Set<string>,
-): Outing | null {
-  const { from, stage, cycle } = spell;
-  if (stage !== 'sleep' || cycle * IDLE.playCycleMs < from + IDLE.sleepAfterMs) return null;
-  const outing = plannedOuting(id, salt, cycle);
-  if (outing === null || taken.has(keyOf(outing.spot.tile))) return null;
-  taken.add(keyOf(outing.spot.tile));
-  return outing;
 }
 
 /** A sign over the head: a rising "Z" (0 to 1 of its way), or a small bubble. */
