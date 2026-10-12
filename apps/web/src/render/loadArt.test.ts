@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { MemberId } from '../guild.config';
-import { loadArt } from './loadArt';
+import { loadArt, PICTURE_TIMEOUT_MS } from './loadArt';
 import { SPRITE_SIZE } from './metrics';
 
 /**
@@ -31,6 +31,7 @@ function stubPictures(response: () => Promise<Response>, width = 7 * SPRITE_SIZE
 const ok = () => Promise.resolve(new Response(new Blob([new Uint8Array([1, 2, 3])])));
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -40,7 +41,10 @@ describe('loadArt', () => {
     await loadArt();
     // 6 members, the tiles, the small things and the held items.
     expect(fetch).toHaveBeenCalledTimes(9);
-    for (const [, init] of fetch.mock.calls) expect(init).toEqual({ cache: 'no-cache' });
+    for (const [, init] of fetch.mock.calls) {
+      expect(init?.cache).toBe('no-cache');
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+    }
     expect(createImageBitmap).toHaveBeenCalledTimes(9);
   });
 
@@ -68,6 +72,34 @@ describe('loadArt', () => {
   it('uses the placeholders when the pictures cannot be reached', async () => {
     const { createImageBitmap } = stubPictures(() => Promise.reject(new TypeError('offline')));
     const art = await loadArt();
+    expect(createImageBitmap).not.toHaveBeenCalled();
+    for (const id of IDS) expect(art.sprites.hasHoldFrames(id)).toBe(false);
+  });
+});
+
+describe('loadArt with a picture that never arrives', () => {
+  it('gives up on a picture that does not arrive in time and uses the placeholders', async () => {
+    vi.useFakeTimers();
+    const fetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('aborted', 'AbortError'));
+          });
+        }),
+    );
+    const createImageBitmap = vi.fn<(blob: Blob) => Promise<ImageBitmap>>();
+    vi.stubGlobal('fetch', fetch);
+    vi.stubGlobal('createImageBitmap', createImageBitmap);
+    let done = false;
+    const loading = loadArt().finally(() => {
+      done = true;
+    });
+    await vi.advanceTimersByTimeAsync(PICTURE_TIMEOUT_MS - 1);
+    expect(done).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(done).toBe(true);
+    const art = await loading;
     expect(createImageBitmap).not.toHaveBeenCalled();
     for (const id of IDS) expect(art.sprites.hasHoldFrames(id)).toBe(false);
   });
