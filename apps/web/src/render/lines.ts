@@ -65,9 +65,8 @@ function avoidedOf<L>(count: number, recent: readonly L[]): readonly L[] {
 
 /**
  * One of `options` that is not among the last ones seen (`recent`, oldest first) nor still to show
- * (`pending`), chosen evenly by `random`. When that leaves none, only the pending ones are avoided;
- * null when every option is pending (the member says nothing rather than a line said again) or
- * there are none.
+ * (`pending`), chosen evenly by `random`. Null when that leaves none (the member says nothing this
+ * time rather than a line said lately or about to be said) or there are none.
  */
 export function pickLine<L>(
   options: readonly L[],
@@ -76,11 +75,7 @@ export function pickLine<L>(
   pending: readonly L[] = [],
 ): L | null {
   const avoided = [...avoidedOf(options.length, recent), ...pending];
-  const choices = [
-    options.filter((line) => !avoided.includes(line)),
-    options.filter((line) => !pending.includes(line)),
-  ];
-  const fresh = choices.find((list) => list.length > 0) ?? [];
+  const fresh = options.filter((line) => !avoided.includes(line));
   // No number is drawn for nothing to say, so the sequence goes on as if it was never asked.
   if (fresh.length === 0) return null;
   const index = Math.min(Math.floor(random() * fresh.length), fresh.length - 1);

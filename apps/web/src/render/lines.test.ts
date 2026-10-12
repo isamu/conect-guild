@@ -208,8 +208,19 @@ describe('createLinePicker: only what is seen counts', () => {
 });
 
 describe('pickLine with pending lines', () => {
-  it('avoids only the pending ones when the recent and pending leave nothing', () => {
-    expect(pickLine(['x', 'y', 'z'], ['x', 'y'], () => 0, ['z'])).toBe('x');
+  it('says nothing (and draws no number) when the recent and pending leave nothing', () => {
+    let draws = 0;
+    const random = () => {
+      draws += 1;
+      return 0;
+    };
+    // Seen lately: x and y; about to show: z. None is said again.
+    expect(pickLine(['x', 'y', 'z'], ['x', 'y'], random, ['z'])).toBeNull();
+    expect(draws).toBe(0);
+  });
+
+  it('says the one left when the recent and pending leave exactly one', () => {
+    expect(pickLine(['w', 'x', 'y', 'z'], ['x', 'y'], () => 0.9999, ['z'])).toBe('w');
   });
 
   it('says nothing (and draws no number) when every option is pending', () => {
