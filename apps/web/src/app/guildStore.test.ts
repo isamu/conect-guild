@@ -111,12 +111,15 @@ afterEach(() => {
 });
 
 describe('createGuildStore: loading', () => {
-  it('loads at start and then every 30 seconds', async () => {
+  it('loads at start and then every 5 seconds', async () => {
+    expect(REFRESH_INTERVAL_MS).toBe(5_000);
     const { store, loader } = setup([ok(first), ok(first), ok(first)]);
     store.start();
     await settle();
     expect(loader).toHaveBeenCalledTimes(1);
-    await nextTick();
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(loader).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
     expect(loader).toHaveBeenCalledTimes(2);
     await nextTick();
     expect(loader).toHaveBeenCalledTimes(3);

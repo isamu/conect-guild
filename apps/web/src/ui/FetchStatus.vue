@@ -23,6 +23,13 @@ const emit = defineEmits<{ 'clear-baseline': [] }>();
         >情報が古い</span
       >
     </p>
+    <p
+      v-if="status.sessions !== null"
+      class="fetch__line fetch__note"
+      title="作業中・許可待ちは GitHub だけでは分からないため、いまは出していません"
+    >
+      {{ status.sessions }}
+    </p>
     <p v-if="status.failure !== null" class="fetch__line fetch__failure" role="status">
       {{ status.failure }}
     </p>

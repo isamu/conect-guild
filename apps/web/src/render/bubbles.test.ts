@@ -1,24 +1,57 @@
 import { describe, expect, it } from 'vitest';
-import type { MemberState } from '../domain/party';
-import { bubbleFor, bubblesOf } from './bubbles';
+import { issue, pr } from '../domain/fixtures.test-util';
+import { deriveMemberStatuses, type MemberState } from '../domain/party';
+import type { LiveStates } from '../domain/session';
+import { bubbleFor, bubbleShown, bubblesOf, type Bubbles } from './bubbles';
+import { EMPTY_DIRECTOR, frameAt, scheduleEvent } from './director';
+import { DEFAULT_SEATS } from './scenes';
 
 const STATES: readonly MemberState[] = [
+  'awaiting-permission',
   'awaiting-president',
   'awaiting-kaname',
+  'busy',
   'working',
   'done',
   'idle',
 ];
 
+const WAITING: readonly MemberState[] = [
+  'awaiting-permission',
+  'awaiting-president',
+  'awaiting-kaname',
+];
+
 describe('bubbleFor', () => {
   it.each(STATES)('gives a department member in %s the matching bubble or none', (state) => {
-    const expected = state === 'awaiting-president' || state === 'awaiting-kaname' ? state : null;
+    const expected = WAITING.includes(state) ? state : null;
     expect(bubbleFor('minori', state)).toBe(expected);
   });
 
   it('gives かなめ a bubble while PRs wait for her', () => {
     expect(bubbleFor('kaname', 'awaiting-kaname')).toBe('awaiting-kaname');
     expect(bubbleFor('kaname', 'working')).toBeNull();
+  });
+
+  it('gives かなめ the permission bubble while her session waits, and none while busy', () => {
+    expect(bubbleFor('kaname', 'awaiting-permission')).toBe('awaiting-permission');
+    expect(bubbleFor('kaname', 'busy')).toBeNull();
+  });
+
+  it('shows the permission bubble over a PR waiting for the president (order of 4.6)', () => {
+    const snapshot = {
+      issues: [issue(1, { labels: ['経理'] })],
+      prs: [pr(2, { linkedIssues: [1], changedFiles: ['CLAUDE.md'] })],
+    };
+    const rows = (live: LiveStates) =>
+      deriveMemberStatuses(snapshot, 0, undefined, live).map((s) => ({
+        id: s.memberId,
+        state: s.state,
+      }));
+    expect(bubblesOf(rows({}))).toEqual({ minori: 'awaiting-president' });
+    expect(bubblesOf(rows({ minori: 'awaiting-permission' }))).toEqual({
+      minori: 'awaiting-permission',
+    });
   });
 
   it('leaves the king to the HTML bubble', () => {
@@ -40,5 +73,41 @@ describe('bubblesOf', () => {
 
   it('is empty without rows', () => {
     expect(bubblesOf([])).toEqual({});
+  });
+});
+
+describe('bubbleShown', () => {
+  const bubbles: Bubbles = { sasae: 'awaiting-permission', kaname: 'awaiting-kaname' };
+
+  it('shows the bubble of a member at their seat, and none for members without one', () => {
+    expect(bubbleShown(bubbles, { id: 'sasae', inScene: false })).toBe('awaiting-permission');
+    expect(bubbleShown(bubbles, { id: 'kaname', inScene: false })).toBe('awaiting-kaname');
+    expect(bubbleShown(bubbles, { id: 'minori', inScene: false })).toBeNull();
+  });
+
+  it('hides every kind of bubble while the member is in a scene', () => {
+    expect(bubbleShown(bubbles, { id: 'sasae', inScene: true })).toBeNull();
+    expect(bubbleShown(bubbles, { id: 'kaname', inScene: true })).toBeNull();
+  });
+
+  it('hides it for the whole scene, walking empty-handed included, and shows it back after', () => {
+    const director = scheduleEvent(
+      EMPTY_DIRECTOR,
+      { id: 'pr-merged#1', kind: 'pr-merged', number: 1, department: '総務' },
+      0,
+      { seats: DEFAULT_SEATS, random: () => 0.5 },
+    );
+    const end = director.busyUntil.sasae ?? 0;
+    const poses = [];
+    for (let t = 0; t < end; t += 100) {
+      const sasae = frameAt(director, t, DEFAULT_SEATS).members.find((m) => m.id === 'sasae');
+      if (sasae === undefined) throw new Error('sasae is always on the stage');
+      poses.push(sasae);
+      expect(bubbleShown(bubbles, sasae)).toBeNull();
+    }
+    // The scene has stretches where she holds nothing (the bubble used to follow her then).
+    expect(poses.some((m) => m.pose.held === null)).toBe(true);
+    const back = frameAt(director, end, DEFAULT_SEATS).members.find((m) => m.id === 'sasae');
+    expect(back === undefined ? null : bubbleShown(bubbles, back)).toBe('awaiting-permission');
   });
 });

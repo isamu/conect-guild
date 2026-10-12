@@ -17,7 +17,11 @@ export type { GuildMessage } from './messageQueue';
 
 /** localStorage key of the diff baseline (numbers, states and times only). */
 export const BASELINE_STORAGE_KEY = 'conect-guild:baseline';
-export const REFRESH_INTERVAL_MS = 30_000;
+/**
+ * The collector rewrites the snapshot every 5 seconds (the session states; GitHub every 60).
+ * The fetch is local and no-store, so following it closely is cheap.
+ */
+export const REFRESH_INTERVAL_MS = 5_000;
 /**
  * How long a message stays at least before the next queued one replaces it; longer when the next
  * one's scene has to wait for its cast (app/messageQueue.ts). The last one stays.
@@ -78,7 +82,7 @@ interface SyncOutcome {
 
 /**
  * Diffs against the stored baseline and stores the new one (docs/DESIGN.md 4.4).
- * Without a working localStorage there are no events, so nothing is replayed every 30 seconds.
+ * Without a working localStorage there are no events, so nothing is replayed on every fetch.
  */
 function syncBaseline(storage: KeyValueStore, snapshot: Snapshot): SyncOutcome {
   const stored = storage.read(BASELINE_STORAGE_KEY, z.unknown());

@@ -1,3 +1,4 @@
+import type { Snapshot, SnapshotSession } from '@conect-guild/snapshot';
 import { describe, expect, it } from 'vitest';
 import {
   at,
@@ -17,6 +18,7 @@ import {
   countWaits,
   EMPTY_CUE_QUEUE,
   formatClock,
+  LIVE_TOOLTIPS,
   receiveCue,
   sceneCue,
   STATE_LABELS,
@@ -145,8 +147,10 @@ describe('buildParty: かなめ and the king', () => {
 
   it('has a Japanese label for every state', () => {
     expect(Object.values(STATE_LABELS)).toEqual([
+      '許可待ち',
       '社長の承認まち',
       'かなめの確認まち',
+      'いま作業中',
       '作業中',
       '完了',
       '待機中',
@@ -154,26 +158,108 @@ describe('buildParty: かなめ and the king', () => {
   });
 });
 
+describe('buildParty: live sessions', () => {
+  const now = at(T0);
+  const live = (members: SnapshotSession[], checkedAt = T0): Snapshot['sessions'] => ({
+    status: 'ok',
+    checkedAt,
+    members,
+  });
+
+  it('shows 許可待ち and いま作業中 with their tooltips', () => {
+    const snap = snapshot({
+      issues: [issue(1, { labels: ['広報'] })],
+      sessions: live([
+        { department: '経理', state: 'awaiting-permission' },
+        { department: '広報', state: 'working' },
+        { department: '企画', state: 'resting' },
+        { department: '総務', state: 'idle' },
+      ]),
+    });
+    const rows = buildParty(snap, now);
+    expect(rows.slice(1, 5).map((r) => [r.state, r.stateLabel])).toEqual([
+      ['awaiting-permission', '許可待ち'],
+      ['busy', 'いま作業中'],
+      ['idle', '待機中'],
+      ['idle', '待機中'],
+    ]);
+    expect(rows[1]?.tooltip).toBe(LIVE_TOOLTIPS['awaiting-permission']);
+    expect(rows[2]?.tooltip).toBe(LIVE_TOOLTIPS.working);
+  });
+
+  it('ranks かなめ: 許可待ち > PR の確認 > いま作業中 > 受付', () => {
+    const reviewing = { issues: [issue(2)], prs: [pr(10)] };
+    const asking = live([{ department: null, state: 'awaiting-permission' }]);
+    const working = live([{ department: null, state: 'working' }]);
+    expect(buildParty(snapshot({ ...reviewing, sessions: asking }), now)[0]).toMatchObject({
+      state: 'awaiting-permission',
+      stateLabel: '許可待ち',
+    });
+    expect(buildParty(snapshot({ ...reviewing, sessions: working }), now)[0]).toMatchObject({
+      state: 'awaiting-kaname',
+    });
+    const reception = buildParty(snapshot({ issues: [issue(2)], sessions: working }), now)[0];
+    expect(reception).toMatchObject({ state: 'busy', stateLabel: 'いま作業中' });
+    expect(reception?.tooltip).toContain(LIVE_TOOLTIPS.working);
+  });
+
+  it('falls back to GitHub when the sessions are unavailable or stale', () => {
+    const issues = [issue(1, { labels: ['経理'] })];
+    const busy = [{ department: '経理', state: 'working' } as const];
+    const stale = live(busy, minutesAfter(T0, -1));
+    expect(buildParty(snapshot({ issues, sessions: stale }), now)[1]?.state).toBe('working');
+    const fresh = live(busy, T0);
+    expect(buildParty(snapshot({ issues, sessions: fresh }), now)[1]?.state).toBe('busy');
+    expect(buildParty(snapshot({ issues }), now)[1]?.state).toBe('working');
+  });
+
+  it('never changes the king', () => {
+    const rows = buildParty(
+      snapshot({ sessions: live([{ department: null, state: 'working' }]) }),
+      now,
+    );
+    expect(rows[5]).toMatchObject({ state: 'idle' });
+  });
+});
+
 describe('buildFetchStatus', () => {
   const fetchedAt = '2026-10-12T00:00:00Z';
+  const sessions: Snapshot['sessions'] = { status: 'ok', checkedAt: fetchedAt, members: [] };
 
   it('shows nothing before the first success', () => {
     expect(buildFetchStatus(null, null, at(fetchedAt))).toEqual({
       failure: null,
       stale: false,
       fetchedAt: null,
+      sessions: null,
     });
   });
 
+  it('notes when the sessions are unavailable or stale, judged apart from fetchedAt', () => {
+    expect(buildFetchStatus({ fetchedAt, sessions }, null, at(fetchedAt)).sessions).toBeNull();
+    const unavailable = { status: 'unavailable', checkedAt: fetchedAt } as const;
+    expect(
+      buildFetchStatus({ fetchedAt, sessions: unavailable }, null, at(fetchedAt)).sessions,
+    ).toBe('セッションの状態を読めません');
+    const later = at(fetchedAt) + 31_000;
+    const view = buildFetchStatus({ fetchedAt, sessions }, null, later);
+    expect(view.sessions).toBe('セッションの状態が古いままです');
+    expect(view.stale).toBe(false);
+  });
+
   it('labels a failure while keeping the previous snapshot time', () => {
-    const view = buildFetchStatus({ fetchedAt }, 'network', at(fetchedAt));
+    const view = buildFetchStatus({ fetchedAt, sessions }, 'network', at(fetchedAt));
     expect(view.failure).toBe('取得失敗（つながりません）');
     expect(view.fetchedAt).toBe(formatClock(at(fetchedAt)));
   });
 
   it('marks the snapshot stale only past five minutes', () => {
-    expect(buildFetchStatus({ fetchedAt }, null, at(minutesAfter(fetchedAt, 5))).stale).toBe(false);
-    expect(buildFetchStatus({ fetchedAt }, null, at(minutesAfter(fetchedAt, 6))).stale).toBe(true);
+    expect(
+      buildFetchStatus({ fetchedAt, sessions }, null, at(minutesAfter(fetchedAt, 5))).stale,
+    ).toBe(false);
+    expect(
+      buildFetchStatus({ fetchedAt, sessions }, null, at(minutesAfter(fetchedAt, 6))).stale,
+    ).toBe(true);
   });
 
   it('labels every failure reason', () => {

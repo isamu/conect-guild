@@ -42,6 +42,8 @@ export interface MemberPose {
   readonly depth: number;
   /** An item the member handles at their seat (ambient), placed from the feet; null otherwise. */
   readonly hand: HandProp | null;
+  /** True while the member is in a scene (inScene): no ambient move and no waiting bubble. */
+  readonly inScene: boolean;
 }
 
 /** The small moves while members are out of scenes (ambient.ts). */
@@ -117,13 +119,12 @@ export function inScene(director: Director, id: MemberId, now: number): boolean 
 
 /** Applies the member's ambient move to the pose at their seat; scenes are left as they are. */
 function withAmbient(
-  director: Director,
   member: MemberPose,
   now: number,
   ambient: AmbientContext | undefined,
 ): MemberPose {
   const mood = ambient?.moods[member.id];
-  if (ambient === undefined || mood === undefined || inScene(director, member.id, now)) {
+  if (ambient === undefined || mood === undefined || member.inScene) {
     return member;
   }
   const move = ambientPose(mood, ambient.seeds[member.id], now);
@@ -154,10 +155,11 @@ export function frameAt(
       pose: { ...pose, point: seatedPoint(pose.point) },
       depth: pose.point.y,
       hand: null,
+      inScene: inScene(director, id, now),
     };
   })
     .sort((a, b) => a.depth - b.depth)
-    .map((member) => withAmbient(director, member, now, ambient));
+    .map((member) => withAmbient(member, now, ambient));
   // Over the seat, even while the member walks to the counter and back.
   const confetti = director.bursts
     .map((burst): ConfettiView => ({

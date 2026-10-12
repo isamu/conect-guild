@@ -15,8 +15,10 @@ import { AMBIENT } from './metrics';
 
 const SEED: AmbientSeed = { phaseMs: 0, intervalMs: 10_000 };
 const STATES: readonly MemberState[] = [
+  'awaiting-permission',
   'awaiting-president',
   'awaiting-kaname',
+  'busy',
   'working',
   'done',
   'idle',
@@ -31,9 +33,10 @@ function sample(mood: AmbientMood, seed: AmbientSeed, from: number, to: number) 
 }
 
 describe('ambientMoodOf', () => {
-  it('gives department members desk work while working, idle moves otherwise', () => {
+  it('gives department members desk work while working or busy, idle moves otherwise', () => {
     for (const state of STATES) {
-      expect(ambientMoodOf('minori', state)).toBe(state === 'working' ? 'desk-work' : 'idle');
+      const working = state === 'working' || state === 'busy';
+      expect(ambientMoodOf('minori', state)).toBe(working ? 'desk-work' : 'idle');
     }
   });
 
@@ -41,6 +44,15 @@ describe('ambientMoodOf', () => {
     expect(ambientMoodOf('kaname', 'working')).toBe('tidy-scroll');
     expect(ambientMoodOf('kaname', 'idle')).toBe('fan');
     expect(ambientMoodOf('kaname', 'awaiting-kaname')).toBe('desk-work');
+  });
+
+  it('has かなめ work at the desk while her session is busy', () => {
+    expect(ambientMoodOf('kaname', 'busy')).toBe('desk-work');
+  });
+
+  it('has anyone waiting for a permission look around instead of working', () => {
+    expect(ambientMoodOf('kaname', 'awaiting-permission')).toBe('idle');
+    expect(ambientMoodOf('hirame', 'awaiting-permission')).toBe('idle');
   });
 
   it('has the king fidget only while PRs wait for him', () => {

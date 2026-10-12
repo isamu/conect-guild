@@ -19,6 +19,7 @@ import {
 } from '../domain/party';
 import { toQuests, type Quest } from '../domain/quest';
 import { countRecentRewards } from '../domain/reward';
+import { liveStatesOf, NO_LIVE_STATES, type LiveState } from '../domain/session';
 import type { GuildMessage } from './messageQueue';
 
 /**
@@ -37,8 +38,10 @@ export interface BoardGroup {
 }
 
 export const STATE_LABELS: Readonly<Record<MemberState, string>> = {
+  'awaiting-permission': '許可待ち',
   'awaiting-president': '社長の承認まち',
   'awaiting-kaname': 'かなめの確認まち',
+  busy: 'いま作業中',
   working: '作業中',
   done: '完了',
   idle: '待機中',
@@ -110,13 +113,35 @@ function row(
   return { id: member.id, name: member.name, role: member.role, color: member.color, ...view };
 }
 
-function kanameRow(waits: WaitCounts): PartyRow {
+/** Tooltips of the live states: they come from the session, not from GitHub. */
+export const LIVE_TOOLTIPS: Readonly<Record<LiveState, string>> = {
+  'awaiting-permission': 'セッションがツールを使う許可を待っています（MulmoTerminal より）',
+  working: 'セッションがいま動いています（MulmoTerminal より）',
+};
+
+function kanameRow(waits: WaitCounts, live: LiveState | undefined): PartyRow {
   const tooltip = `確認まちの PR ${String(waits.kaname)} 件・受付の巻物 ${String(waits.reception)} 件`;
+  if (live === 'awaiting-permission') {
+    return row(MEMBERS.kaname, {
+      state: 'awaiting-permission',
+      stateLabel: STATE_LABELS['awaiting-permission'],
+      tooltip: `${LIVE_TOOLTIPS[live]}。${tooltip}`,
+      rewards: null,
+    });
+  }
   if (waits.kaname > 0) {
     return row(MEMBERS.kaname, {
       state: 'awaiting-kaname',
       stateLabel: `PR の確認 ${String(waits.kaname)} 件`,
       tooltip,
+      rewards: null,
+    });
+  }
+  if (live === 'working') {
+    return row(MEMBERS.kaname, {
+      state: 'busy',
+      stateLabel: STATE_LABELS.busy,
+      tooltip: `${LIVE_TOOLTIPS[live]}。${tooltip}`,
       rewards: null,
     });
   }
@@ -148,19 +173,32 @@ function kingRow(waits: WaitCounts): PartyRow {
   });
 }
 
-/** Six rows: かなめ, the four departments (fixed order), then the king. `now` is epoch ms. */
-export function buildParty(snapshot: SnapshotLists, now: number): PartyRow[] {
+function memberTooltip(state: MemberState, reason: string | null): string | null {
+  if (state === 'awaiting-permission') return LIVE_TOOLTIPS['awaiting-permission'];
+  if (state === 'busy') return LIVE_TOOLTIPS.working;
+  return reason;
+}
+
+/**
+ * Six rows: かなめ, the four departments (fixed order), then the king. The live session states
+ * join in while they are fresh (docs/DESIGN.md 4.7). `now` is epoch ms.
+ */
+export function buildParty(
+  snapshot: Pick<Snapshot, 'issues' | 'prs' | 'sessions'>,
+  now: number,
+): PartyRow[] {
   const waits = countWaits(snapshot);
   const rewards = countRecentRewards(snapshot, now);
-  const members = deriveMemberStatuses(snapshot, now).map((status) =>
+  const live = liveStatesOf(snapshot.sessions, now) ?? NO_LIVE_STATES;
+  const members = deriveMemberStatuses(snapshot, now, undefined, live).map((status) =>
     row(MEMBERS[status.memberId], {
       state: status.state,
       stateLabel: STATE_LABELS[status.state],
-      tooltip: status.reason,
+      tooltip: memberTooltip(status.state, status.reason),
       rewards: rewards[status.department],
     }),
   );
-  return [kanameRow(waits), ...members, kingRow(waits)];
+  return [kanameRow(waits, live.kaname), ...members, kingRow(waits)];
 }
 
 export interface KingBubbleView {
@@ -231,6 +269,13 @@ export interface FetchStatusView {
   readonly stale: boolean;
   /** `HH:MM` (local time) of the shown snapshot's fetchedAt; null before the first success. */
   readonly fetchedAt: string | null;
+  /** Why the live session states are not shown; null while they are (or before any snapshot). */
+  readonly sessions: string | null;
+}
+
+function sessionsNotice(snapshot: Pick<Snapshot, 'sessions'>, now: number): string | null {
+  if (snapshot.sessions.status === 'unavailable') return 'セッションの状態を読めません';
+  return liveStatesOf(snapshot.sessions, now) === null ? 'セッションの状態が古いままです' : null;
 }
 
 /** `HH:MM` in the runtime's local time zone. */
@@ -241,7 +286,7 @@ export function formatClock(epochMs: number): string {
 }
 
 export function buildFetchStatus(
-  snapshot: Pick<Snapshot, 'fetchedAt'> | null,
+  snapshot: Pick<Snapshot, 'fetchedAt' | 'sessions'> | null,
   failure: SnapshotLoadFailure | null,
   now: number,
 ): FetchStatusView {
@@ -249,5 +294,6 @@ export function buildFetchStatus(
     failure: failure === null ? null : `取得失敗（${FAILURE_LABELS[failure]}）`,
     stale: snapshot !== null && isSnapshotStale(snapshot.fetchedAt, now),
     fetchedAt: snapshot === null ? null : formatClock(Date.parse(snapshot.fetchedAt)),
+    sessions: snapshot === null ? null : sessionsNotice(snapshot, now),
   };
 }

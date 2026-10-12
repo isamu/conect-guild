@@ -4,7 +4,7 @@ import type { SnapshotLoadResult } from '../adapters/snapshot';
 import { createKeyValueStore, type StorageLike } from '../adapters/storage';
 import { GAP_NOTICE_MESSAGE } from '../domain/events';
 import { issue, mergedPr, minutesAfter, pr, snapshot, T0 } from '../domain/fixtures.test-util';
-import { createGuildStore, MESSAGE_HOLD_MS, REFRESH_INTERVAL_MS } from './guildStore';
+import { createGuildStore, MESSAGE_HOLD_MS } from './guildStore';
 import { sceneCue, type SceneCue } from './guildView';
 import { EMPTY_DIRECTOR, scheduleEvent } from '../render/director';
 import { DEFAULT_SEATS } from '../render/scenes';
@@ -57,8 +57,15 @@ const context = { seats: DEFAULT_SEATS, random: () => 0.5 };
 
 const ok = (snap: Snapshot): SnapshotLoadResult => ({ ok: true, snapshot: snap });
 
+/**
+ * These tests follow the messages and scenes between two fetches, so the fetches are spaced wider
+ * than a few message holds (the real store fetches every 5 seconds; guildStore.test.ts).
+ */
+const REFRESH_INTERVAL_MS = 60_000;
+
 function setup(results: SnapshotLoadResult[], storage: StorageLike = memoryStorage()) {
   const store = createGuildStore({
+    refreshIntervalMs: REFRESH_INTERVAL_MS,
     loadSnapshot: () =>
       Promise.resolve(results.shift() ?? ({ ok: false, reason: 'network' } as const)),
     storage: createKeyValueStore(() => storage),

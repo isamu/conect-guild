@@ -1,0 +1,187 @@
+import { createHash } from 'node:crypto';
+import type { SessionState, SnapshotSession } from '@conect-guild/snapshot';
+import { z } from 'zod';
+import type { CompanySeat } from '../collector.config.ts';
+
+/**
+ * Company session states from MulmoTerminal's files (docs/DESIGN.md 4.7). Pure: the caller reads
+ * the files. Only the five company directories are kept; every other line is dropped where it is
+ * read, and nothing of it (path, id or count) leaves these functions.
+ */
+
+/** MulmoTerminal's session id (a UUID, `SESSION_ID_RE` in its server/config/env.ts). */
+const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * One line of dev-terminal-cwds.json: `<id> <absolute path>`. The id holds no space, so the first
+ * space splits it and the rest (spaces included) is the path. Trimmed as MulmoTerminal does.
+ * Private on purpose: it returns any line's id and path, and only the company ones may leave.
+ */
+function parseCwdLine(line: string): { id: string; cwd: string } | null {
+  const text = line.trim();
+  const at = text.indexOf(' ');
+  if (at <= 0) return null;
+  const id = text.slice(0, at);
+  const cwd = text.slice(at + 1).trim();
+  return SESSION_ID.test(id) && cwd !== '' ? { id, cwd } : null;
+}
+
+/**
+ * The last line of the log when no newline follows it, kept between reads as a hash of its text
+ * and where it ends (chars from the start). The text itself is not kept: it may be another
+ * directory's line.
+ */
+export interface TailMark {
+  readonly hash: string;
+  readonly end: number;
+}
+
+function sameTail(a: TailMark | null, b: TailMark | null): boolean {
+  return a !== null && b !== null && a.hash === b.hash && a.end === b.end;
+}
+
+/**
+ * The lines of the log from its text chunks, for {@link latestCompanySessionIds}. MulmoTerminal
+ * appends each record as `\n<id> <path>`, so the last line has no newline after it and may be half
+ * written (a department's path cut at the company root would read as かなめ's). It is passed on
+ * only when the previous read ended with the same tail at the same place (`previous`): the file has
+ * not moved since, so the line is whole. A new session thus shows up one read later. `onTail` gets
+ * this read's tail (null when the text ends with a newline) for the next read.
+ */
+export async function* settledLines(
+  chunks: AsyncIterable<string> | Iterable<string>,
+  previous: TailMark | null,
+  onTail: (tail: TailMark | null) => void,
+): AsyncGenerator<string> {
+  let rest = '';
+  let end = 0;
+  for await (const chunk of chunks) {
+    end += chunk.length;
+    const lines = (rest + chunk).split('\n');
+    rest = lines.pop() ?? '';
+    yield* lines;
+  }
+  const tail = rest === '' ? null : { hash: createHash('sha256').update(rest).digest('hex'), end };
+  onTail(tail);
+  if (sameTail(tail, previous)) yield rest;
+}
+
+/**
+ * The current session id of each company seat, keyed by the seat's cwd.
+ *
+ * The log only grows and the last line of an id is its truth, so for each seat this is the id of
+ * its last line whose id was not moved elsewhere later. Lines of other directories are only
+ * compared and dropped: their path and id are never stored, so they cannot leak.
+ */
+export async function latestCompanySessionIds(
+  lines: AsyncIterable<string> | Iterable<string>,
+  seats: readonly CompanySeat[],
+): Promise<ReadonlyMap<string, string>> {
+  const seatPaths = new Set(seats.map((seat) => seat.cwd));
+  // Company ids only: where each one was last seen and on which line. One pass, no rescans.
+  const lastSeen = new Map<string, { cwd: string; line: number }>();
+  let line = 0;
+  for await (const text of lines) {
+    line += 1;
+    const record = parseCwdLine(text);
+    if (record === null) continue;
+    if (seatPaths.has(record.cwd)) lastSeen.set(record.id, { cwd: record.cwd, line });
+    else lastSeen.delete(record.id);
+  }
+  const latest = new Map<string, { id: string; line: number }>();
+  for (const [id, seen] of lastSeen) {
+    const current = latest.get(seen.cwd);
+    if (current === undefined || seen.line > current.line)
+      latest.set(seen.cwd, { id, line: seen.line });
+  }
+  return new Map([...latest].map(([cwd, { id }]) => [cwd, id]));
+}
+
+/** One entry of activity-state.json. Extra keys are ignored; a missing or mistyped one fails. */
+export const activityEntrySchema = z.object({
+  working: z.boolean(),
+  waiting: z.boolean(),
+  event: z.string().nullable(),
+});
+
+export type ActivityEntry = z.infer<typeof activityEntrySchema>;
+
+/**
+ * The rules, top first: a Notification while waiting asks for a permission; a turn in progress is
+ * working; any other wait (Stop, MarkedUnread) finished a turn; no entry is idle.
+ */
+export function sessionStateOf(entry: ActivityEntry | undefined): SessionState {
+  if (entry === undefined) return 'idle';
+  if (entry.waiting && entry.event === 'Notification') return 'awaiting-permission';
+  if (entry.working) return 'working';
+  if (entry.waiting) return 'resting';
+  return 'idle';
+}
+
+export type SessionsFailureKind =
+  'missing' | 'read-failed' | 'too-large' | 'parse-failed' | 'invalid';
+
+export type SessionsReading =
+  | {
+      readonly ok: true;
+      readonly members: readonly SnapshotSession[];
+      /** How many seats have a session in the cwd log. */
+      readonly found: number;
+    }
+  | { readonly ok: false; readonly kind: SessionsFailureKind };
+
+function parseJson(text: string): { ok: true; value: unknown } | { ok: false } {
+  try {
+    const value: unknown = JSON.parse(text);
+    return { ok: true, value };
+  } catch {
+    return { ok: false };
+  }
+}
+
+type EntryLookup = { ok: true; entry: ActivityEntry | undefined } | { ok: false };
+
+/** The file must be a JSON object (not an array). Its keys are not walked or copied. */
+function isJsonObject(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function lookupEntry(file: Readonly<Record<string, unknown>>, id: string | undefined): EntryLookup {
+  if (id === undefined || !Object.hasOwn(file, id)) return { ok: true, entry: undefined };
+  const entry = activityEntrySchema.safeParse(file[id]);
+  return entry.success ? { ok: true, entry: entry.data } : { ok: false };
+}
+
+/**
+ * Each seat's state from the activity-state.json text. The file is rewritten in place by
+ * MulmoTerminal, so an empty or half written text is normal now and then: it fails this cycle and
+ * the next one reads it again.
+ */
+export function readSeatStates(
+  activityText: string,
+  seats: readonly CompanySeat[],
+  ids: ReadonlyMap<string, string>,
+): SessionsReading {
+  const json = parseJson(activityText);
+  if (!json.ok) return { ok: false, kind: 'parse-failed' };
+  return seatStatesOf(json.value, seats, ids);
+}
+
+/**
+ * Each seat's state from the parsed activity-state.json. Only the seats' ids are looked up (own
+ * keys, each entry checked by zod); other keys are never listed, read or copied.
+ */
+export function seatStatesOf(
+  file: unknown,
+  seats: readonly CompanySeat[],
+  ids: ReadonlyMap<string, string>,
+): SessionsReading {
+  if (!isJsonObject(file)) return { ok: false, kind: 'invalid' };
+  const members: SnapshotSession[] = [];
+  for (const seat of seats) {
+    const lookup = lookupEntry(file, ids.get(seat.cwd));
+    if (!lookup.ok) return { ok: false, kind: 'invalid' };
+    members.push({ department: seat.department, state: sessionStateOf(lookup.entry) });
+  }
+  return { ok: true, members, found: seats.filter((seat) => ids.has(seat.cwd)).length };
+}

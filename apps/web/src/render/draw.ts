@@ -1,6 +1,6 @@
 import { decorPose } from './ambient';
 import type { GuildArt } from './art';
-import type { BubbleKind, Bubbles } from './bubbles';
+import { bubbleShown, type BubbleKind, type Bubbles } from './bubbles';
 import type { ConfettiView, MemberPose, StageFrame } from './director';
 import { FLOOR_PATCH_DECOR, type AnimatedDecor, type DecorPlacement } from './decor';
 import {
@@ -77,6 +77,7 @@ export function drawAnimatedDecor(
 }
 
 const BUBBLE_GLYPHS: Readonly<Record<BubbleKind, { glyph: string; color: string }>> = {
+  'awaiting-permission': { glyph: '?', color: '#1a56b0' },
   'awaiting-president': { glyph: '!', color: '#b0103a' },
   'awaiting-kaname': { glyph: '…', color: '#222222' },
 };
@@ -143,7 +144,7 @@ function drawHeldItem(ctx: CanvasRenderingContext2D, member: MemberPose, art: Gu
 /**
  * Members (back to front) between the front layers, so the furniture in front of a member covers
  * their lower body; then what they hold (sunk into a seat, the hands are just over the desk or the
- * counter, which would hide the item), the bubbles of those holding nothing, and confetti on top.
+ * counter, which would hide the item), the bubbles of those out of scenes, and confetti on top.
  */
 export function drawActors(
   ctx: CanvasRenderingContext2D,
@@ -159,9 +160,9 @@ export function drawActors(
     ctx.drawImage(step.layer.image, 0, 0);
     drawAnimatedDecor(ctx, art, now, step.layer.layer.animated);
   }
-  for (const { id, pose } of frame.members) {
-    const bubble = bubbles[id];
-    if (pose.held === null && bubble !== undefined) drawBubble(ctx, bubble, pose.point);
+  for (const member of frame.members) {
+    const bubble = bubbleShown(bubbles, member);
+    if (bubble !== null) drawBubble(ctx, bubble, member.pose.point);
   }
   for (const view of frame.confetti) drawConfetti(ctx, view);
 }

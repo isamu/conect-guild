@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "fetchedAt": "2026-10-12T09:00:00.000Z",
   "repo": "example-owner/example-company",
   "issues": [
@@ -80,5 +80,16 @@
       "linkedIssues": [98],
       "changedFiles": []
     }
-  ]
+  ],
+  "sessions": {
+    "status": "ok",
+    "checkedAt": "2026-10-12T09:00:00.000Z",
+    "members": [
+      { "department": null, "state": "working" },
+      { "department": "経理", "state": "awaiting-permission" },
+      { "department": "広報", "state": "working" },
+      { "department": "企画", "state": "resting" },
+      { "department": "総務", "state": "idle" }
+    ]
+  }
 }

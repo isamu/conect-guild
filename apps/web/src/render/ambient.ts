@@ -26,14 +26,19 @@ export type AmbientMood =
 
 export type AmbientMoods = Readonly<Partial<Record<MemberId, AmbientMood>>>;
 
+/**
+ * `busy` (the session is in a turn right now) is desk work for everyone. `awaiting-permission`
+ * (the session waits for a tool permission) looks around: the bubble (bubbles.ts) says why.
+ */
 export function ambientMoodOf(id: MemberId, state: MemberState): AmbientMood {
+  if (state === 'awaiting-permission') return 'idle';
   if (id === 'kaname') {
     if (state === 'working') return 'tidy-scroll';
     // awaiting-kaname: reviewing PRs, which reads as desk work.
     return state === 'idle' ? 'fan' : 'desk-work';
   }
   if (id === 'yukihiro') return state === 'awaiting-president' ? 'fidget' : 'idle';
-  return state === 'working' ? 'desk-work' : 'idle';
+  return state === 'working' || state === 'busy' ? 'desk-work' : 'idle';
 }
 
 export function ambientMoodsOf(

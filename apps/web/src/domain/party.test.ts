@@ -8,6 +8,7 @@ import {
   isRuleChangePath,
   prWaitKind,
 } from './party';
+import type { LiveStates } from './session';
 import { T0, at, closedIssue, issue, mergedPr, minutesAfter, pr } from './fixtures.test-util';
 
 describe('isRuleChangePath', () => {
@@ -239,5 +240,56 @@ describe('deriveMemberStatuses: idle reasons and time', () => {
     const input = { issues: [closedIssue(1, T0, ['経理'])], prs: [] };
     expect(stateOf('経理', input, at(T0) + 60_000)).toBe('done');
     expect(stateOf('経理', input, at(T0) + 31 * 60_000)).toBe('idle');
+  });
+});
+
+describe('deriveMemberStatuses: live sessions', () => {
+  const withPresident = {
+    issues: [issue(1, { labels: ['経理'] })],
+    prs: [pr(2, { linkedIssues: [1], changedFiles: ['CLAUDE.md'] })],
+  };
+  const withKaname = {
+    issues: [issue(1, { labels: ['経理'] })],
+    prs: [pr(2, { linkedIssues: [1] })],
+  };
+  const withIssue = { issues: [issue(1, { labels: ['経理'] })], prs: [] };
+  const withDone = { issues: [closedIssue(1, ago(1), ['経理'])], prs: [] };
+  const nothing = { issues: [], prs: [] };
+
+  function minori(input: Parameters<typeof deriveMemberStatuses>[0], live: LiveStates) {
+    return deriveMemberStatuses(input, NOW, undefined, live)[0];
+  }
+
+  it.each([
+    ['the president approval', withPresident],
+    ['a review by かなめ', withKaname],
+    ['an open Issue', withIssue],
+    ['nothing', nothing],
+  ])('puts 許可待ち over %s', (_label, input) => {
+    expect(minori(input, { minori: 'awaiting-permission' })?.state).toBe('awaiting-permission');
+  });
+
+  it.each([
+    ['the president approval', withPresident, 'awaiting-president'],
+    ['a review by かなめ', withKaname, 'awaiting-kaname'],
+    ['an open Issue', withIssue, 'busy'],
+    ['a recent close', withDone, 'busy'],
+    ['nothing', nothing, 'busy'],
+  ] as const)('ranks いま作業中 against %s', (_label, input, state) => {
+    expect(minori(input, { minori: 'working' })?.state).toBe(state);
+  });
+
+  it('applies a live state only to its own member', () => {
+    const states = deriveMemberStatuses(nothing, NOW, undefined, { hibiki: 'working' });
+    expect(states.map((s) => s.state)).toEqual(['idle', 'busy', 'idle', 'idle']);
+  });
+
+  it('gives no idle reason to a live state', () => {
+    expect(minori(nothing, { minori: 'working' })?.reason).toBeNull();
+  });
+
+  it('is GitHub only without live states', () => {
+    expect(minori(withIssue, {})?.state).toBe('working');
+    expect(deriveMemberStatuses(withIssue, NOW)[0]?.state).toBe('working');
   });
 });
