@@ -33,6 +33,8 @@ interface Drawing {
   readonly ctx: CanvasRenderingContext2D;
   readonly art: GuildArt;
   readonly now: number;
+  /** Someone stays by the pet (DecorCues.petCompany). */
+  readonly petCompany: boolean;
 }
 
 /** One thing at its place, with the time it has been moving since (its trigger). */
@@ -77,9 +79,12 @@ function drawFlame(d: Drawing, thing: Thing): void {
   if (glow > 0) addLight(d, thing, glow);
 }
 
-/** The pet breathes, and now and then wakes and sits up (its awake picture, not scaled). */
+/**
+ * The pet breathes, and now and then wakes and sits up (its awake picture, not scaled); it sits up
+ * all the while someone stays by it.
+ */
 function drawPet(d: Drawing, thing: Thing): void {
-  const { name, dy } = petPoseAt(thing.name, thing.phaseMs, d.now);
+  const { name, dy } = petPoseAt(thing.name, thing.phaseMs, d.now, d.petCompany);
   d.art.decor.drawDecor(d.ctx, name, thing.x, thing.y + dy);
 }
 
@@ -228,7 +233,7 @@ export function drawAnimatedDecor(
   stage: { readonly now: number; readonly cues: DecorCues },
   items: readonly AnimatedDecor[],
 ): void {
-  const d: Drawing = { ctx, art, now: stage.now };
+  const d: Drawing = { ctx, art, now: stage.now, petCompany: stage.cues.petCompany };
   for (const { placement, motion, phaseMs, trigger } of items) {
     const x = placement.col * TILE_SIZE;
     const y = placement.row * TILE_SIZE;

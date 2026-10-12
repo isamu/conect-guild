@@ -30,7 +30,7 @@ const PICTURE = TILE_SIZE;
 const byName = (a: string, b: string) => a.localeCompare(b);
 /** Everybody at their seat (trinkets.seat.test.ts covers members away). */
 const AT_SEAT = (['kaname', 'minori', 'hibiki', 'hirame', 'sasae', 'yukihiro'] as const).map(
-  (id) => ({ id, atSeat: true }),
+  (id) => ({ id, atSeat: true, withPet: false }),
 );
 
 describe('decorCuesOf', () => {
@@ -142,6 +142,7 @@ describe('activeSince', () => {
     working: new Set(['hibiki']),
     awaitingPresident: true,
     clearedAt: { minori: 300, kaname: 900, sasae: 50 },
+    petCompany: false,
   };
 
   it('always moves a thing with no trigger', () => {
@@ -340,14 +341,14 @@ describe('petAwakeAt', () => {
 describe('petPoseAt', () => {
   it('draws the awake poodle sitting still while it is up', () => {
     for (let t = 0; t < TRINKETS.petSitMs; t += 10) {
-      expect(petPoseAt('sleeping-poodle', 0, t)).toEqual({ name: PET_AWAKE_DECOR, dy: 0 });
+      expect(petPoseAt('sleeping-poodle', 0, t, false)).toEqual({ name: PET_AWAKE_DECOR, dy: 0 });
     }
   });
 
   it('draws the sleeping picture breathing (1 px) while it sleeps', () => {
     const rises = new Set<number>();
     for (let t: number = TRINKETS.petSitMs; t < TRINKETS.petIntervalMs; t += 10) {
-      const pose = petPoseAt('sleeping-poodle', 0, t);
+      const pose = petPoseAt('sleeping-poodle', 0, t, false);
       expect(pose).toEqual({ name: 'sleeping-poodle', dy: decorPose('breath', 0, t).dy });
       rises.add(pose.dy);
     }
@@ -357,21 +358,27 @@ describe('petPoseAt', () => {
   it('uses the same phase for waking and for breathing', () => {
     const phase = 3_770;
     const up = TRINKETS.petIntervalMs - phase;
-    expect(petPoseAt('sleeping-poodle', phase, up - 1)).toEqual({
+    expect(petPoseAt('sleeping-poodle', phase, up - 1, false)).toEqual({
       name: 'sleeping-poodle',
       dy: decorPose('breath', phase, up - 1).dy,
     });
-    expect(petPoseAt('sleeping-poodle', phase, up)).toEqual({ name: PET_AWAKE_DECOR, dy: 0 });
+    expect(petPoseAt('sleeping-poodle', phase, up, false)).toEqual({
+      name: PET_AWAKE_DECOR,
+      dy: 0,
+    });
     const down = up + TRINKETS.petSitMs;
-    expect(petPoseAt('sleeping-poodle', phase, down - 1).name).toBe(PET_AWAKE_DECOR);
-    expect(petPoseAt('sleeping-poodle', phase, down)).toEqual({
+    expect(petPoseAt('sleeping-poodle', phase, down - 1, false).name).toBe(PET_AWAKE_DECOR);
+    expect(petPoseAt('sleeping-poodle', phase, down, false)).toEqual({
       name: 'sleeping-poodle',
       dy: decorPose('breath', phase, down).dy,
     });
     // The breath has its own phase too: shifting it changes the rise at the same moment.
     const rises = new Set<number>();
     for (let t = down; t < down + AMBIENT.breathMs; t += 10) {
-      rises.add(petPoseAt('sleeping-poodle', phase, t).dy - petPoseAt('sleeping-poodle', 0, t).dy);
+      rises.add(
+        petPoseAt('sleeping-poodle', phase, t, false).dy -
+          petPoseAt('sleeping-poodle', 0, t, false).dy,
+      );
     }
     expect(rises.size).toBeGreaterThan(1);
   });
