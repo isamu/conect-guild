@@ -5,7 +5,8 @@ import { EMPTY_DIRECTOR, frameAt, scheduleEvent, type Director, type MemberPose 
 import { levelTags, type LevelTag } from './levelTags';
 import { linesOf } from './lineBook';
 import type { PickLine } from './lines';
-import { BUBBLE_RISE, DETAIL_SCALE, OVERHEAD_OFFSET } from './metrics';
+import { BUBBLE_RISE, DETAIL_SCALE, OVERHEAD_OFFSET, TILE_SIZE } from './metrics';
+import { MS_PER_TILE } from './motion';
 import { overheadLift } from './overhead';
 import type { Point } from './path';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './map';
@@ -87,11 +88,34 @@ function expectClear(member: MemberPose, words: string, t: number): void {
   }
 }
 
+/**
+ * Every 5 ms from `from` to `end` (a walker, a tile in MS_PER_TILE, moves under a pixel in that
+ * time: checked below), and every start and
+ * end of a segment, a line and their last moment before, so no contact between samples is missed.
+ */
+const STEP_MS = 5;
+
+function momentsOf(director: Director, end: number, from = 0): number[] {
+  const edges = [
+    ...director.tracks.flatMap((track) => track.segments.flatMap((s) => [s.start, s.end])),
+    ...director.lines.flatMap((said) => [said.start, said.end]),
+  ].flatMap((at) => [at - 1, at]);
+  const steps = Array.from(
+    { length: Math.ceil((end - from) / STEP_MS) },
+    (_, i) => from + i * STEP_MS,
+  );
+  return [...new Set([...steps, ...edges])].filter((t) => t >= from && t < end);
+}
+
 function contextFor(toss: number): SceneContext {
   return { seats: DEFAULT_SEATS, random: () => 0.5, tossRandom: () => toss, pickLine: pick };
 }
 
 describe('line bubbles and level tags', () => {
+  it('samples finer than a pixel of walking', () => {
+    expect((TILE_SIZE / MS_PER_TILE) * STEP_MS).toBeLessThan(1);
+  });
+
   it('has tags to check', () => {
     expect(TAGS).toHaveLength(5);
   });
@@ -100,7 +124,7 @@ describe('line bubbles and level tags', () => {
     const director = scheduleEvent(EMPTY_DIRECTOR, event(c.kind, c.label), 0, contextFor(c.toss));
     const end = Math.max(...director.lines.map((said) => said.end));
     let checked = 0;
-    for (let t = 0; t < end; t += 50) {
+    for (const t of momentsOf(director, end)) {
       const frame = frameAt(director, t, DEFAULT_SEATS);
       for (const member of frame.members) {
         const line = frame.lines[member.id];
@@ -146,7 +170,7 @@ describe('the words of the king’s call and level tags', () => {
     let checked = 0;
     for (const start of [0, 2_000, 4_000, 6_000, 8_000]) {
       const end = summonsEnd({ start, members: EVERYONE });
-      for (let t = start; t < end; t += 100) checked += checkCall(director, start, t);
+      for (const t of momentsOf(director, end, start)) checked += checkCall(director, start, t);
     }
     expect(checked).toBeGreaterThan(0);
   });
