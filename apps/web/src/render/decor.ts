@@ -2,6 +2,7 @@ import { DECOR, type DecorName } from '../../../../assets/decor/decor';
 import { DECOR_MOTION, type DecorMotion } from './ambient';
 import type { TileRect } from './map';
 import { AMBIENT } from './metrics';
+import { triggerOf, type DecorTrigger } from './trinkets';
 
 /**
  * The small things that make the office busy (assets/decor/decor.ts): on the walls, on the desks
@@ -9,7 +10,8 @@ import { AMBIENT } from './metrics';
  * (経理: abacus, ledgers, coins, safe; 広報: posters, megaphone, flyers, easel; 企画: map table,
  * blueprints, globe, model; 総務: files, key board, toolbox); the rest is shared.
  * Floor things block the way (members walk around them); things on desks, the counter and the
- * walls sit on cells nobody walks on anyway. A light patch is a flat floor patch.
+ * walls sit on cells nobody walks on anyway. A light patch is a flat floor patch, drawn every
+ * frame as it drifts with the sun (daylight.ts).
  */
 
 export interface DecorPlacement extends TileRect {
@@ -92,7 +94,7 @@ export const DECOR_PLACEMENTS: readonly DecorPlacement[] = [
   place('plant-large', 29, 15),
 ];
 
-/** Drawn once with the ground, before the furniture. */
+/** Drawn every frame over the cached ground, before the members (they drift with the sun). */
 export const FLOOR_PATCH_DECOR: readonly DecorPlacement[] = DECOR_PLACEMENTS.filter(isFloorPatch);
 
 /** Drawn once after the furniture, lower ones last so they overlap the ones behind them. */
@@ -105,10 +107,16 @@ export interface AnimatedDecor {
   readonly motion: DecorMotion;
   /** Shifts this one's flicker or breath against the others. */
   readonly phaseMs: number;
+  /** When it moves (trinkets.ts); null when it always does (the lamps and the cat). */
+  readonly trigger: DecorTrigger | null;
 }
 
-/** Drawn every frame (the lamps' flames and the sleeping cat), under the members. */
+/** Drawn every frame (the lamps, the cat and the things that move at times), under the members. */
 export const ANIMATED_DECOR: readonly AnimatedDecor[] = DECOR_PLACEMENTS.flatMap((placement) => {
   const motion = DECOR_MOTION[placement.name];
   return motion === undefined ? [] : [{ placement, motion, phaseMs: 0 }];
-}).map((item, index) => ({ ...item, phaseMs: index * AMBIENT.decorPhaseStepMs }));
+}).map((item, index) => ({
+  ...item,
+  phaseMs: index * AMBIENT.decorPhaseStepMs,
+  trigger: triggerOf(item.placement),
+}));

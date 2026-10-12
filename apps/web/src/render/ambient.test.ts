@@ -269,13 +269,20 @@ describe('decorPose', () => {
     expect(decorPose('breath', 0, AMBIENT.breathMs)).toEqual({ dy: 0, glow: 0 });
   });
 
-  it('moves only lamps, candles and the sleeping cat', () => {
+  it('moves the lamps, the cat and the departments’ things (Issue #11), nothing else', () => {
     expect(DECOR_MOTION).toEqual({
       lantern: 'flame',
       sconce: 'flame',
       'pillar-lamp': 'flame',
       candlestick: 'flame',
       'sleeping-cat': 'breath',
+      abacus: 'glint',
+      'coin-pile': 'glint',
+      megaphone: 'notes',
+      globe: 'spin',
+      'key-board': 'swing',
+      hourglass: 'sand',
+      banner: 'flutter',
     });
   });
 });

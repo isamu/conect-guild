@@ -10,6 +10,7 @@ import {
 import { ambientMoodsOf } from '../render/ambient';
 import type { GuildArt } from '../render/art';
 import { bubblesOf } from '../render/bubbles';
+import { hourFromQuery } from '../render/daylight';
 import { loadArt } from '../render/loadArt';
 import { isShown, startRenderLoop, type RenderLoop } from '../render/loop';
 
@@ -45,8 +46,15 @@ function playCues(): void {
   for (const cue of taken.play) loop?.play(cue.event);
 }
 
+/** Dev only: `?hour=21.5` fixes the time of day, to check the day and the night by hand. */
+const fixedHour = import.meta.env.DEV ? hourFromQuery(globalThis.location.search) : null;
+
 function start(element: HTMLCanvasElement, art: GuildArt): void {
-  const running = startRenderLoop({ canvas: element, art });
+  const running = startRenderLoop({
+    canvas: element,
+    art,
+    ...(fixedHour === null ? {} : { localHour: () => fixedHour }),
+  });
   loop = running;
   running.setBubbles(bubblesOf(props.party));
   running.setMoods(ambientMoodsOf(props.party));

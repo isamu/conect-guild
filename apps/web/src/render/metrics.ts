@@ -86,3 +86,79 @@ export const HOLD = {
   /** Half the height of a raised item's picture (chest 31 px, scroll bundle 32 px): it sits on the hands. */
   raisedItemHalfPx: 16,
 } as const;
+
+/**
+ * Confetti over a member when a quest is cleared (confetti.ts): squares of `smallPx` or `largePx`,
+ * thrown up and out, then drifting down slowly (light paper, low gravity) for `durationMs`.
+ * Velocities are logical px / s. Chosen so that over every seat the squares stay on screen and
+ * above the message window until the end: the fastest rise stays under the top of the room from
+ * the upper seats, and the slowest one has not fallen past the message window from the lower ones.
+ */
+export const CONFETTI = {
+  durationMs: 2_600,
+  count: 48,
+  smallPx: 2 * DETAIL_SCALE,
+  largePx: 3 * DETAIL_SCALE,
+  /** Share of the large squares. */
+  largeShare: 0.4,
+  /** Sideways speed, -spread/2 to +spread/2. */
+  spreadPx: 60 * DETAIL_SCALE,
+  riseMinPx: 25 * DETAIL_SCALE,
+  riseMaxPx: 60 * DETAIL_SCALE,
+  gravityPx: 40 * DETAIL_SCALE,
+} as const;
+
+/**
+ * The small things that move (trinkets.ts): times are ms, distances logical px (one px of the
+ * decor pictures). Each thing is still unless its trigger holds (who works, the king waiting, a
+ * quest just cleared); the cat and the light patches always move.
+ */
+export const TRINKETS = {
+  /** 経理: a glint on the abacus or the coins now and then, `showMs` out of every `stepMs`. */
+  sparkleStepMs: 1_120,
+  sparkleShowMs: 420,
+  /** Share of the steps with a glint. */
+  sparkleShare: 0.6,
+  /** 広報: a note or a "!" leaves the megaphone every `noteEveryMs` and lives `noteLifeMs`. */
+  noteEveryMs: 840,
+  noteLifeMs: 1_680,
+  noteRisePx: 28,
+  noteDriftPx: 20,
+  /** Share of "!" among them. */
+  bangShare: 0.25,
+  /** 企画: a band of light crosses the globe once every `spinMs`, as if it turned. */
+  spinMs: 1_960,
+  spinBandPx: 4,
+  /** 総務: the keys swing `swingPx` at the bottom, once every `swingMs`. */
+  swingMs: 1_260,
+  swingPx: 2,
+  /** The hourglass: a grain falls through the neck every `sandMs`. */
+  sandMs: 700,
+  /** A banner flutters while the confetti flies, `wavePx` at the bottom, one wave every `waveMs`. */
+  waveMs: 560,
+  wavePx: 4,
+  /** The cat wakes once every `catIntervalMs`: it rises, then stretches out. */
+  catIntervalMs: 21_000,
+  catRiseMs: 420,
+  catStretchMs: 1_260,
+  catRiseY: 1.1,
+  catStretchX: 1.15,
+  catStretchY: 0.88,
+  /** The light patches drift with the sun (from morning to evening) and sway a little. */
+  patchDriftPx: 16,
+  patchSwayPx: 2,
+  patchSwayMs: 17_000,
+} as const;
+
+/** Day and night (daylight.ts): the light around the lamps at night and the sun in the windows. */
+export const DAYLIGHT = {
+  /** Radius of the light around a lantern or a pillar lamp, and around a candle or a sconce. */
+  lampRadiusPx: 84,
+  smallLampRadiusPx: 60,
+  /** The radius grows by up to this share with the flame's flicker. */
+  lampFlickerShare: 0.1,
+  /** Warm light added around the lamps at full night. */
+  glowAlpha: 0.3,
+  /** Light added over the window tiles in full sun. */
+  windowSunAlpha: 0.3,
+} as const;

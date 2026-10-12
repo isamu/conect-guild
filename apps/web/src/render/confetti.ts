@@ -1,11 +1,10 @@
-import { DETAIL_SCALE, OVERHEAD_OFFSET } from './metrics';
+import { CONFETTI, OVERHEAD_OFFSET } from './metrics';
 import type { Point } from './path';
 
 /** Confetti over a member's head when a quest is cleared. Random numbers are injected. */
 
-export const CONFETTI_MS = 1_800;
-export const CONFETTI_COUNT = 24;
-const GRAVITY = 180 * DETAIL_SCALE; // logical px / s^2
+export const CONFETTI_MS = CONFETTI.durationMs;
+export const CONFETTI_COUNT = CONFETTI.count;
 const COLORS = ['#ffd84a', '#ff5f7e', '#4fd1ff', '#7ee07e', '#ffffff'] as const;
 
 /** Returns a number in [0, 1), like Math.random. */
@@ -35,10 +34,10 @@ function pick<T>(items: readonly [T, ...T[]], random: Random): T {
 /** Particles fly up and out in a fan, then fall. */
 export function createConfetti(random: Random, count: number = CONFETTI_COUNT): Particle[] {
   return Array.from({ length: count }, () => ({
-    vx: (random() - 0.5) * 120 * DETAIL_SCALE,
-    vy: (-60 - random() * 80) * DETAIL_SCALE,
+    vx: (random() - 0.5) * CONFETTI.spreadPx,
+    vy: -(CONFETTI.riseMinPx + random() * (CONFETTI.riseMaxPx - CONFETTI.riseMinPx)),
     color: pick(COLORS, random),
-    size: (random() < 0.3 ? 2 : 1) * DETAIL_SCALE,
+    size: random() < CONFETTI.largeShare ? CONFETTI.largePx : CONFETTI.smallPx,
   }));
 }
 
@@ -52,7 +51,7 @@ export function confettiAt(
   const s = elapsedMs / 1000;
   return particles.map((p) => ({
     x: p.vx * s,
-    y: p.vy * s + (GRAVITY * s * s) / 2,
+    y: p.vy * s + (CONFETTI.gravityPx * s * s) / 2,
     color: p.color,
     size: p.size,
   }));
