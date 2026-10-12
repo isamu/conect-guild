@@ -39,8 +39,8 @@ export interface BoardGroup {
 
 export const STATE_LABELS: Readonly<Record<MemberState, string>> = {
   'awaiting-permission': '許可待ち',
-  'awaiting-president': '社長の承認まち',
-  'awaiting-kaname': 'かなめの確認まち',
+  'awaiting-president': `${MEMBERS.yukihiro.role}の承認まち`,
+  'awaiting-kaname': `${MEMBERS.kaname.name}の確認まち`,
   busy: 'いま作業中',
   working: '作業中',
   done: '完了',
@@ -161,7 +161,7 @@ function kingRow(waits: WaitCounts): PartyRow {
     return row(MEMBERS.yukihiro, {
       state: 'awaiting-president',
       stateLabel: `承認まち ${String(waits.president)} 件`,
-      tooltip: 'ルール（CLAUDE.md・.claude/agents/）を変える PR は社長がマージします',
+      tooltip: `ルール（CLAUDE.md・.claude/agents/）を変える PR は${MEMBERS.yukihiro.role}がマージします`,
       rewards: null,
     });
   }

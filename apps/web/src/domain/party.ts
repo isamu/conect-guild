@@ -4,6 +4,7 @@ import {
   DEPARTMENT_LABELS,
   DEPARTMENT_MEMBER,
   DONE_WINDOW_MS,
+  MEMBERS,
   RULE_CHANGE_PATHS,
   type DepartmentLabel,
   type MemberId,
@@ -151,7 +152,7 @@ function idleReason(load: Workload, unassigned: Unassigned): string {
   const parts = ['担当の Issue・PR がありません'];
   if (unassigned.issues > 0 || unassigned.prs > 0) {
     parts.push(
-      `担当を判定できない Issue ${String(unassigned.issues)} 件・PR ${String(unassigned.prs)} 件はかなめの受付にあります`,
+      `担当を判定できない Issue ${String(unassigned.issues)} 件・PR ${String(unassigned.prs)} 件は${MEMBERS.kaname.name}の受付にあります`,
     );
   }
   if (load.closedWithoutTime > 0) {

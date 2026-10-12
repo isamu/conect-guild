@@ -28,17 +28,18 @@ export function eventMessage(
   const n = String(event.number);
   const title = quoted(titleOf(event, snapshot));
   const actor = actorName(event.department);
+  const kaname = MEMBERS.kaname.name;
   switch (event.kind) {
     case 'issue-closed':
       return `${actor}は クエスト#${n}${title}を クリアした！`;
     case 'pr-merged':
       return event.department === null
-        ? `かなめの受付に PR#${n}${title}が とどいた！`
-        : `${actor}は PR#${n}${title}を かなめに とどけた！`;
+        ? `${kaname}の受付に PR#${n}${title}が とどいた！`
+        : `${actor}は PR#${n}${title}を ${kaname}に とどけた！`;
     case 'issue-opened':
       return event.department === null
-        ? `かなめの受付に クエスト#${n}${title}が とどいた！`
-        : `かなめは ${actor}に クエスト#${n}${title}を わたした！`;
+        ? `${kaname}の受付に クエスト#${n}${title}が とどいた！`
+        : `${kaname}は ${actor}に クエスト#${n}${title}を わたした！`;
   }
 }
 
