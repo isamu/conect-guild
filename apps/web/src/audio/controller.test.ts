@@ -275,7 +275,9 @@ describe("createSoundController: the king's call", () => {
     muted.controller.toggle();
     expect(cues(muted.player).filter((cue) => cue === 'summon')).toEqual([]);
   });
+});
 
+describe("createSoundController: the king's call gives way", () => {
   it('gives way to a sound still playing, and rings once it is over', () => {
     const { player, controller, show, message, clock } = setup({ enabled: true, volume: 2 });
     show({ message: message('pr-merged') });
