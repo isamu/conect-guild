@@ -125,14 +125,14 @@ packages/collector ──検証して一時ファイルに書き rename──▶
 - **対象リポジトリ**: `guild.settings.ts` の `repo` に固定する（既定 `yukihiroyamaguchi569/conect-management`）。コマンドライン引数や環境変数では変えられず、設定ファイルを書き換えて変える
 - **`gh` の呼び方**: `child_process.execFile('gh', [引数の配列])`。シェル文字列は組まない。認証はユーザーの `gh` のものをそのまま使う
 - **ページ送り**: `gh api --paginate --jq '<射影> | @json'` で、要るフィールドだけに絞った要素を 1 行 1 JSON で受け、行ごとに zod で検証する（`--slurp` は `--jq` と併用できない）。差分の中身や Issue の本文は gh の段階で落とす。ページが配列でなければ jq でエラーにし、空の一覧と取り違えない。`execFile` の `maxBuffer` は 64 MB にし、超えたら失敗として扱う。テストは複数ページの出力で行う
-- **Issue**: 全ページ取る。open も closed も全履歴を取る（closed を `since` で絞らない。累積の経験値の履歴を毎回数え直すため。Issue #19）。snapshot の `issues` に入れる closed は今までどおり直近 7 日（`closed_at` で確かめる）。閉じた理由（`state_reason`）も受ける。GitHub が後で理由の種類を足しても止まらないよう、文字列か null として検証する。GitHub の Issue 一覧には PR が混ざるので、`pull_request` キーを持つものは除く
+- **Issue**: open と closed を 1 つの一覧（`state=all`、作成日の新しい順）で全ページ取る。closed を `since` で絞らない（累積の経験値の履歴を毎回数え直すため。Issue #19）。open と closed を別々に取ると、その間に閉じた・開き直した Issue が両方から漏れうるため、1 つの一覧にした。作成日の順なので、読んでいる途中で状態が変わってもページの位置は動かず、どちらかの状態で 1 回は読める。途中で新しい Issue が作られるとページがずれて同じ Issue を 2 回読むことがあり、そのときは後で読んだ方（新しい方）を使う。snapshot の `issues` には open の全部と、直近 7 日に閉じたもの（`closed_at` で確かめる）を同じ一覧から入れる。閉じた理由（`state_reason`）も受ける。GitHub が後で理由の種類を足しても止まらないよう、文字列か null として検証する。GitHub の Issue 一覧には PR が混ざるので、`pull_request` キーを持つものは除く
 - **PR**: open は全部、closed / merged は直近 7 日のもの。全ページ取る（pulls の API に `since` が無いので、closed はもともと全履歴が届いている）
 - **履歴（`history`、Issue #19）**: 取った全履歴から毎回数え直す。差分で足し込まないので、取りこぼし・再オープン・ラベルの付け替えは次の取得でそのまま正しくなる。入れるのは番号と部門だけ（4.2）
   - 開かれた Issue の総数（`openedIssueCount`）: open と closed の Issue の件数（PR を除く）。閉じた理由を問わない。かなめの「受付で配った巻物」（4.6）は、Issue が開かれた時点で受付が配ったものなので、あとで「Close as not planned」や重複で閉じたものも含める
   - completed で閉じた Issue（`completedIssues`）: `state_reason` が `completed` のものだけ。部門ラベルだけを固定の順で残す。not planned・duplicate・理由なし・再オープン中のものは入れない
   - マージ済みの PR（`mergedPrs`）: `merged_at` があるものだけ。リンクした Issue の番号（上の結び付けと同じ規則）と、ブランチ名を `branchPrefixes` に当てて引いた部門（当たらなければ null）。ブランチ名そのものは collector の中で部門に変えて捨て、履歴には入れない
-  - 同じ番号が open と closed の両方の一覧に出たら（取得の間に閉じた）、closed の方を使う。番号の順に並べる
-- **API の呼び出し回数**（2026-10-12 に件数だけを確かめた: closed の Issue 109 件、closed の PR 198 件、open の Issue 2 件、open の PR 0 件）: 1 回の GitHub の取得で、open の Issue 1 回、closed の Issue（Issue 一覧には PR も混ざるので 109 + 198 = 307 件）4 回、open の PR 1 回、closed の PR 2 回、open PR ごとの変更ファイル 1 回ずつ（100 ファイルまで。それを超える PR は 100 ファイルごとに 1 回）。`since` を外す前は closed の Issue が 1 回だったので、増えるのは 3 回/分（約 180 回/時）。全体で約 8 回/分（約 480 回/時、open PR が無いとき）で、`gh` の上限 5000 回/時の 1 割に収まる。closed の Issue と PR が合わせて 100 件増えるごとに 1 回/分増える。合わせて 2000 件を超えたら（closed の Issue だけで 20 回/分）、履歴の取得だけを 10 分ごとに間引くことを考える。そのときも数え直しの考え方は変えない
+  - 同じ Issue を 2 回読んだら後で読んだ方を、同じ PR が open と closed の両方の一覧に出たら（取得の間にマージされた）closed の方を使う。番号の順に並べる
+- **API の呼び出し回数**（2026-10-12 に件数だけを確かめた: closed の Issue 109 件、closed の PR 198 件、open の Issue 2 件、open の PR 0 件）: 1 回の GitHub の取得で、Issue の一覧（PR も混ざるので 2 + 109 + 198 = 309 件）4 回、open の PR 1 回、closed の PR 2 回、open PR ごとの変更ファイル 1 回ずつ（100 ファイルまで。それを超える PR は 100 ファイルごとに 1 回）。以前は open の Issue 1 回と直近 7 日の closed の Issue 1 回の計 2 回だったので、増えるのは 2 回/分（約 120 回/時）。全体で約 7 回/分（約 420 回/時、open PR が無いとき）で、`gh` の上限 5000 回/時の 1 割に収まる。Issue と PR が合わせて 100 件増えるごとに 1 回/分増える。合わせて 2000 件を超えたら（Issue の一覧だけで 20 回/分）、履歴の取得だけを 10 分ごとに間引くことを考える。そのときも数え直しの考え方は変えない
 - **PR と Issue の結び付け**: PR の題名と本文から、同じリポジトリを指す参照（`#番号` と `<対象リポジトリ>#番号`）を正規表現で拾い、`linkedIssues: number[]` として持つ。別リポジトリの参照（`owner/other#番号`）は拾わない。`Closes`・`Fixes`・`Resolves` の後の参照が 1 つでもあれば、それだけを使う。本文そのものは保存しない
 - **変更ファイル**: open PR だけ、`gh api --paginate --jq` で `repos/<r>/pulls/<n>/files` の `filename` だけを取り、`changedFiles: string[]` として持つ（差分の中身は取らない）
 - **間隔**: GitHub は 60 秒ごと（`gh` のレート制限に十分収まる）。collector 自体は 5 秒ごとに回り、セッションの状態（4.7）を読むたびに、GitHub の最後の正常な結果と合わせて snapshot を書き直す。GitHub の取得は裏で走らせ、遅くてもセッションの 5 秒の周期を止めない（最初の 1 回だけは、書くものが無いので待つ）。周期は予定時刻から数え、1 回の処理の時間も 5 秒に含める。処理が予定を過ぎたら、取り戻そうと続けて回さず、次の予定まで飛ばす。`--once` で 1 回だけ（GitHub とセッションを 1 回ずつ）実行もできる
@@ -405,7 +405,7 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 ## 変更履歴
 
 - **Issue #19 の 1 本目（2026-10-12）** 累積の経験値とレベルのため、collector が全履歴を取り、snapshot に番号と部門だけの `history` を足した（4.1、4.2、4.6。社長の判断）
-  - closed の Issue の取得から `since` を外し、`state_reason` を受ける。履歴は毎回数え直す。増える API の呼び出しは約 3 回/分（4.1）
+  - Issue を open と closed の 2 つの一覧ではなく `state=all` の 1 つの一覧で、`since` なしで取り、`state_reason` を受ける。2 つの一覧の間に状態が変わった Issue が漏れないようにするため（統合レビューの指摘）。履歴は毎回数え直す。増える API の呼び出しは約 2 回/分（4.1）
   - `schemaVersion` を 3 に上げた。v2 の snapshot は今までどおり「収集スクリプトを更新してください」で止める。画面は v3 を読めるようにしただけで、表示は 2 本目
   - かなめの基準の「開かれた Issue の総数」には not planned で閉じた Issue も含める。受付で配った時点の数なので、あとの閉じ方を問わない（実装時の判断）
   - ブランチ接頭辞 → 部門の判定を `packages/snapshot/src/settings.ts` に移し、collector と画面で共有した（3 章）
