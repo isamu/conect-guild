@@ -3,8 +3,6 @@ import type { GhRunner } from './gh.ts';
 import { projectionFilter } from './gh.ts';
 import { fetchChangedFiles, fetchIssues, fetchPrs } from './github.ts';
 
-const SINCE = new Date('2026-10-05T00:00:00.000Z');
-
 /** Records the jq filter of each call and answers with `stdout`. */
 function recordingGh(stdout: string): GhRunner & { filters: string[]; args: string[][] } {
   const filters: string[] = [];
@@ -36,12 +34,42 @@ describe('fetchChangedFiles', () => {
 describe('fetchIssues', () => {
   it('projects issues without their body', async () => {
     const gh = recordingGh('');
-    await fetchIssues(gh, 'o/r', SINCE);
-    expect(gh.filters).toHaveLength(2);
+    await fetchIssues(gh, 'o/r');
+    expect(gh.filters).toHaveLength(1);
     for (const filter of gh.filters) {
       expect(filter).not.toMatch(/body/);
       expect(filter).toContain('has("pull_request")');
+      expect(filter).toContain('state_reason');
     }
+  });
+
+  it('asks for every issue in one list sorted by creation, without since, for the history', async () => {
+    const gh = recordingGh('');
+    await fetchIssues(gh, 'o/r');
+    expect(gh.args.map((a) => a.at(-1))).toEqual([
+      'repos/o/r/issues?state=all&sort=created&direction=desc&per_page=100',
+    ]);
+    expect(gh.args.every((a) => a.includes('--paginate'))).toBe(true);
+  });
+
+  it.each([
+    ['a missing state_reason', undefined],
+    ['a numeric state_reason', 1],
+  ])('rejects %s', async (_label, reason) => {
+    const line = JSON.stringify({
+      number: 1,
+      title: 't',
+      state: 'closed',
+      state_reason: reason,
+      labels: [],
+      created_at: '2026-10-01T00:00:00Z',
+      updated_at: '2026-10-01T00:00:00Z',
+      closed_at: '2026-10-01T00:00:00Z',
+      is_pull_request: false,
+    });
+    await expect(fetchIssues(recordingGh(`${line}\n`), 'o/r')).rejects.toMatchObject({
+      kind: 'validation-failed',
+    });
   });
 
   it('rejects an issue that still carries a body', async () => {
@@ -49,6 +77,7 @@ describe('fetchIssues', () => {
       number: 1,
       title: 't',
       state: 'open',
+      state_reason: null,
       labels: [],
       created_at: '2026-10-01T00:00:00Z',
       updated_at: '2026-10-01T00:00:00Z',
@@ -56,7 +85,7 @@ describe('fetchIssues', () => {
       is_pull_request: false,
       body: 'secret',
     });
-    await expect(fetchIssues(recordingGh(`${line}\n`), 'o/r', SINCE)).rejects.toMatchObject({
+    await expect(fetchIssues(recordingGh(`${line}\n`), 'o/r')).rejects.toMatchObject({
       kind: 'validation-failed',
     });
   });
@@ -69,6 +98,15 @@ describe('fetchPrs', () => {
     const filter = projectionFilter(
       '{number, title, body, state, merged_at, closed_at, head_ref: .head.ref}',
     );
-    expect(gh.filters).toEqual([filter, filter]);
+    expect(gh.filters).toEqual([filter]);
+  });
+
+  it('asks for every PR in one list sorted by creation, so an updated PR keeps its page', async () => {
+    const gh = recordingGh('');
+    await fetchPrs(gh, 'o/r');
+    expect(gh.args.map((a) => a.at(-1))).toEqual([
+      'repos/o/r/pulls?state=all&sort=created&direction=desc&per_page=100',
+    ]);
+    expect(gh.args.every((a) => a.includes('--paginate'))).toBe(true);
   });
 });

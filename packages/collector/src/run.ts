@@ -26,14 +26,32 @@ type GithubResult =
   | { readonly ok: false; readonly kind: FailureKind };
 
 export type CycleResult =
-  | { readonly ok: true; readonly issues: number; readonly prs: number }
+  | {
+      readonly ok: true;
+      readonly issues: number;
+      readonly prs: number;
+      /** Counts of the history: Issues ever opened, completed Issues, merged PRs. */
+      readonly history: {
+        readonly opened: number;
+        readonly completed: number;
+        readonly merged: number;
+      };
+    }
   | { readonly ok: false; readonly kind: FailureKind };
 
 type WriteResult = { readonly ok: true } | { readonly ok: false; readonly kind: FailureKind };
 
 async function fetchGithub(deps: RunDeps, now: Date): Promise<GithubResult> {
   try {
-    return { ok: true, part: await collectSnapshot(deps.gh, COLLECTOR_CONFIG.repo, now) };
+    return {
+      ok: true,
+      part: await collectSnapshot(
+        deps.gh,
+        COLLECTOR_CONFIG.repo,
+        now,
+        COLLECTOR_CONFIG.branchPrefixes,
+      ),
+    };
   } catch (error) {
     return { ok: false, kind: errorKind(error) };
   }
@@ -83,7 +101,17 @@ async function writeSnapshot(
 function cycleResult(github: GithubResult, write: WriteResult | null): CycleResult {
   if (!github.ok) return github;
   if (write !== null && !write.ok) return write;
-  return { ok: true, issues: github.part.issues.length, prs: github.part.prs.length };
+  const { history } = github.part;
+  return {
+    ok: true,
+    issues: github.part.issues.length,
+    prs: github.part.prs.length,
+    history: {
+      opened: history.openedIssueCount,
+      completed: history.completedIssues.length,
+      merged: history.mergedPrs.length,
+    },
+  };
 }
 
 /** One full cycle (GitHub, sessions, write). Nothing is written unless GitHub succeeds. */
@@ -103,7 +131,11 @@ function prefix(deps: RunDeps): string {
 /** Logs carry only counts, times and error kinds (no titles, bodies, branch names, paths or ids). */
 function reportCycle(deps: RunDeps, result: CycleResult): void {
   if (result.ok) {
-    deps.log(`${prefix(deps)} ok: issues=${String(result.issues)} prs=${String(result.prs)}`);
+    const { opened, completed, merged } = result.history;
+    deps.log(
+      `${prefix(deps)} ok: issues=${String(result.issues)} prs=${String(result.prs)}` +
+        ` history: opened=${String(opened)} completed=${String(completed)} merged=${String(merged)}`,
+    );
   } else {
     deps.error(`${prefix(deps)} failed: ${result.kind}`);
   }

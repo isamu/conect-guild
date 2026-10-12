@@ -37,7 +37,7 @@ function clockedHarness(gh: GhRunner, untilMs: number, patch: Partial<RunDeps> =
 }
 
 function githubCycles(gh: { calls: string[] }): number {
-  return gh.calls.filter((c) => c.includes('issues?state=open')).length;
+  return gh.calls.filter((c) => c.includes('issues?state=all')).length;
 }
 
 describe('runCollector loop', () => {
@@ -110,7 +110,9 @@ describe('runCollector loop: failures', () => {
     // tick at 60 s has nothing yet; 65 s writes.
     expect(deps.writes).toHaveLength(1);
     expect(deps.errors).toEqual(['[collector] 2026-10-12T00:00:00.000Z failed: gh-failed']);
-    expect(deps.logs).toContain('[collector] 2026-10-12T00:01:00.000Z ok: issues=1 prs=2');
+    expect(deps.logs).toContain(
+      '[collector] 2026-10-12T00:01:00.000Z ok: issues=1 prs=2 history: opened=3 completed=1 merged=1',
+    );
   });
 });
 

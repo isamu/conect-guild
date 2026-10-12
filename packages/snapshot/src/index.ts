@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { DEPARTMENT_LABELS } from './settings.ts';
+import { DEPARTMENT_LABELS, departmentLabelSchema } from './settings.ts';
 
 /** Bump when the snapshot shape changes; the web app refuses other versions. */
-export const SNAPSHOT_SCHEMA_VERSION = 2;
+export const SNAPSHOT_SCHEMA_VERSION = 3;
 
 const isoDateTime = z.iso.datetime({ offset: true });
 
@@ -65,6 +65,52 @@ export const snapshotSessionsSchema = z.discriminatedUnion('status', [
   z.strictObject({ status: z.literal('unavailable'), checkedAt: isoDateTime }),
 ]);
 
+const issueNumber = z.number().int().positive();
+
+function hasUniqueNumbers(items: readonly { readonly number: number }[]): boolean {
+  return new Set(items.map((item) => item.number)).size === items.length;
+}
+
+/** True when `labels` are distinct and in the fixed order of DEPARTMENT_LABELS. */
+function inFixedOrder(labels: readonly string[]): boolean {
+  const positions = labels.map((label) => DEPARTMENT_LABELS.findIndex((d) => d === label));
+  return positions.every((position, i) => i === 0 || position > (positions[i - 1] ?? -1));
+}
+
+/** An Issue closed as completed. Only its department labels, distinct and in the fixed order. */
+export const historyIssueSchema = z.strictObject({
+  number: issueNumber,
+  departments: z.array(departmentLabelSchema).refine(inFixedOrder, 'distinct, in the fixed order'),
+});
+
+/**
+ * A merged PR. `branchDepartment` is the department the collector read from the branch name
+ * prefix; the branch name itself is not kept.
+ */
+export const historyPrSchema = z.strictObject({
+  number: issueNumber,
+  linkedIssues: z.array(issueNumber),
+  branchDepartment: departmentLabelSchema.nullable(),
+});
+
+/**
+ * The whole history of the repository, for the cumulative experience and levels
+ * (docs/DESIGN.md 4.6). Numbers and departments only: no titles, no other labels, no branch
+ * names, no times. Counted afresh from GitHub on every fetch.
+ */
+export const snapshotHistorySchema = z
+  .strictObject({
+    /** Every Issue ever opened (open and closed, whatever the reason): かなめ's scrolls. */
+    openedIssueCount: z.number().int().nonnegative(),
+    /** Issues closed as completed (not as not planned or duplicate). */
+    completedIssues: z.array(historyIssueSchema).refine(hasUniqueNumbers, 'unique numbers'),
+    mergedPrs: z.array(historyPrSchema).refine(hasUniqueNumbers, 'unique numbers'),
+  })
+  .refine(
+    (history) => history.completedIssues.length <= history.openedIssueCount,
+    'more completed Issues than opened ones',
+  );
+
 /** The GitHub part, written at most once a minute. `fetchedAt` is the time of that fetch. */
 export const githubPartSchema = z.strictObject({
   schemaVersion: z.literal(SNAPSHOT_SCHEMA_VERSION),
@@ -72,6 +118,7 @@ export const githubPartSchema = z.strictObject({
   repo: z.string().regex(/^[\w.-]+\/[\w.-]+$/),
   issues: z.array(snapshotIssueSchema),
   prs: z.array(snapshotPrSchema),
+  history: snapshotHistorySchema,
 });
 
 export const snapshotSchema = z.strictObject({
@@ -85,5 +132,8 @@ export type SessionDepartment = (typeof SESSION_DEPARTMENTS)[number];
 export type SessionState = z.infer<typeof sessionStateSchema>;
 export type SnapshotSession = z.infer<typeof snapshotSessionSchema>;
 export type SnapshotSessions = z.infer<typeof snapshotSessionsSchema>;
+export type HistoryIssue = z.infer<typeof historyIssueSchema>;
+export type HistoryPr = z.infer<typeof historyPrSchema>;
+export type SnapshotHistory = z.infer<typeof snapshotHistorySchema>;
 export type GithubPart = z.infer<typeof githubPartSchema>;
 export type Snapshot = z.infer<typeof snapshotSchema>;

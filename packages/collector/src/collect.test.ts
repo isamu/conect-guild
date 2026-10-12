@@ -29,7 +29,7 @@ describe('collectSnapshot', () => {
     let fileCalls = 0;
     const gh: GhRunner = async (args) => {
       const path = args.at(-1) ?? '';
-      if (path.includes('pulls?state=open')) {
+      if (path.includes('pulls?state=all')) {
         return lines(Array.from({ length: OPEN_PR_COUNT }, (_, i) => openPr(i + 1)));
       }
       if (!path.includes('/files')) return '';
@@ -40,7 +40,7 @@ describe('collectSnapshot', () => {
       inFlight -= 1;
       return lines(['a.md']);
     };
-    const snapshot = await collectSnapshot(gh, REPO, new Date('2026-10-12T00:00:00.000Z'));
+    const snapshot = await collectSnapshot(gh, REPO, new Date('2026-10-12T00:00:00.000Z'), []);
     expect(fileCalls).toBe(OPEN_PR_COUNT);
     expect(peak).toBe(CHANGED_FILES_CONCURRENCY);
     expect(snapshot.prs.every((pr) => pr.changedFiles.length === 1)).toBe(true);
@@ -52,16 +52,16 @@ describe('collectSnapshot', () => {
       const path = args.at(-1) ?? '';
       inFlight += 1;
       try {
-        if (path.includes('issues?state=open')) throw new Error('gh failed');
+        if (path.includes('issues?state=all')) throw new Error('gh failed');
         for (let i = 0; i < 5; i += 1) await new Promise((resolve) => setImmediate(resolve));
         return '';
       } finally {
         inFlight -= 1;
       }
     };
-    await expect(collectSnapshot(gh, REPO, new Date('2026-10-12T00:00:00.000Z'))).rejects.toThrow(
-      'gh failed',
-    );
+    await expect(
+      collectSnapshot(gh, REPO, new Date('2026-10-12T00:00:00.000Z'), []),
+    ).rejects.toThrow('gh failed');
     expect(inFlight).toBe(0);
   });
 });
