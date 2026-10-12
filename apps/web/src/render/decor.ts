@@ -100,7 +100,7 @@ export const FLOOR_PATCH_DECOR: readonly DecorPlacement[] = DECOR_PLACEMENTS.fil
 /** Drawn once after the furniture, lower ones last so they overlap the ones behind them. */
 export const STILL_DECOR: readonly DecorPlacement[] = DECOR_PLACEMENTS.filter(
   (item) => !isFloorPatch(item) && DECOR_MOTION[item.name] === undefined,
-).sort((a, b) => a.row + a.h - (b.row + b.h));
+).toSorted((a, b) => a.row + a.h - (b.row + b.h));
 
 export interface AnimatedDecor {
   readonly placement: DecorPlacement;

@@ -79,7 +79,7 @@ describe('snapshotSchema: sessions', () => {
   });
 
   it('accepts かなめ (department null) and the four departments in any order', () => {
-    const members = [...FIVE].reverse();
+    const members = FIVE.toReversed();
     expect(withSessions({ status: 'ok', checkedAt: CHECKED_AT, members }).success).toBe(true);
   });
 
