@@ -430,4 +430,4 @@ M1 まで行けば「本物の Issue が掲示板に出て、クローズでク�
 
 ## 変更履歴
 
-変更の経緯は Issue ごとのファイルにして [`docs/changes/`](changes/) に置く。置き方は [`docs/changes/README.md`](changes/README.md) を見る。この節には追記しない（並行する PR が同じ位置に足して衝突するため。Issue #54）。
+変更の経緯は PR ごとのファイル（名前は Issue 番号から付ける。Issue が無いときは PR 番号から）にして [`docs/changes/`](changes/) に置く。置き方は [`docs/changes/README.md`](changes/README.md) を見る。この節には追記しない（並行する PR が同じ位置に足して衝突するため。Issue #54）。
