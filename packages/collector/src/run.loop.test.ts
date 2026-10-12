@@ -2,12 +2,15 @@ import { snapshotSchema } from '@conect-guild/snapshot';
 import { describe, expect, it } from 'vitest';
 import { CollectorError } from './errors.ts';
 import type { GhRunner } from './gh.ts';
-import { runCollector, type RunDeps } from './run.ts';
+import { nextTickAt, runCollector, type RunDeps } from './run.ts';
 import { fakeGh, harness, SESSIONS_OK } from './run.fixtures.test-util.ts';
 import type { SessionsReading } from './sessions.ts';
 
-/** A clock that only moves when the loop sleeps; aborts once `untilMs` has passed. */
-function clockedHarness(gh: GhRunner, untilMs: number, patch: Partial<RunDeps> = {}) {
+/**
+ * A clock that only moves when the loop sleeps, or by `workMs` while it reads the sessions (the
+ * time a tick takes); aborts once `untilMs` has passed.
+ */
+function clockedHarness(gh: GhRunner, untilMs: number, patch: Partial<RunDeps> = {}, workMs = 0) {
   const controller = new AbortController();
   const start = Date.parse('2026-10-12T00:00:00.000Z');
   let elapsed = 0;
@@ -18,6 +21,7 @@ function clockedHarness(gh: GhRunner, untilMs: number, patch: Partial<RunDeps> =
     now: () => new Date(start + elapsed),
     readSessions: () => {
       sessionReads.push(elapsed);
+      elapsed += workMs;
       return Promise.resolve(SESSIONS_OK);
     },
     // Like a real sleep, it lets background work (a GitHub fetch) settle before the next tick.
@@ -252,5 +256,39 @@ describe('runCollector loop: interrupts', () => {
     await expect(runCollector([], deps)).resolves.toBe(0);
     expect([...deps.logs, ...deps.errors]).toEqual([]);
     expect(deps.writes).toEqual([]);
+  });
+});
+
+describe('nextTickAt', () => {
+  it('counts the tick itself towards the interval', () => {
+    expect(nextTickAt(0, 3_000, 5_000)).toBe(5_000);
+    expect(nextTickAt(0, 0, 5_000)).toBe(5_000);
+  });
+
+  it('starts right away when the tick took exactly the interval', () => {
+    expect(nextTickAt(0, 5_000, 5_000)).toBe(5_000);
+  });
+
+  it('skips the missed ticks instead of running them back to back', () => {
+    expect(nextTickAt(0, 12_000, 5_000)).toBe(15_000);
+    expect(nextTickAt(10_000, 30_001, 5_000)).toBe(35_000);
+  });
+});
+
+describe('runCollector loop: timing', () => {
+  it('keeps the 5- and 60-second schedules when each tick takes 3 seconds', async () => {
+    const gh = fakeGh();
+    const { deps, sleeps, sessionReads } = clockedHarness(gh, 125_000, {}, 3_000);
+    await runCollector([], deps);
+    expect(new Set(sleeps)).toEqual(new Set([2_000]));
+    expect(sessionReads).toEqual(Array.from({ length: 25 }, (_, i) => i * 5_000));
+    // GitHub at 0 s, 60 s and 120 s.
+    expect(githubCycles(gh)).toBe(3);
+  });
+
+  it('skips to the next schedule after a tick that overran it', async () => {
+    const { deps, sessionReads } = clockedHarness(fakeGh(), 40_000, {}, 12_000);
+    await runCollector([], deps);
+    expect(sessionReads).toEqual([0, 15_000, 30_000]);
   });
 });

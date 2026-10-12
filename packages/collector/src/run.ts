@@ -183,6 +183,16 @@ async function tick(deps: RunDeps, state: LoopState): Promise<void> {
   reportSessions(deps, state, reading);
 }
 
+/**
+ * When the tick after the one scheduled at `scheduledAt` should start, given that the tick ended at
+ * `now` (epoch ms). The tick's own time counts towards the interval. A tick that overran the
+ * interval does not start the missed ticks back to back: it skips to the first schedule from now.
+ */
+export function nextTickAt(scheduledAt: number, now: number, intervalMs: number): number {
+  const steps = Math.max(1, Math.ceil((now - scheduledAt) / intervalMs));
+  return scheduledAt + steps * intervalMs;
+}
+
 /** Collect until the signal aborts. Failures are retried on the next tick. */
 async function runLoop(deps: RunDeps): Promise<void> {
   const state: LoopState = {
@@ -194,11 +204,14 @@ async function runLoop(deps: RunDeps): Promise<void> {
   };
   // A function call keeps TypeScript from narrowing `aborted` across awaits.
   const stopped = (): boolean => deps.signal.aborted;
+  let scheduledAt = deps.now().getTime();
   while (!stopped()) {
     await tick(deps, state);
     // An interrupt during a tick ends quietly instead of reporting the killed gh.
     if (stopped()) break;
-    await deps.sleep(COLLECTOR_CONFIG.sessions.intervalMs);
+    const now = deps.now().getTime();
+    scheduledAt = nextTickAt(scheduledAt, now, COLLECTOR_CONFIG.sessions.intervalMs);
+    await deps.sleep(scheduledAt - now);
   }
   // No gh process outlives the loop.
   await state.githubInFlight;
