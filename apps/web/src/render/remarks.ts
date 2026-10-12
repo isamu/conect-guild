@@ -3,7 +3,7 @@ import type { BubbleKind, Bubbles } from './bubbles';
 import type { Random } from './confetti';
 import { inScene, isAtSeat, type Director } from './director';
 import type { IdlePoses } from './idle';
-import type { LineScene } from './lineBook';
+import { sceneOfLine, type LineScene } from './lineBook';
 import {
   linesAt,
   speakInTurn,
@@ -111,15 +111,26 @@ export interface RemarkMoment {
  */
 export function receiveParty(remarks: Remarks, party: RemarkParty, moment: RemarkMoment): Remarks {
   if (party.halted) return NO_REMARKS;
-  if (!party.known) return { ...remarks, previous: null };
+  // No snapshot behind the party: nothing to compare with, and no wait to speak of.
+  if (!party.known) return NO_REMARKS;
+  const kept = stillWaiting(remarks.said, party.bubbles);
   const changes = newlyWaiting(remarks.previous, party.bubbles);
-  if (moment.quiet || changes.length === 0) return { ...remarks, previous: party.bubbles };
-  const at = Math.max(moment.t, ...remarks.said.map((said) => said.end));
+  if (moment.quiet || changes.length === 0) return { previous: party.bubbles, said: kept };
+  const at = Math.max(moment.t, ...kept.map((said) => said.end));
   const turns = remarkTurns(changes, at, moment.free, moment.random);
-  return {
-    previous: party.bubbles,
-    said: [...remarks.said, ...speakInTurn(turns, remarks.said, moment.pick)],
-  };
+  return { previous: party.bubbles, said: [...kept, ...speakInTurn(turns, kept, moment.pick)] };
+}
+
+/**
+ * The remarks, showing or to come, whose wait is still the member's in `bubbles`: one of a wait
+ * that is over (no bubble) or became another is dropped, so no line speaks of a wait the bubble no
+ * longer shows. Those after it keep their times.
+ */
+export function stillWaiting(said: readonly Utterance[], bubbles: Bubbles): Utterance[] {
+  return said.filter((remark) => {
+    const kind = bubbles[remark.actor];
+    return kind !== undefined && sceneOfLine(remark.actor, remark.line) === SCENE_OF[kind];
+  });
 }
 
 /** Who says a remark at `t`. */
