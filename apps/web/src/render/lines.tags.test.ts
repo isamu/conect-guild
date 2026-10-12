@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { GuildEvent, GuildEventKind } from '../domain/events';
 import type { DepartmentLabel, MemberId } from '../guild.config';
+import { createAmbientSeeds } from './ambient';
 import { EMPTY_DIRECTOR, frameAt, scheduleEvent, type Director, type MemberPose } from './director';
+import { idlePose, type IdlePose } from './idle';
+import { PLAY_SPOTS } from './idleSpots';
 import { levelTags, type LevelTag } from './levelTags';
 import { linesOf } from './lineBook';
 import type { PickLine } from './lines';
 import { BUBBLE_RISE, DETAIL_SCALE, OVERHEAD_OFFSET } from './metrics';
+import { walkSegment } from './motion';
+import { playScene } from './murmurs';
 import { overheadLift, overheadSide, type Side } from './overhead';
 import type { Point } from './path';
 import { LOGICAL_WIDTH, TALLEST_WINDOW_EXTENTS } from './map';
@@ -173,4 +178,60 @@ describe('lines on starting to wait and level tags (remarks.ts)', () => {
     }
     expect(checked).toBeGreaterThan(0);
   });
+});
+
+describe('murmurs and level tags (murmurs.ts)', () => {
+  const SEAT_SCENES = ['work', 'idle', 'doze', 'sleepTalk'] as const;
+  const seeds = createAmbientSeeds(() => 0);
+  /** Everyone as drawn with `idle` (idle.ts) applied to `id`. */
+  const drawnWith = (id: MemberId, idle: IdlePose): MemberPose | undefined =>
+    frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS, {
+      moods: {},
+      seeds,
+      hasHoldFrames: () => false,
+      idle: { [id]: idle },
+    }).members.find((m) => m.id === id);
+
+  it.each([...EVERYONE, 'yukihiro' as const])(
+    '%s at the seat, awake, dozing or asleep: the longest murmur meets no tag nor window',
+    (id) => {
+      const seat = DEFAULT_SEATS[id];
+      const poses = [
+        frameAt(EMPTY_DIRECTOR, 0, DEFAULT_SEATS).members.find((m) => m.id === id),
+        drawnWith(id, idlePose({ kind: 'doze' }, seat, 0, 0)),
+        drawnWith(id, idlePose({ kind: 'sleep' }, seat, 0, 0)),
+      ];
+      let checked = 0;
+      for (const member of poses) {
+        if (member === undefined) throw new Error(`no ${id}`);
+        for (const scene of SEAT_SCENES) {
+          const line = pick(id, scene);
+          if (line === null) continue;
+          expectClear(member, line, 0);
+          checked += 1;
+        }
+      }
+      expect(checked).toBeGreaterThan(0);
+    },
+  );
+
+  const OUTINGS = EVERYONE.flatMap((id) => PLAY_SPOTS[id].map((spot) => ({ id, spot })));
+
+  it.each(OUTINGS)(
+    '$id at the $spot.kind spot: the longest murmur meets no tag nor window',
+    (o) => {
+      const out = walkSegment(o.spot.path, 0);
+      const outing = { spot: o.spot, out, back: walkSegment(o.spot.path, out.end + 10_000) };
+      const member = drawnWith(
+        o.id,
+        idlePose({ kind: 'play', outing }, DEFAULT_SEATS[o.id], 0, out.end),
+      );
+      if (member === undefined) throw new Error(`no ${o.id}`);
+      for (const hour of [7, 12, 17, 22]) {
+        const line = pick(o.id, playScene(o.spot.kind, hour));
+        if (line === null) throw new Error(`no line at ${o.spot.kind}`);
+        expectClear(member, line, hour);
+      }
+    },
+  );
 });
