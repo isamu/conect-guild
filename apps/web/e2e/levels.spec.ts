@@ -1,4 +1,9 @@
+import { drawnLevels, installCanvasTextRecorder } from './canvasText.ts';
 import { expect, test, waitForRoom } from './fixtures.ts';
+import { sampleSnapshot } from './sampleSnapshot.ts';
+
+/** The sample's levels as the canvas writes them (かなめ 4, the four departments 3, 2, 2, 3). */
+const SAMPLE_TAGS = ['Lv 2', 'Lv 2', 'Lv 3', 'Lv 3', 'Lv 4'];
 
 /**
  * Cumulative levels (Issue #19) from the sample's history: 経理 45, 広報 25, 企画 25, 総務 35 and
@@ -40,8 +45,30 @@ test('the levels do not make the party column taller than the room keeps free', 
   await page.setViewportSize({ width: 1024, height: 576 });
   await page.goto('/');
   await waitForRoom(page);
+  // Measure once all six rows (with their levels) are in.
+  await expect(
+    page.getByRole('region', { name: 'パーティのようす' }).getByRole('listitem'),
+  ).toHaveCount(6);
   // The fetch status sits under the party window: its bottom is the column's.
   const side = await page.getByRole('region', { name: '取得のようす' }).boundingBox();
   if (side === null) throw new Error('the fetch status has no box');
   expect(side.y + side.height).toBeLessThanOrEqual(340);
+});
+
+for (const hour of ['12', '21.5']) {
+  test(`the canvas writes 「Lv N」 under the five seats (?hour=${hour})`, async ({ page }) => {
+    await page.addInitScript(installCanvasTextRecorder);
+    await page.goto(`/?hour=${hour}`);
+    await waitForRoom(page);
+    await expect.poll(() => drawnLevels(page)).toEqual(SAMPLE_TAGS);
+  });
+}
+
+test('a halted screen writes no 「Lv N」 on the canvas', async ({ page, snapshotServer }) => {
+  await page.addInitScript(installCanvasTextRecorder);
+  snapshotServer.serve({ ...(await sampleSnapshot()), repo: 'someone/else' });
+  await page.goto('/');
+  await expect(page.getByRole('alert')).toContainText('収集の対象と設定が違います');
+  await waitForRoom(page);
+  expect(await drawnLevels(page)).toEqual([]);
 });
