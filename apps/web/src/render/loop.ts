@@ -9,6 +9,7 @@ import type { Random } from './confetti';
 import {
   EMPTY_DIRECTOR,
   frameAt,
+  hushed,
   isAnimating,
   prune,
   type Director,
@@ -30,7 +31,8 @@ import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './map';
 import { AMBIENT } from './metrics';
 import type { IdleSeeds, IdleSince } from './idle';
 import { createIdleCrew, playEvent, type IdleCrew } from './idleCrew';
-import { DEFAULT_SEATS } from './scenes';
+import { createLinePicker } from './lines';
+import { DEFAULT_SEATS, type SceneContext } from './scenes';
 import { createCalls, type CallView, type Calls } from './calls';
 import type { Speeches } from './summons';
 import { decorCuesOf, type DecorCues } from './trinkets';
@@ -67,6 +69,8 @@ export interface RenderLoopOptions {
   readonly random?: Random;
   /** Whether かなめ tosses a scroll (scenes.SceneContext.tossRandom); apart from `random`. */
   readonly tossRandom?: Random;
+  /** Which line a member says in a scene (lines.ts, Issue #47); apart from the other two. */
+  readonly lineRandom?: Random;
   readonly visibility?: PageVisibility;
   /** Epoch ms, for the long idle spells (idle.ts); they go on while the page is hidden. */
   readonly wallNow?: () => number;
@@ -82,7 +86,10 @@ export interface StageParty {
   readonly bubbles: Bubbles;
   readonly moods: AmbientMoods;
   readonly idleSince: IdleSince;
-  /** The screen is halted (not live): the king's calls are dropped, to come or playing. */
+  /**
+   * The screen is halted (not live): the king's calls are dropped, to come or playing, and so are
+   * the lines of the scenes (lines.ts).
+   */
   readonly halted: boolean;
 }
 
@@ -297,7 +304,7 @@ function createCast(
     calls,
     receive: (director, party, t) => {
       calls.setHalted(party.halted);
-      return crew.setSince(director, party.idleSince, t);
+      return crew.setSince(party.halted ? hushed(director) : director, party.idleSince, t);
     },
     frame: (director, t, moods) =>
       frameAt(director, t, DEFAULT_SEATS, {
@@ -321,14 +328,26 @@ function stageAt(
   return { ...view, cues: decorCuesOf(moods, director.bursts, t, view.frame.members) };
 }
 
+/**
+ * How the scenes are planned. The toss and the lines draw from sources of their own, never the
+ * injected `random`: an injected (reproducible) sequence keeps its confetti. All default to
+ * Math.random, which has no sequence anyone could reproduce, so sharing it is harmless.
+ */
+function sceneContext(options: RenderLoopOptions, random: Random): SceneContext {
+  return {
+    seats: DEFAULT_SEATS,
+    random,
+    tossRandom: options.tossRandom ?? Math.random,
+    pickLine: createLinePicker(options.lineRandom ?? Math.random),
+  };
+}
+
 export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   const { canvas, art } = options;
   const now = options.now ?? (() => performance.now());
   const localHour = options.localHour ?? (() => hourOf(new Date()));
   const random = options.random ?? Math.random;
-  // Never the injected `random`: an injected (reproducible) sequence keeps its confetti. Both
-  // default to Math.random, which has no sequence anyone could reproduce, so sharing it is harmless.
-  const tossRandom = options.tossRandom ?? Math.random;
+  const context = sceneContext(options, random);
   const painter = createPainter(context2d(canvas), art);
   const cast = createCast(art, random, options);
   const visibility = options.visibility ?? documentVisibility;
@@ -369,7 +388,6 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   return {
     play(event) {
       // Members out playing come back first; the scene waits for them (idleCrew.playEvent).
-      const context = { seats: DEFAULT_SEATS, random, tossRandom };
       director = playEvent(cast.crew, director, event, { t: stageNow(), context });
       refresh();
     },

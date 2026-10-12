@@ -1,6 +1,6 @@
 import type { MemberId } from '../guild.config';
 import type { GuildArt } from './art';
-import { bubbleShown, type BubbleKind, type Bubbles } from './bubbles';
+import type { BubbleKind, Bubbles } from './bubbles';
 import type { ConfettiView, MemberPose, StageFrame } from './director';
 import type { DecorPlacement } from './decor';
 import { drawAnimatedDecor } from './drawDecor';
@@ -9,6 +9,7 @@ import { GROUND } from './map';
 import type { IdleMark } from './idle';
 import { BUBBLE_RISE, DETAIL_SCALE, IDLE, OVERHEAD_OFFSET, TILE_SIZE } from './metrics';
 import { heldLook } from './hands';
+import { overheadLift, overheadOf, type Overhead } from './overhead';
 import type { Point } from './path';
 import type { SpeechLine, Speeches } from './summons';
 import { flyingItemPoint } from './toss';
@@ -78,7 +79,7 @@ interface BubbleSize {
 
 /** The waiting bubbles and the signs of a long idle spell: one glyph. */
 const SMALL_BUBBLE: BubbleSize = { font: 'bold 8px sans-serif', width: 11 };
-/** The words of the king's summons. */
+/** The words of the king's summons and the members' lines (lines.ts). */
 const SPEECH_BUBBLE: BubbleSize = { font: 'bold 7px sans-serif', width: null };
 
 /** A bubble to the upper right of the head, drawn in detail pixels. */
@@ -133,6 +134,9 @@ const SPEECH_COLORS: Readonly<Record<SpeechLine, string>> = {
   ゴニョゴニョ: '#222222',
   'はっ！': '#1a3a8a',
 };
+
+/** The members' lines (lineBook.ts) read best in the dark ink of the king's murmur. */
+const LINE_COLOR = '#222222';
 
 function drawMark(ctx: CanvasRenderingContext2D, mark: IdleMark, feet: Point): void {
   if (mark.kind === 'z') drawSleepZ(ctx, mark.rise, feet);
@@ -207,23 +211,30 @@ export function drawActors(
   drawFlights(ctx, stage.frame, art);
 }
 
+function drawOverheadOf(ctx: CanvasRenderingContext2D, shown: Overhead, feet: Point): void {
+  if (shown.kind === 'speech') {
+    const glyph = { glyph: shown.words, color: SPEECH_COLORS[shown.words] };
+    drawBubble(ctx, glyph, feet, SPEECH_BUBBLE);
+  } else if (shown.kind === 'line') {
+    drawBubble(ctx, { glyph: shown.words, color: LINE_COLOR }, feet, SPEECH_BUBBLE);
+  } else if (shown.kind === 'bubble') drawBubble(ctx, BUBBLE_GLYPHS[shown.bubble], feet);
+  else drawMark(ctx, shown.mark, feet);
+}
+
 /**
  * Over everything, after the shade of the night (drawDaylight.ts), so they read the same at any
- * hour: the words of the king's summons, else the bubbles of the members out of scenes (or the
- * signs of a long idle spell), and confetti.
+ * hour: one thing over each head (overhead.ts: the words of the king's summons, a line of a scene,
+ * the waiting bubble or the sign of a long idle spell), and confetti.
  */
 export function drawOverhead(
   ctx: CanvasRenderingContext2D,
   stage: { readonly frame: StageFrame; readonly bubbles: Bubbles; readonly speeches: Speeches },
 ): void {
+  const sources = { ...stage, lines: stage.frame.lines };
   for (const member of stage.frame.members) {
-    const speech = stage.speeches[member.id];
-    const bubble = bubbleShown(stage.bubbles, member);
-    if (speech !== undefined) {
-      const glyph = { glyph: speech, color: SPEECH_COLORS[speech] };
-      drawBubble(ctx, glyph, member.pose.point, SPEECH_BUBBLE);
-    } else if (bubble !== null) drawBubble(ctx, BUBBLE_GLYPHS[bubble], member.pose.point);
-    else if (member.mark !== null) drawMark(ctx, member.mark, member.pose.point);
+    const shown = overheadOf(member, sources);
+    const { x, y } = member.pose.point;
+    if (shown !== null) drawOverheadOf(ctx, shown, { x, y: y - overheadLift(member.pose) });
   }
   for (const view of stage.frame.confetti) drawConfetti(ctx, view);
 }
