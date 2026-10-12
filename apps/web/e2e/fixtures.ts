@@ -71,8 +71,8 @@ export async function waitForRoom(page: Page): Promise<CanvasStats> {
 }
 
 /** Waits until the first fetch stored the diff baseline (later changes then become events). */
-export async function waitForBaseline(page: Page): Promise<void> {
+export async function waitForBaseline(page: Page, timeout?: number): Promise<void> {
   await expect
-    .poll(() => page.evaluate((key) => localStorage.getItem(key), BASELINE_KEY))
+    .poll(() => page.evaluate((key) => localStorage.getItem(key), BASELINE_KEY), { timeout })
     .not.toBeNull();
 }

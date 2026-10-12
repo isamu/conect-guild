@@ -1,5 +1,6 @@
 import { claimDataDir } from './snapshotFile.ts';
 
-export default async function globalSetup(): Promise<void> {
-  await claimDataDir();
+/** Creates .data for the run; the returned function (the global teardown) removes it. */
+export default function globalSetup(): Promise<() => Promise<void>> {
+  return claimDataDir();
 }

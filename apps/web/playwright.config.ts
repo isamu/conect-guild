@@ -12,9 +12,11 @@ export default defineConfig({
   workers: 1,
   forbidOnly: ON_CI,
   retries: ON_CI ? 1 : 0,
-  reporter: ON_CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  // Next to this file, where the CI job uploads it from on failure.
+  reporter: ON_CI
+    ? [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]]
+    : 'list',
   globalSetup: './e2e/globalSetup.ts',
-  globalTeardown: './e2e/globalTeardown.ts',
   use: {
     baseURL: BASE_URL,
     headless: true,

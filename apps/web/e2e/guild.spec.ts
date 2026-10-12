@@ -2,6 +2,9 @@ import { installFakeAudio } from './fakeAudio.ts';
 import { BASELINE_KEY, expect, test, waitForBaseline, waitForRoom } from './fixtures.ts';
 import { sampleSnapshot, writeSnapshot } from './snapshotFile.ts';
 
+/** Longer than one refresh (5 s), for waits on the next fetch. */
+const REFRESH_TIMEOUT = 15_000;
+
 test('opens without console or page errors', async ({ page, pageErrors }) => {
   await page.goto('/');
   await expect(page.getByText('#101')).toBeVisible();
@@ -78,11 +81,21 @@ test('「基準を消す」 removes the baseline and the next fetch stores a new
 }) => {
   await page.goto('/');
   await waitForBaseline(page);
+  // Hold the refreshes, so none stores a new baseline before the check below.
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('/snapshot.json', async (route) => {
+    await gate;
+    await route.continue();
+  });
   await page.getByRole('button', { name: '基準を消す' }).click();
   await expect(page.getByText('基準を消しました')).toBeVisible();
   expect(await page.evaluate((key) => localStorage.getItem(key), BASELINE_KEY)).toBeNull();
-  // The next refresh (5 s) counts as the first load: a new baseline, no events.
-  await waitForBaseline(page);
+  // The next refresh counts as the first load: a new baseline, no events.
+  release();
+  await waitForBaseline(page, REFRESH_TIMEOUT);
   await expect(page.getByRole('region', { name: 'メッセージ' })).toContainText(
     'あたらしい できごとは まだ ない。',
   );

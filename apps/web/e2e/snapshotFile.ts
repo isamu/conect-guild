@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { snapshotSchema, type Snapshot } from '@conect-guild/snapshot';
@@ -12,26 +11,26 @@ const WEB_ROOT = path.resolve(import.meta.dirname, '..');
 const SAMPLE_FILE = path.join(WEB_ROOT, 'public', 'snapshot.sample.json');
 export const DATA_DIR = path.join(WEB_ROOT, '.data');
 const SNAPSHOT_FILE = path.join(DATA_DIR, 'snapshot.json');
-/** Left in .data while the tests own it; without it the directory may hold real data. */
-const OWNER_MARKER = path.join(DATA_DIR, '.e2e-owned');
 
 /** The fixed "now" of every test (12:00 in Tokyo). */
 export const NOW = Date.parse('2026-10-12T03:00:00.000Z');
 
-/** Takes .data for the run; refuses when it exists without the marker (real collector data). */
-export async function claimDataDir(): Promise<void> {
-  if (existsSync(DATA_DIR) && !existsSync(OWNER_MARKER)) {
+/**
+ * Creates .data for this run and returns how to remove it. Refuses when it already exists: it may
+ * hold the collector's real data (or be left by a run that was killed; then delete it by hand).
+ * Do not run the collector in the same checkout while the tests run.
+ */
+export async function claimDataDir(): Promise<() => Promise<void>> {
+  try {
+    // Not recursive: fails with EEXIST instead of taking over a directory that is already there.
+    await mkdir(DATA_DIR, { mode: 0o700 });
+  } catch (error) {
     throw new Error(
-      `${DATA_DIR} already exists (collector data?). The E2E tests do not touch it: run them in a checkout without it.`,
+      `Cannot create ${DATA_DIR} (it may hold the collector's real data). The E2E tests never use an existing one: move it away first.`,
+      { cause: error },
     );
   }
-  await mkdir(DATA_DIR, { recursive: true, mode: 0o700 });
-  await writeFile(OWNER_MARKER, '', { mode: 0o600 });
-}
-
-/** Removes .data, only when this run created it. */
-export async function releaseDataDir(): Promise<void> {
-  if (existsSync(OWNER_MARKER)) await rm(DATA_DIR, { recursive: true, force: true });
+  return () => rm(DATA_DIR, { recursive: true, force: true });
 }
 
 /** The sample, pointed at guild.settings.ts's repo and fetched at `at`. */
