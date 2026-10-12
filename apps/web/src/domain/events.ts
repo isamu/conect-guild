@@ -1,16 +1,20 @@
 import type { Snapshot, SnapshotIssue, SnapshotPr } from '@conect-guild/snapshot';
 import { EVENT_GAP_LIMIT_MS, type DepartmentLabel } from '../guild.config';
 import { repoFingerprint, toBaseline, type Baseline } from './baseline';
+import { levelUps, type MemberLevels } from './levelUp';
 import { assignPr, indexIssues, type IssueIndex } from './party';
 import { pickDepartment } from './quest';
 
-export type GuildEventKind = 'issue-opened' | 'pr-merged' | 'issue-closed';
+export type GuildEventKind = 'issue-opened' | 'pr-merged' | 'issue-closed' | 'level-up';
 
 export interface GuildEvent {
-  /** Kind + number, e.g. `issue-closed#123`. Unique within one diff. */
+  /**
+   * Kind + number, e.g. `issue-closed#123`; a level-up adds whose it is (`level-up:経理#4`; かなめ's is `level-up:kaname#4`).
+   * Unique within one diff.
+   */
   readonly id: string;
   readonly kind: GuildEventKind;
-  /** Issue number for issue events, PR number for `pr-merged`. */
+  /** Issue number for issue events, PR number for `pr-merged`, the level reached for `level-up`. */
   readonly number: number;
   /** Who acts in the scene; null means かなめ's reception (no department found). */
   readonly department: DepartmentLabel | null;
@@ -33,13 +37,17 @@ export interface DiffResult {
   readonly notice: DiffNotice | null;
 }
 
-const KIND_ORDER: readonly GuildEventKind[] = ['issue-opened', 'pr-merged', 'issue-closed'];
+/** The kinds read from the Issues and PRs (a level-up is read from the levels). */
+type ItemEventKind = Exclude<GuildEventKind, 'level-up'>;
+type ItemEvent = GuildEvent & { readonly kind: ItemEventKind };
+
+const KIND_ORDER: readonly ItemEventKind[] = ['issue-opened', 'pr-merged', 'issue-closed'];
 
 function makeEvent(
-  kind: GuildEventKind,
+  kind: ItemEventKind,
   number: number,
   department: DepartmentLabel | null,
-): GuildEvent {
+): ItemEvent {
   return { id: `${kind}#${String(number)}`, kind, number, department };
 }
 
@@ -51,7 +59,7 @@ function issueEvent(
   issue: SnapshotIssue,
   before: Baseline['issues'][number] | undefined,
   baselineAt: number,
-): GuildEventKind | null {
+): ItemEventKind | null {
   if (before === undefined) {
     if (issue.state === 'open') return 'issue-opened';
     // Opened and closed between two fetches: show only the clear.
@@ -82,11 +90,11 @@ function prMerged(
   return before.mergedAt === null;
 }
 
-function collectEvents(baseline: Baseline, snapshot: Snapshot, index: IssueIndex): GuildEvent[] {
+function collectEvents(baseline: Baseline, snapshot: Snapshot, index: IssueIndex): ItemEvent[] {
   const baselineAt = Date.parse(baseline.fetchedAt);
   const issuesBefore = new Map(baseline.issues.map((i) => [i.number, i]));
   const prsBefore = new Map(baseline.prs.map((p) => [p.number, p]));
-  const byId = new Map<string, GuildEvent>();
+  const byId = new Map<string, ItemEvent>();
   for (const issue of snapshot.issues) {
     const kind = issueEvent(issue, issuesBefore.get(issue.number), baselineAt);
     if (kind === null) continue;
@@ -104,11 +112,26 @@ function collectEvents(baseline: Baseline, snapshot: Snapshot, index: IssueIndex
 }
 
 /**
+ * One event per member whose level went up (two or more levels at once are one event), after the
+ * other events of the diff so the window reads 「クリアした！」 before 「あがった！」.
+ */
+function levelUpEvents(before: MemberLevels, after: MemberLevels): GuildEvent[] {
+  return levelUps(before, after).map(({ department, level }) => ({
+    id: `level-up:${department ?? 'kaname'}#${String(level)}`,
+    kind: 'level-up',
+    number: level,
+    department,
+  }));
+}
+
+/**
  * Compares the stored baseline with a freshly fetched and validated snapshot (docs/DESIGN.md 4.4).
  * - no baseline (absent, malformed or another version → pass null): no events, store the snapshot
  * - snapshot not newer than the baseline: nothing at all, keep the baseline (never rewind)
- * - baseline older than `gapLimitMs` before the snapshot: no events, store it, show the gap notice
- * - otherwise: opened / merged / closed events, each at most once, then store the snapshot
+ * - baseline older than `gapLimitMs` before the snapshot: store it, show the gap notice, and only
+ *   the level-ups (the levels are counted afresh from the whole history, so none is missed)
+ * - otherwise: opened / merged / closed events, each at most once, then the level-ups, then store
+ *   the snapshot
  * Call it only after a successful fetch; a failed fetch must leave the baseline alone.
  */
 export function diffSnapshot(
@@ -116,7 +139,8 @@ export function diffSnapshot(
   snapshot: Snapshot,
   gapLimitMs: number = EVENT_GAP_LIMIT_MS,
 ): DiffResult {
-  const replace: BaselineUpdate = { action: 'replace', baseline: toBaseline(snapshot) };
+  const next = toBaseline(snapshot);
+  const replace: BaselineUpdate = { action: 'replace', baseline: next };
   // A baseline of another repository (guild.settings.ts changed) counts as the first load.
   if (baseline?.repo !== repoFingerprint(snapshot.repo)) {
     return { events: [], baselineUpdate: replace, notice: null };
@@ -125,8 +149,11 @@ export function diffSnapshot(
   if (gap <= 0) return { events: [], baselineUpdate: { action: 'keep' }, notice: null };
   if (gap > gapLimitMs) {
     const notice: DiffNotice = { kind: 'gap-unrecoverable', message: GAP_NOTICE_MESSAGE };
-    return { events: [], baselineUpdate: replace, notice };
+    return { events: levelUpEvents(baseline.levels, next.levels), baselineUpdate: replace, notice };
   }
-  const events = collectEvents(baseline, snapshot, indexIssues(snapshot.issues));
+  const events = [
+    ...collectEvents(baseline, snapshot, indexIssues(snapshot.issues)),
+    ...levelUpEvents(baseline.levels, next.levels),
+  ];
   return { events, baselineUpdate: replace, notice: null };
 }
