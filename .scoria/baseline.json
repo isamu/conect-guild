@@ -1,0 +1,1677 @@
+{
+  "report": {
+    "schemaVersion": 1,
+    "root": ".",
+    "label": "conect-guild",
+    "profile": "app",
+    "stacks": [
+      "vue",
+      "ts"
+    ],
+    "complete": true,
+    "size": {
+      "files": 158,
+      "sloc": 8255,
+      "testSloc": 9530
+    },
+    "dimensions": [
+      {
+        "dimension": "architecture",
+        "status": "experimental",
+        "score": 69.455,
+        "coverage": 1,
+        "metrics": [
+          {
+            "metric": "knip.unused_export_ratio",
+            "value": 0.1203,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 0.2
+            },
+            "weight": 0.3,
+            "points": 11.955
+          },
+          {
+            "metric": "knip.unused_file_ratio",
+            "value": 0,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 0.3
+            },
+            "weight": 0.25,
+            "points": 25
+          },
+          {
+            "metric": "knip.unused_dependencies",
+            "value": 0,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 10
+            },
+            "weight": 0.2,
+            "points": 20
+          },
+          {
+            "metric": "circular.cycle_count",
+            "value": 4,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 8
+            },
+            "weight": 0.25,
+            "points": 12.5
+          }
+        ],
+        "confidence": "high",
+        "confidenceReason": "1 suppressions in scope"
+      },
+      {
+        "dimension": "correctness",
+        "status": "experimental",
+        "score": 55.154,
+        "coverage": 1,
+        "metrics": [
+          {
+            "metric": "oxlint.errors_per_kloc",
+            "value": 0.2423,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 3
+            },
+            "weight": 0.6,
+            "density": true,
+            "points": 55.154
+          },
+          {
+            "metric": "oxlint.violations_per_kloc",
+            "value": 10.1757,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 8
+            },
+            "weight": 0.4,
+            "density": true,
+            "points": 0,
+            "topContributors": [
+              {
+                "file": "apps/web/src/render/layers.test.ts",
+                "value": 9
+              },
+              {
+                "file": "packages/snapshot/src/settings.test.ts",
+                "value": 6
+              },
+              {
+                "file": "apps/web/src/render/director.test.ts",
+                "value": 5
+              },
+              {
+                "file": "apps/web/src/audio/scores.test.ts",
+                "value": 4
+              },
+              {
+                "file": "apps/web/src/render/trinkets.test.ts",
+                "value": 4
+              }
+            ]
+          }
+        ],
+        "confidence": "high",
+        "confidenceReason": "1 suppressions in scope"
+      },
+      {
+        "dimension": "documentation",
+        "status": "experimental",
+        "score": 100.0001,
+        "coverage": 0.75,
+        "metrics": [
+          {
+            "metric": "readme-contract.has_readme",
+            "value": 1,
+            "state": "ok",
+            "scale": {
+              "good": 1,
+              "bad": 0
+            },
+            "weight": 0.35,
+            "points": 46.6667
+          },
+          {
+            "metric": "readme-contract.readme_words",
+            "value": 359,
+            "state": "ok",
+            "scale": {
+              "good": 120,
+              "bad": 30
+            },
+            "weight": 0.2,
+            "points": 26.6667
+          },
+          {
+            "metric": "readme-contract.documented_flag_ratio",
+            "value": 0,
+            "state": "skipped",
+            "scale": {
+              "good": 1,
+              "bad": 0.5
+            },
+            "weight": 0.25,
+            "points": 0
+          },
+          {
+            "metric": "comment-quality.marker_per_kloc",
+            "value": 0,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 2
+            },
+            "weight": 0.2,
+            "density": true,
+            "points": 26.6667,
+            "topContributors": []
+          }
+        ],
+        "confidence": "high",
+        "confidenceReason": "1 suppressions in scope"
+      },
+      {
+        "dimension": "integrity",
+        "status": "experimental",
+        "score": 70.9409,
+        "coverage": 1,
+        "metrics": [
+          {
+            "metric": "suppression-scan.source_per_kloc",
+            "value": 0.1211,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 5
+            },
+            "weight": 0.3,
+            "density": true,
+            "points": 29.2734,
+            "topContributors": [
+              {
+                "file": "packages/collector/src/gh.ts",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "metric": "suppression-scan.unreasoned_ratio",
+            "value": 1,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 1
+            },
+            "weight": 0.2,
+            "points": 0
+          },
+          {
+            "metric": "suppression-scan.test_count",
+            "value": 0,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 200
+            },
+            "weight": 0.1,
+            "points": 10
+          },
+          {
+            "metric": "config-integrity.gap_ratio",
+            "value": 0,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 0.6
+            },
+            "weight": 0.25,
+            "points": 25
+          },
+          {
+            "metric": "ci-integrity.gap_ratio",
+            "value": 0.3333,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 0.6
+            },
+            "weight": 0.15,
+            "points": 6.6675
+          }
+        ],
+        "confidence": "high",
+        "confidenceReason": "no suppression signal wired"
+      },
+      {
+        "dimension": "readability",
+        "status": "experimental",
+        "score": 82.4881,
+        "coverage": 1,
+        "metrics": [
+          {
+            "metric": "file-shape.sloc_p95",
+            "value": 230,
+            "state": "ok",
+            "scale": {
+              "good": 150,
+              "bad": 800
+            },
+            "weight": 0.3,
+            "points": 26.3077,
+            "topContributors": [
+              {
+                "file": "apps/web/src/render/loop.ts",
+                "value": 317
+              },
+              {
+                "file": "apps/web/src/render/idle.ts",
+                "value": 288
+              },
+              {
+                "file": "apps/web/src/app/guildView.ts",
+                "value": 274
+              },
+              {
+                "file": "apps/web/src/render/trinkets.ts",
+                "value": 269
+              },
+              {
+                "file": "apps/web/src/render/map.ts",
+                "value": 230
+              }
+            ]
+          },
+          {
+            "metric": "file-shape.max_file_sloc",
+            "value": 317,
+            "state": "ok",
+            "scale": {
+              "good": 300,
+              "bad": 2000
+            },
+            "weight": 0.2,
+            "points": 19.8
+          },
+          {
+            "metric": "file-shape.god_file_count",
+            "value": 0,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 20
+            },
+            "weight": 0.15,
+            "points": 15
+          },
+          {
+            "metric": "jscpd.duplicated_lines_pct",
+            "value": 0.45,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 10
+            },
+            "weight": 0.2,
+            "points": 19.1,
+            "topContributors": [
+              {
+                "file": "apps/web/src/render/ambient.test.ts",
+                "value": 14
+              },
+              {
+                "file": "apps/web/src/domain/events.test.ts",
+                "value": 14
+              },
+              {
+                "file": "apps/web/src/adapters/snapshot.ts",
+                "value": 13
+              },
+              {
+                "file": "packages/collector/src/sessions.ts",
+                "value": 12
+              },
+              {
+                "file": "apps/web/src/app/lastActive.test.ts",
+                "value": 10
+              }
+            ]
+          },
+          {
+            "metric": "oxlint.violations_per_kloc",
+            "value": 10.1757,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 12
+            },
+            "weight": 0.15,
+            "density": true,
+            "points": 2.2804,
+            "topContributors": [
+              {
+                "file": "apps/web/src/render/layers.test.ts",
+                "value": 9
+              },
+              {
+                "file": "packages/snapshot/src/settings.test.ts",
+                "value": 6
+              },
+              {
+                "file": "apps/web/src/render/director.test.ts",
+                "value": 5
+              },
+              {
+                "file": "apps/web/src/audio/scores.test.ts",
+                "value": 4
+              },
+              {
+                "file": "apps/web/src/render/trinkets.test.ts",
+                "value": 4
+              }
+            ]
+          }
+        ],
+        "confidence": "high",
+        "confidenceReason": "1 suppressions in scope"
+      },
+      {
+        "dimension": "security",
+        "status": "experimental",
+        "score": 100,
+        "coverage": 1,
+        "metrics": [
+          {
+            "metric": "audit.critical",
+            "value": 0,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 1
+            },
+            "weight": 0.4,
+            "points": 40
+          },
+          {
+            "metric": "audit.high",
+            "value": 0,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 5
+            },
+            "weight": 0.35,
+            "points": 35
+          },
+          {
+            "metric": "audit.moderate",
+            "value": 0,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 20
+            },
+            "weight": 0.25,
+            "points": 25
+          }
+        ],
+        "confidence": "high",
+        "confidenceReason": "no suppression signal wired"
+      },
+      {
+        "dimension": "test-coverage",
+        "status": "experimental",
+        "score": 88.3666,
+        "coverage": 1,
+        "metrics": [
+          {
+            "metric": "test-presence.test_to_source_ratio",
+            "value": 1.1545,
+            "state": "ok",
+            "scale": {
+              "good": 0.5,
+              "bad": 0.05
+            },
+            "weight": 0.3,
+            "points": 30
+          },
+          {
+            "metric": "coverage.line_pct",
+            "value": 76.26,
+            "state": "ok",
+            "scale": {
+              "good": 90,
+              "bad": 40
+            },
+            "weight": 0.3,
+            "points": 21.756
+          },
+          {
+            "metric": "coverage.branch_pct",
+            "value": 84.81,
+            "state": "ok",
+            "scale": {
+              "good": 85,
+              "bad": 30
+            },
+            "weight": 0.25,
+            "points": 24.9136
+          },
+          {
+            "metric": "coverage.function_pct",
+            "value": 78.99,
+            "state": "ok",
+            "scale": {
+              "good": 90,
+              "bad": 40
+            },
+            "weight": 0.15,
+            "points": 11.697
+          }
+        ],
+        "confidence": "high",
+        "confidenceReason": "1 suppressions in scope"
+      },
+      {
+        "dimension": "type-safety",
+        "status": "experimental",
+        "score": 100,
+        "coverage": 1,
+        "metrics": [
+          {
+            "metric": "source-mix.untyped_sloc_ratio",
+            "value": 0,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 0.5
+            },
+            "weight": 0.3,
+            "points": 30
+          },
+          {
+            "metric": "source-mix.untyped_file_ratio",
+            "value": 0,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 0.5
+            },
+            "weight": 0.2,
+            "points": 20,
+            "topContributors": []
+          },
+          {
+            "metric": "tsc.type_errors_per_kloc",
+            "value": 0,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 2
+            },
+            "weight": 0.5,
+            "density": true,
+            "points": 50
+          }
+        ],
+        "confidence": "high",
+        "confidenceReason": "1 suppressions in scope"
+      },
+      {
+        "dimension": "ui-consistency",
+        "status": "experimental",
+        "score": 60.175,
+        "coverage": 1,
+        "metrics": [
+          {
+            "metric": "ui-token.color_cardinality",
+            "value": 19,
+            "state": "ok",
+            "scale": {
+              "good": 20,
+              "bad": 120
+            },
+            "weight": 0.3,
+            "points": 30,
+            "topContributors": [
+              {
+                "file": "apps/web/src/ui/PartyStatus.vue",
+                "value": 9
+              },
+              {
+                "file": "apps/web/src/ui/QuestBoard.vue",
+                "value": 7
+              },
+              {
+                "file": "apps/web/src/ui/KingBubble.vue",
+                "value": 3
+              },
+              {
+                "file": "apps/web/src/ui/FetchStatus.vue",
+                "value": 2
+              },
+              {
+                "file": "apps/web/src/ui/MessageWindow.vue",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "metric": "ui-token.spacing_cardinality",
+            "value": 35,
+            "state": "ok",
+            "scale": {
+              "good": 10,
+              "bad": 60
+            },
+            "weight": 0.3,
+            "points": 15,
+            "topContributors": [
+              {
+                "file": "apps/web/src/ui/QuestBoard.vue",
+                "value": 15
+              },
+              {
+                "file": "apps/web/src/ui/PartyStatus.vue",
+                "value": 14
+              },
+              {
+                "file": "apps/web/src/App.vue",
+                "value": 10
+              },
+              {
+                "file": "apps/web/src/ui/MessageWindow.vue",
+                "value": 10
+              },
+              {
+                "file": "apps/web/src/ui/FetchStatus.vue",
+                "value": 7
+              }
+            ]
+          },
+          {
+            "metric": "ui-token.inline_style_per_kloc",
+            "value": 2.4125,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 10
+            },
+            "weight": 0.2,
+            "density": true,
+            "points": 15.175
+          },
+          {
+            "metric": "ui-token.style_block_ratio",
+            "value": 1,
+            "state": "ok",
+            "scale": {
+              "good": 0,
+              "bad": 0.6
+            },
+            "weight": 0.2,
+            "points": 0
+          }
+        ],
+        "confidence": "high",
+        "confidenceReason": "1 suppressions in scope"
+      }
+    ],
+    "metrics": {
+      "suppression-scan.source_count": 1,
+      "suppression-scan.test_count": 0,
+      "suppression-scan.source_per_kloc": 0.1211,
+      "suppression-scan.unreasoned_source_count": 1,
+      "suppression-scan.unreasoned_ratio": 1,
+      "file-shape.sloc_p95": 230,
+      "file-shape.max_file_sloc": 317,
+      "file-shape.god_file_count": 0,
+      "file-shape.source_file_count": 83,
+      "file-shape.source_sloc": 8255,
+      "source-mix.untyped_file_ratio": 0,
+      "source-mix.untyped_sloc_ratio": 0,
+      "source-mix.untyped_file_count": 0,
+      "source-mix.typed_file_count": 83,
+      "config-integrity.gap_ratio": 0,
+      "config-integrity.gap_count": 0,
+      "ci-integrity.gap_ratio": 0.3333,
+      "ci-integrity.gap_count": 2,
+      "ci-integrity.workflow_count": 2,
+      "oxlint.violations_per_kloc": 10.1757,
+      "oxlint.violations": 84,
+      "oxlint.errors_per_kloc": 0.2423,
+      "jscpd.duplicated_lines_pct": 0.45,
+      "jscpd.clone_count": 11,
+      "tsc.type_errors": 0,
+      "tsc.type_errors_per_kloc": 0,
+      "knip.unused_files": 0,
+      "knip.unused_file_ratio": 0,
+      "knip.unused_export_ratio": 0.1203,
+      "knip.unused_exports": 19,
+      "knip.unused_dependencies": 0,
+      "audit.critical": 0,
+      "audit.high": 0,
+      "audit.moderate": 0,
+      "audit.low": 0,
+      "test-presence.test_to_source_ratio": 1.1545,
+      "test-presence.test_sloc": 9530,
+      "test-presence.test_file_count": 69,
+      "coverage.line_pct": 76.26,
+      "coverage.branch_pct": 84.81,
+      "coverage.function_pct": 78.99,
+      "circular.cycle_count": 4,
+      "readme-contract.has_readme": 1,
+      "readme-contract.readme_words": 359,
+      "comment-quality.marker_per_kloc": 0,
+      "comment-quality.marker_count": 0,
+      "comment-quality.comment_density": 0.225,
+      "ui-token.color_cardinality": 19,
+      "ui-token.spacing_cardinality": 35,
+      "ui-token.inline_style_per_kloc": 2.4125,
+      "ui-token.style_block_ratio": 1,
+      "ui-token.ui_file_count": 8
+    },
+    "findings": [
+      {
+        "rule": "eslint-disable-no-reason",
+        "severity": "error",
+        "file": "packages/collector/src/gh.ts",
+        "line": 21,
+        "message": "suppresses an ESLint rule, with no reason given",
+        "probe": "suppression-scan",
+        "dimension": "integrity",
+        "tier": 0
+      },
+      {
+        "rule": "ci-step-lint",
+        "severity": "warning",
+        "file": "package.json",
+        "line": 1,
+        "message": "CI does not run `lint`",
+        "probe": "ci-integrity",
+        "dimension": "integrity",
+        "tier": 0
+      },
+      {
+        "rule": "ci-step-typecheck",
+        "severity": "warning",
+        "file": "package.json",
+        "line": 1,
+        "message": "CI does not run `typecheck`",
+        "probe": "ci-integrity",
+        "dimension": "integrity",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-await-in-loop",
+        "severity": "warning",
+        "file": "packages/collector/src/run.ts",
+        "line": 1,
+        "message": "Unexpected `await` inside a loop.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-await-in-loop",
+        "severity": "warning",
+        "file": "packages/collector/src/run.ts",
+        "line": 1,
+        "message": "Unexpected `await` inside a loop.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-await-in-loop",
+        "severity": "warning",
+        "file": "packages/collector/src/run.test.ts",
+        "line": 1,
+        "message": "Unexpected `await` inside a loop.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/loadArt.ts",
+        "line": 1,
+        "message": "Function `load` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/vite-plugin-snapshot.test.ts",
+        "line": 1,
+        "message": "Function `resolveDone` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-array-sort",
+        "severity": "warning",
+        "file": "apps/web/src/audio/scores.test.ts",
+        "line": 1,
+        "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-useless-spread",
+        "severity": "error",
+        "file": "apps/web/src/audio/scores.test.ts",
+        "line": 1,
+        "message": "Using a spread operator here creates a new array unnecessarily.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-array-sort",
+        "severity": "warning",
+        "file": "apps/web/src/audio/scores.test.ts",
+        "line": 1,
+        "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-useless-spread",
+        "severity": "error",
+        "file": "apps/web/src/audio/scores.test.ts",
+        "line": 1,
+        "message": "Using a spread operator here creates a new array unnecessarily.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/app/guildView.test.ts",
+        "line": 1,
+        "message": "Function `live` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/idle.test.ts",
+        "line": 1,
+        "message": "Function `still` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-array-reverse",
+        "severity": "warning",
+        "file": "apps/web/src/render/idle.test.ts",
+        "line": 1,
+        "message": "Use `Array#toReversed()` instead of `Array#reverse()`.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/director.test.ts",
+        "line": 1,
+        "message": "Function `drawnAt` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/director.test.ts",
+        "line": 1,
+        "message": "Function `member` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/director.test.ts",
+        "line": 1,
+        "message": "Function `member` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/director.test.ts",
+        "line": 1,
+        "message": "Function `member` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-array-sort",
+        "severity": "warning",
+        "file": "apps/web/src/render/director.test.ts",
+        "line": 1,
+        "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/app/guildView.ts",
+        "line": 1,
+        "message": "Function `pad` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/trinkets.papers.test.ts",
+        "line": 1,
+        "message": "Function `look` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/domain/party.test.ts",
+        "line": 1,
+        "message": "Function `input` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/domain/party.test.ts",
+        "line": 1,
+        "message": "Function `minori` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/map.test.ts",
+        "line": 1,
+        "message": "Function `byName` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-array-sort",
+        "severity": "warning",
+        "file": "apps/web/src/render/map.test.ts",
+        "line": 1,
+        "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-array-sort",
+        "severity": "warning",
+        "file": "apps/web/src/render/map.test.ts",
+        "line": 1,
+        "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/app/lastActive.test.ts",
+        "line": 1,
+        "message": "Function `setup` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-await-in-loop",
+        "severity": "warning",
+        "file": "packages/collector/src/limit.test.ts",
+        "line": 1,
+        "message": "Unexpected `await` inside a loop.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-await-in-loop",
+        "severity": "warning",
+        "file": "packages/collector/src/limit.test.ts",
+        "line": 1,
+        "message": "Unexpected `await` inside a loop.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-await-in-loop",
+        "severity": "warning",
+        "file": "packages/collector/src/limit.test.ts",
+        "line": 1,
+        "message": "Unexpected `await` inside a loop.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "packages/collector/src/sessionFiles.test.ts",
+        "line": 1,
+        "message": "Function `id` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/app/guildStore.events.test.ts",
+        "line": 1,
+        "message": "Function `heads` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-array-sort",
+        "severity": "warning",
+        "file": "packages/collector/src/links.ts",
+        "line": 1,
+        "message": "Use `Array#toSorted()` instead of `Array#sort()`.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/idle.ts",
+        "line": 1,
+        "message": "Function `same` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-array-reverse",
+        "severity": "warning",
+        "file": "apps/web/src/render/idle.ts",
+        "line": 1,
+        "message": "Use `Array#toReversed()` instead of `Array#reverse()`.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-map-spread",
+        "severity": "warning",
+        "file": "apps/web/src/audio/judge.test.ts",
+        "line": 1,
+        "message": "Spreading to modify object properties in `map` calls is inefficient",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-shadow",
+        "severity": "warning",
+        "file": "apps/web/src/render/ambient.ts",
+        "line": 1,
+        "message": "'seed' is already declared in the upper scope.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-shadow",
+        "severity": "warning",
+        "file": "apps/web/src/render/ambient.ts",
+        "line": 1,
+        "message": "'seed' is already declared in the upper scope.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-await-in-loop",
+        "severity": "warning",
+        "file": "packages/collector/src/limit.ts",
+        "line": 1,
+        "message": "Unexpected `await` inside a loop.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-await-in-loop",
+        "severity": "warning",
+        "file": "packages/collector/src/collect.test.ts",
+        "line": 1,
+        "message": "Unexpected `await` inside a loop.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/consistent-function-scoping",
+        "severity": "warning",
+        "file": "apps/web/src/render/ambient.test.ts",
+        "line": 1,
+        "message": "Function `at` does not capture any variables from its parent scope",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "oxlint/no-array-reverse",
+        "severity": "warning",
+        "file": "packages/snapshot/src/index.test.ts",
+        "line": 1,
+        "message": "Use `Array#toReversed()` instead of `Array#reverse()`.",
+        "probe": "oxlint",
+        "dimension": "correctness",
+        "tier": 0
+      },
+      {
+        "rule": "duplicated-block",
+        "severity": "warning",
+        "file": "apps/web/src/render/director.test.ts",
+        "line": 234,
+        "message": "6 duplicated lines",
+        "probe": "jscpd",
+        "dimension": "readability",
+        "tier": 0
+      },
+      {
+        "rule": "duplicated-block",
+        "severity": "warning",
+        "file": "apps/web/src/render/ambient.test.ts",
+        "line": 273,
+        "message": "14 duplicated lines",
+        "probe": "jscpd",
+        "dimension": "readability",
+        "tier": 0
+      },
+      {
+        "rule": "duplicated-block",
+        "severity": "warning",
+        "file": "apps/web/src/domain/events.test.ts",
+        "line": 89,
+        "message": "6 duplicated lines",
+        "probe": "jscpd",
+        "dimension": "readability",
+        "tier": 0
+      },
+      {
+        "rule": "duplicated-block",
+        "severity": "warning",
+        "file": "apps/web/src/domain/events.test.ts",
+        "line": 171,
+        "message": "8 duplicated lines",
+        "probe": "jscpd",
+        "dimension": "readability",
+        "tier": 0
+      },
+      {
+        "rule": "duplicated-block",
+        "severity": "warning",
+        "file": "apps/web/src/audio/controller.test.ts",
+        "line": 54,
+        "message": "6 duplicated lines",
+        "probe": "jscpd",
+        "dimension": "readability",
+        "tier": 0
+      },
+      {
+        "rule": "duplicated-block",
+        "severity": "warning",
+        "file": "apps/web/src/app/lastActive.test.ts",
+        "line": 16,
+        "message": "10 duplicated lines",
+        "probe": "jscpd",
+        "dimension": "readability",
+        "tier": 0
+      },
+      {
+        "rule": "duplicated-block",
+        "severity": "warning",
+        "file": "apps/web/src/app/guildStore.test.ts",
+        "line": 280,
+        "message": "9 duplicated lines",
+        "probe": "jscpd",
+        "dimension": "readability",
+        "tier": 0
+      },
+      {
+        "rule": "duplicated-block",
+        "severity": "warning",
+        "file": "apps/web/src/adapters/snapshot.ts",
+        "line": 50,
+        "message": "13 duplicated lines",
+        "probe": "jscpd",
+        "dimension": "readability",
+        "tier": 0
+      },
+      {
+        "rule": "duplicated-block",
+        "severity": "warning",
+        "file": "packages/collector/src/sessions.ts",
+        "line": 131,
+        "message": "12 duplicated lines",
+        "probe": "jscpd",
+        "dimension": "readability",
+        "tier": 0
+      },
+      {
+        "rule": "duplicated-block",
+        "severity": "warning",
+        "file": "packages/collector/src/run.loop.test.ts",
+        "line": 192,
+        "message": "10 duplicated lines",
+        "probe": "jscpd",
+        "dimension": "readability",
+        "tier": 0
+      },
+      {
+        "rule": "duplicated-block",
+        "severity": "warning",
+        "file": "packages/collector/src/run.fixtures.test-util.ts",
+        "line": 76,
+        "message": "7 duplicated lines",
+        "probe": "jscpd",
+        "dimension": "readability",
+        "tier": 0
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "packages/collector/src/gh.ts",
+        "line": 1,
+        "message": "`GH_MAX_BUFFER` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "packages/collector/src/run.ts",
+        "line": 1,
+        "message": "`toSnapshotSessions` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "packages/collector/src/run.ts",
+        "line": 1,
+        "message": "`sessionsSummary` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "packages/collector/src/run.ts",
+        "line": 1,
+        "message": "`isGithubDue` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "packages/collector/src/build.ts",
+        "line": 1,
+        "message": "`RECENT_WINDOW_MS` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "packages/collector/src/run.fixtures.test-util.ts",
+        "line": 1,
+        "message": "`SECRET_BODY` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "packages/collector/src/sessions.ts",
+        "line": 1,
+        "message": "`activityEntrySchema` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "apps/web/vite-plugin-snapshot.ts",
+        "line": 1,
+        "message": "`SNAPSHOT_ROUTE` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "apps/web/vite-plugin-snapshot.ts",
+        "line": 1,
+        "message": "`SNAPSHOT_DATA_DIR` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "apps/web/src/adapters/snapshot.ts",
+        "line": 1,
+        "message": "`DEFAULT_SNAPSHOT_TIMEOUT_MS` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "apps/web/src/audio/judge.ts",
+        "line": 1,
+        "message": "`EVENT_CUES` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "apps/web/src/audio/player.ts",
+        "line": 1,
+        "message": "`defaultCreateAudioContext` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "apps/web/src/domain/baseline.ts",
+        "line": 1,
+        "message": "`baselineSchema` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "apps/web/src/app/messageQueue.ts",
+        "line": 1,
+        "message": "`nextShowAt` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "apps/web/src/render/map.ts",
+        "line": 1,
+        "message": "`TILE_SIZE` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "apps/web/src/render/map.ts",
+        "line": 1,
+        "message": "`PARTY_TALLEST_BOTTOM` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "apps/web/src/render/map.ts",
+        "line": 1,
+        "message": "`rect` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "apps/web/src/render/map.ts",
+        "line": 1,
+        "message": "`buildGround` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "unused-export",
+        "severity": "warning",
+        "file": "apps/web/src/render/hands.ts",
+        "line": 1,
+        "message": "`FRAMES_WITH_HOLDS` is exported but never imported",
+        "probe": "knip",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "circular-dependency",
+        "severity": "warning",
+        "file": "apps/web/src/render/ambient.ts",
+        "line": 1,
+        "message": "import cycle: apps/web/src/render/ambient.ts → apps/web/src/render/confetti.ts → apps/web/src/render/path.ts → apps/web/src/render/map.ts → apps/web/src/render/decor.ts → apps/web/src/render/ambient.ts",
+        "probe": "circular",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "circular-dependency",
+        "severity": "warning",
+        "file": "apps/web/src/render/map.ts",
+        "line": 1,
+        "message": "import cycle: apps/web/src/render/map.ts → apps/web/src/render/decor.ts → apps/web/src/render/map.ts",
+        "probe": "circular",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "circular-dependency",
+        "severity": "warning",
+        "file": "apps/web/src/render/ambient.ts",
+        "line": 1,
+        "message": "import cycle: apps/web/src/render/ambient.ts → apps/web/src/render/confetti.ts → apps/web/src/render/path.ts → apps/web/src/render/map.ts → apps/web/src/render/decor.ts → apps/web/src/render/trinkets.ts → apps/web/src/render/ambient.ts",
+        "probe": "circular",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "circular-dependency",
+        "severity": "warning",
+        "file": "apps/web/src/render/path.ts",
+        "line": 1,
+        "message": "import cycle: apps/web/src/render/path.ts → apps/web/src/render/map.ts → apps/web/src/render/decor.ts → apps/web/src/render/trinkets.ts → apps/web/src/render/path.ts",
+        "probe": "circular",
+        "dimension": "architecture",
+        "tier": 1
+      },
+      {
+        "rule": "style-block",
+        "severity": "warning",
+        "file": "apps/web/src/App.vue",
+        "line": 1,
+        "message": "a style block, where a utility class or a token would be shared",
+        "probe": "ui-token",
+        "dimension": "ui-consistency",
+        "tier": 0
+      },
+      {
+        "rule": "style-block",
+        "severity": "warning",
+        "file": "apps/web/src/ui/FetchStatus.vue",
+        "line": 1,
+        "message": "a style block, where a utility class or a token would be shared",
+        "probe": "ui-token",
+        "dimension": "ui-consistency",
+        "tier": 0
+      },
+      {
+        "rule": "style-block",
+        "severity": "warning",
+        "file": "apps/web/src/ui/GuildCanvas.vue",
+        "line": 1,
+        "message": "a style block, where a utility class or a token would be shared",
+        "probe": "ui-token",
+        "dimension": "ui-consistency",
+        "tier": 0
+      },
+      {
+        "rule": "style-block",
+        "severity": "warning",
+        "file": "apps/web/src/ui/KingBubble.vue",
+        "line": 1,
+        "message": "a style block, where a utility class or a token would be shared",
+        "probe": "ui-token",
+        "dimension": "ui-consistency",
+        "tier": 0
+      },
+      {
+        "rule": "style-block",
+        "severity": "warning",
+        "file": "apps/web/src/ui/MessageWindow.vue",
+        "line": 1,
+        "message": "a style block, where a utility class or a token would be shared",
+        "probe": "ui-token",
+        "dimension": "ui-consistency",
+        "tier": 0
+      },
+      {
+        "rule": "style-block",
+        "severity": "warning",
+        "file": "apps/web/src/ui/PartyStatus.vue",
+        "line": 1,
+        "message": "a style block, where a utility class or a token would be shared",
+        "probe": "ui-token",
+        "dimension": "ui-consistency",
+        "tier": 0
+      },
+      {
+        "rule": "style-block",
+        "severity": "warning",
+        "file": "apps/web/src/ui/QuestBoard.vue",
+        "line": 1,
+        "message": "a style block, where a utility class or a token would be shared",
+        "probe": "ui-token",
+        "dimension": "ui-consistency",
+        "tier": 0
+      },
+      {
+        "rule": "style-block",
+        "severity": "warning",
+        "file": "apps/web/src/ui/SoundControl.vue",
+        "line": 1,
+        "message": "a style block, where a utility class or a token would be shared",
+        "probe": "ui-token",
+        "dimension": "ui-consistency",
+        "tier": 0
+      }
+    ],
+    "probes": [
+      {
+        "probe": "suppression-scan",
+        "status": {
+          "kind": "ok"
+        },
+        "tools": []
+      },
+      {
+        "probe": "file-shape",
+        "status": {
+          "kind": "ok"
+        },
+        "tools": []
+      },
+      {
+        "probe": "source-mix",
+        "status": {
+          "kind": "ok"
+        },
+        "tools": []
+      },
+      {
+        "probe": "config-integrity",
+        "status": {
+          "kind": "ok"
+        },
+        "tools": []
+      },
+      {
+        "probe": "ci-integrity",
+        "status": {
+          "kind": "ok"
+        },
+        "tools": []
+      },
+      {
+        "probe": "oxlint",
+        "status": {
+          "kind": "ok"
+        },
+        "tools": [
+          "oxlint"
+        ]
+      },
+      {
+        "probe": "jscpd",
+        "status": {
+          "kind": "ok"
+        },
+        "tools": [
+          "jscpd"
+        ]
+      },
+      {
+        "probe": "tsc",
+        "status": {
+          "kind": "ok"
+        },
+        "tools": [
+          "typescript"
+        ]
+      },
+      {
+        "probe": "knip",
+        "status": {
+          "kind": "ok"
+        },
+        "tools": [
+          "knip"
+        ]
+      },
+      {
+        "probe": "audit",
+        "status": {
+          "kind": "ok"
+        },
+        "tools": [
+          "npm"
+        ]
+      },
+      {
+        "probe": "test-presence",
+        "status": {
+          "kind": "ok"
+        },
+        "tools": []
+      },
+      {
+        "probe": "coverage",
+        "status": {
+          "kind": "ok"
+        },
+        "tools": []
+      },
+      {
+        "probe": "circular",
+        "status": {
+          "kind": "ok"
+        },
+        "tools": [
+          "madge"
+        ]
+      },
+      {
+        "probe": "readme-contract",
+        "status": {
+          "kind": "ok"
+        },
+        "tools": []
+      },
+      {
+        "probe": "comment-quality",
+        "status": {
+          "kind": "ok"
+        },
+        "tools": []
+      },
+      {
+        "probe": "ui-token",
+        "status": {
+          "kind": "ok"
+        },
+        "tools": []
+      }
+    ],
+    "toolVersions": {
+      "oxlint": "Version: 1.87.0",
+      "jscpd": "4.3.0",
+      "typescript": "6.0.3",
+      "knip": "6.41.0",
+      "npm": "11.19.1",
+      "madge": "8.0.0"
+    },
+    "overall": {
+      "score": 80.7311,
+      "scoredDimensions": 9,
+      "comparable": false
+    }
+  },
+  "createdAt": "2026-10-12T05:07:24.948Z"
+}

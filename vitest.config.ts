@@ -6,5 +6,21 @@ export default defineConfig({
   plugins: [vue()],
   test: {
     include: ['apps/web/src/**/*.test.ts', 'apps/web/*.test.ts', 'packages/**/*.test.ts'],
+    // Used only by `npm run test:coverage`; scoria reads coverage/lcov.info.
+    coverage: {
+      provider: 'v8',
+      reporter: ['lcov', 'text-summary'],
+      reportsDirectory: 'coverage',
+      // Implementation files only; tool configs (vite/vitest/eslint) are left out.
+      include: [
+        'apps/web/src/**/*.{ts,vue}',
+        'apps/web/vite-plugin-snapshot.ts',
+        'packages/*/src/**/*.ts',
+        'packages/collector/collector.config.ts',
+        'guild.settings.ts',
+        'assets/*/*.ts',
+      ],
+      exclude: ['**/*.test.ts', '**/*.test-util.ts', '**/*.d.ts'],
+    },
   },
 });

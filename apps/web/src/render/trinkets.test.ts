@@ -28,6 +28,10 @@ import {
 
 const PICTURE = TILE_SIZE;
 const byName = (a: string, b: string) => a.localeCompare(b);
+/** Everybody at their seat (trinkets.seat.test.ts covers members away). */
+const AT_SEAT = (['kaname', 'minori', 'hibiki', 'hirame', 'sasae', 'yukihiro'] as const).map(
+  (id) => ({ id, atSeat: true }),
+);
 
 describe('decorCuesOf', () => {
   it('counts a department member at desk work as working, not かなめ or the king', () => {
@@ -38,15 +42,15 @@ describe('decorCuesOf', () => {
       hirame: 'desk-work',
       yukihiro: 'idle',
     };
-    const cues = decorCuesOf(moods, [], 0);
+    const cues = decorCuesOf(moods, [], 0, AT_SEAT);
     expect([...cues.working].sort(byName)).toEqual(['hirame', 'minori']);
     expect(cues.awaitingPresident).toBe(false);
     expect(cues.clearedAt).toEqual({});
   });
 
   it('knows the king waits while he fidgets', () => {
-    expect(decorCuesOf({ yukihiro: 'fidget' }, [], 0).awaitingPresident).toBe(true);
-    expect(decorCuesOf({}, [], 0).awaitingPresident).toBe(false);
+    expect(decorCuesOf({ yukihiro: 'fidget' }, [], 0, AT_SEAT).awaitingPresident).toBe(true);
+    expect(decorCuesOf({}, [], 0, AT_SEAT).awaitingPresident).toBe(false);
   });
 
   it('keeps the latest confetti start for each member', () => {
@@ -58,6 +62,7 @@ describe('decorCuesOf', () => {
         { actor: 'minori', start: 100 },
       ],
       600,
+      AT_SEAT,
     );
     expect(cues.clearedAt).toEqual({ sasae: 500, minori: 100 });
   });
@@ -68,13 +73,13 @@ describe('decorCuesOf', () => {
       { actor: 'hirame', start: 5_000 },
       { actor: 'sasae', start: 1_000 - CONFETTI.durationMs },
     ] as const;
-    expect(decorCuesOf({}, bursts, 1_500).clearedAt).toEqual({ hirame: 1_000 });
-    expect(decorCuesOf({}, bursts, 999).clearedAt).toEqual({
+    expect(decorCuesOf({}, bursts, 1_500, AT_SEAT).clearedAt).toEqual({ hirame: 1_000 });
+    expect(decorCuesOf({}, bursts, 999, AT_SEAT).clearedAt).toEqual({
       sasae: 1_000 - CONFETTI.durationMs,
     });
-    expect(decorCuesOf({}, bursts, 1_000).clearedAt).toEqual({ hirame: 1_000 });
-    expect(decorCuesOf({}, bursts, 1_000 + CONFETTI.durationMs).clearedAt).toEqual({});
-    expect(decorCuesOf({}, bursts, 5_000).clearedAt).toEqual({ hirame: 5_000 });
+    expect(decorCuesOf({}, bursts, 1_000, AT_SEAT).clearedAt).toEqual({ hirame: 1_000 });
+    expect(decorCuesOf({}, bursts, 1_000 + CONFETTI.durationMs, AT_SEAT).clearedAt).toEqual({});
+    expect(decorCuesOf({}, bursts, 5_000, AT_SEAT).clearedAt).toEqual({ hirame: 5_000 });
   });
 
   it('keeps a banner fluttering while a later confetti is still to come', () => {
@@ -82,7 +87,7 @@ describe('decorCuesOf', () => {
       { actor: 'hirame', start: 1_000 },
       { actor: 'sasae', start: 2_000 },
     ] as const;
-    const cues = decorCuesOf({}, bursts, 1_500);
+    const cues = decorCuesOf({}, bursts, 1_500, AT_SEAT);
     expect(activeSince({ kind: 'cleared', members: ['hirame', 'sasae'] }, cues)).toBe(1_000);
   });
 });
