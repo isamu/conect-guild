@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DEPARTMENT_LABELS, REPO_PATTERN } from './settings.ts';
+import { DEPARTMENT_LABELS } from './settings.ts';
 
 /** Bump when the snapshot shape changes; the web app refuses other versions. */
 export const SNAPSHOT_SCHEMA_VERSION = 2;
@@ -69,7 +69,7 @@ export const snapshotSessionsSchema = z.discriminatedUnion('status', [
 export const githubPartSchema = z.strictObject({
   schemaVersion: z.literal(SNAPSHOT_SCHEMA_VERSION),
   fetchedAt: isoDateTime,
-  repo: z.string().regex(REPO_PATTERN),
+  repo: z.string().regex(/^[\w.-]+\/[\w.-]+$/),
   issues: z.array(snapshotIssueSchema),
   prs: z.array(snapshotPrSchema),
 });

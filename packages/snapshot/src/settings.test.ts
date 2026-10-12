@@ -58,12 +58,24 @@ describe('checkGuildSettings', () => {
 });
 
 describe('guildSettingsSchema', () => {
-  it.each(['', 'owner', 'owner/name/extra', 'owner/na me', 'https://github.com/o/r'])(
-    'rejects repo %j',
-    (repo) => {
-      expect(rejects({ ...settings(), repo })).toBe(true);
-    },
-  );
+  it.each([
+    '',
+    'owner',
+    'owner/name/extra',
+    'owner/na me',
+    'https://github.com/o/r',
+    '../x',
+    'owner/..',
+    'owner/.',
+    '-owner/name',
+    'own_er/name',
+  ])('rejects repo %j', (repo) => {
+    expect(rejects({ ...settings(), repo })).toBe(true);
+  });
+
+  it.each(['o/r', 'my-org/repo.name_2', 'Owner9/.github', 'a/..x'])('accepts repo %j', (repo) => {
+    expect(rejects({ ...settings(), repo })).toBe(false);
+  });
 
   it('rejects unknown keys at the top and in entries', () => {
     expect(rejects({ ...settings(), extra: 1 })).toBe(true);
