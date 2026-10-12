@@ -127,6 +127,44 @@ describe('messageQueue: messages wait for their scene', () => {
   });
 });
 
+describe('messageQueue: a scroll tossed or walked to a near desk (render/toss.ts)', () => {
+  // みのり holds the scroll up longer after the walk than after a toss, then brings a chest.
+  const run = [event('issue-opened', '経理', 1), event('pr-merged', '経理', 2)];
+
+  it.each([
+    ['walks', 0.5],
+    ['tosses', 0],
+  ])('starts the next scene with its message whether the canvas %s', async (_how, draw) => {
+    const { queue, shown } = setup();
+    queue.push(run.map((e) => entry(e)));
+    await vi.advanceTimersByTimeAsync(60_000);
+    queue.dispose();
+    const canvas = { seats: DEFAULT_SEATS, random: () => draw };
+    let director: Director = EMPTY_DIRECTOR;
+    for (const { message, at } of shown) {
+      if (message.event === null) throw new Error('every message here has a scene');
+      expect(castFreeAt(director, message.event, at)).toBe(at);
+      director = scheduleEvent(director, message.event, at, canvas);
+    }
+    expect(shown).toHaveLength(2);
+  });
+
+  it('paces with the walk: the next message waits until みのり is done with the walked scroll', async () => {
+    const { queue, shown } = setup();
+    queue.push(run.map((e) => entry(e)));
+    await vi.advanceTimersByTimeAsync(60_000);
+    queue.dispose();
+    const walked = scheduleEvent(
+      EMPTY_DIRECTOR,
+      run[0] ?? event('issue-opened', '経理', 1),
+      T0,
+      context,
+    );
+    expect(walked.busyUntil.minori).toBeGreaterThan(T0 + HOLD_MS);
+    expect(shown.map((s) => s.at)).toEqual([T0, walked.busyUntil.minori]);
+  });
+});
+
 describe('messageQueue: hidden page', () => {
   it('does not move on while the page is hidden, and keeps the rest of the hold', async () => {
     const { queue, shown } = setup();
