@@ -3,6 +3,7 @@ import type { CompanySeat } from '../collector.config.ts';
 import {
   latestCompanySessionIds,
   readSeatStates,
+  seatStatesOf,
   sessionStateOf,
   settledLines,
   type ActivityEntry,
@@ -275,6 +276,38 @@ describe('readSeatStates', () => {
     const toString = new Map([[ROOT, 'toString']]);
     const result = readSeatStates('{}', SEATS, toString);
     expect(result.ok && result.members[0]).toEqual({ department: null, state: 'idle' });
+  });
+});
+
+describe('seatStatesOf: other keys are not touched', () => {
+  /** The file as parsed, recording every key listed or read. Another key throws when read. */
+  function watchedFile(file: Record<string, unknown>) {
+    const read: string[] = [];
+    let listed = false;
+    const proxy = new Proxy(file, {
+      get(target, key, receiver) {
+        if (typeof key === 'string') read.push(key);
+        if (key === OTHER) throw new Error('another key was read');
+        const value: unknown = Reflect.get(target, key, receiver);
+        return value;
+      },
+      ownKeys(target) {
+        listed = true;
+        return Reflect.ownKeys(target);
+      },
+    });
+    return { proxy, read, listed: () => listed };
+  }
+
+  it('reads only the company ids, never listing or reading another (broken) key', () => {
+    const file = watchedFile({
+      [OTHER]: { working: 'broken' },
+      [KANAME]: { working: true, waiting: false, event: null },
+    });
+    const result = seatStatesOf(file.proxy, SEATS, SEAT_IDS);
+    expect(result.ok && result.members[0]).toEqual({ department: null, state: 'working' });
+    expect(file.listed()).toBe(false);
+    expect(file.read).toEqual([KANAME]);
   });
 });
 

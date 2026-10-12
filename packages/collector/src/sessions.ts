@@ -106,8 +106,6 @@ export const activityEntrySchema = z.object({
 
 export type ActivityEntry = z.infer<typeof activityEntrySchema>;
 
-const activityFileSchema = z.record(z.string(), z.unknown());
-
 /**
  * The rules, top first: a Notification while waiting asks for a permission; a turn in progress is
  * working; any other wait (Stop, MarkedUnread) finished a turn; no entry is idle.
@@ -143,6 +141,11 @@ function parseJson(text: string): { ok: true; value: unknown } | { ok: false } {
 
 type EntryLookup = { ok: true; entry: ActivityEntry | undefined } | { ok: false };
 
+/** The file must be a JSON object (not an array). Its keys are not walked or copied. */
+function isJsonObject(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function lookupEntry(file: Readonly<Record<string, unknown>>, id: string | undefined): EntryLookup {
   if (id === undefined || !Object.hasOwn(file, id)) return { ok: true, entry: undefined };
   const entry = activityEntrySchema.safeParse(file[id]);
@@ -150,9 +153,9 @@ function lookupEntry(file: Readonly<Record<string, unknown>>, id: string | undef
 }
 
 /**
- * Each seat's state from the activity-state.json text. Only the seats' ids are looked up; other
- * keys are never read. The file is rewritten in place by MulmoTerminal, so an empty or half
- * written text is normal now and then: it fails this cycle and the next one reads it again.
+ * Each seat's state from the activity-state.json text. The file is rewritten in place by
+ * MulmoTerminal, so an empty or half written text is normal now and then: it fails this cycle and
+ * the next one reads it again.
  */
 export function readSeatStates(
   activityText: string,
@@ -161,11 +164,22 @@ export function readSeatStates(
 ): SessionsReading {
   const json = parseJson(activityText);
   if (!json.ok) return { ok: false, kind: 'parse-failed' };
-  const file = activityFileSchema.safeParse(json.value);
-  if (!file.success) return { ok: false, kind: 'invalid' };
+  return seatStatesOf(json.value, seats, ids);
+}
+
+/**
+ * Each seat's state from the parsed activity-state.json. Only the seats' ids are looked up (own
+ * keys, each entry checked by zod); other keys are never listed, read or copied.
+ */
+export function seatStatesOf(
+  file: unknown,
+  seats: readonly CompanySeat[],
+  ids: ReadonlyMap<string, string>,
+): SessionsReading {
+  if (!isJsonObject(file)) return { ok: false, kind: 'invalid' };
   const members: SnapshotSession[] = [];
   for (const seat of seats) {
-    const lookup = lookupEntry(file.data, ids.get(seat.cwd));
+    const lookup = lookupEntry(file, ids.get(seat.cwd));
     if (!lookup.ok) return { ok: false, kind: 'invalid' };
     members.push({ department: seat.department, state: sessionStateOf(lookup.entry) });
   }
