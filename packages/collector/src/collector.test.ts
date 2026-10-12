@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { COLLECTOR_CONFIG } from '../collector.config.ts';
+import { COLLECTOR_CONFIG, expandHome } from '../collector.config.ts';
 import { parseCliArgs } from './args.ts';
 
 describe('COLLECTOR_CONFIG', () => {
@@ -37,6 +37,18 @@ describe('COLLECTOR_CONFIG.sessions', () => {
     expect(COLLECTOR_CONFIG.sessions.activityStatePath).toBe(
       `${homedir()}/.mulmoterminal/activity-state.json`,
     );
+  });
+});
+
+describe('expandHome', () => {
+  it.each([
+    ['~', '/home/me'],
+    ['~/conect-management', '/home/me/conect-management'],
+    ['~/a/b c', '/home/me/a/b c'],
+    ['/srv/company', '/srv/company'],
+    ['/srv/~/x', '/srv/~/x'],
+  ])('turns %j into %j', (dir, expected) => {
+    expect(expandHome(dir, '/home/me')).toBe(expected);
   });
 });
 
