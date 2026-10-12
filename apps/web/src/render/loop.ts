@@ -31,6 +31,8 @@ import { AMBIENT } from './metrics';
 import type { IdleSeeds, IdleSince } from './idle';
 import { createIdleCrew, playEvent, type IdleCrew } from './idleCrew';
 import { DEFAULT_SEATS } from './scenes';
+import { createCalls, type CallView, type Calls } from './calls';
+import type { Speeches } from './summons';
 import { decorCuesOf, type DecorCues } from './trinkets';
 
 /**
@@ -70,6 +72,8 @@ export interface RenderLoopOptions {
   readonly wallNow?: () => number;
   /** Members in a scene at `at` (epoch ms), on every frame that shows them in one. */
   readonly onActive?: (ids: readonly MemberId[], at: number) => void;
+  /** A call of the king (summons.ts) starts on the stage now: its sound rings with it. */
+  readonly onCallStart?: () => void;
   /** The idle spells' per-member salts, so the narration tells the same outings (Issue #30). */
   readonly idleSeeds?: IdleSeeds;
 }
@@ -78,11 +82,19 @@ export interface StageParty {
   readonly bubbles: Bubbles;
   readonly moods: AmbientMoods;
   readonly idleSince: IdleSince;
+  /** The screen is halted (not live): the king's calls are dropped, to come or playing. */
+  readonly halted: boolean;
 }
 
 export interface RenderLoop {
   /** Starts the scene for an event now (or when its cast is free); dropped while not shown. */
   play(event: GuildEvent): void;
+  /**
+   * The king calls the members the president gave an order to (summons.ts, Issue #28), now or
+   * after the call still playing. Dropped while the page is hidden or the canvas not shown: the
+   * moment has passed by the time it is seen. A call cut off by a hide goes on after it.
+   */
+  summon(members: readonly MemberId[]): void;
   /**
    * What the party state shows on the stage: the waiting bubbles, the ambient moves, and since
    * when each member has had nothing to do (idle.ts; a member whose time changes while out playing
@@ -227,6 +239,7 @@ interface Moment {
   readonly hour: number;
   readonly frame: StageFrame;
   readonly bubbles: Bubbles;
+  readonly speeches: Speeches;
   readonly cues: DecorCues;
 }
 
@@ -256,12 +269,20 @@ function createPainter(ctx: CanvasRenderingContext2D, art: GuildArt): Painter {
   return { ctx, scratch: { ctx: context2d(image), image }, background, front, art };
 }
 
-/** The members' small moves and long idle spells over the director's scenes. */
+interface Cast {
+  readonly crew: IdleCrew;
+  readonly calls: Calls;
+  frame(director: Director, t: number, moods: AmbientMoods): StageFrame;
+  /** Takes a new party: the idle times (members whose time changed walk back) and the halt. */
+  receive(director: Director, party: StageParty, t: number): Director;
+}
+
+/** The members' small moves and long idle spells over the director's scenes, and the king's calls. */
 function createCast(
   art: GuildArt,
   random: Random,
-  options: Pick<RenderLoopOptions, 'wallNow' | 'onActive' | 'idleSeeds'>,
-): { crew: IdleCrew; frame: (director: Director, t: number, moods: AmbientMoods) => StageFrame } {
+  options: Pick<RenderLoopOptions, 'wallNow' | 'onActive' | 'onCallStart' | 'idleSeeds'>,
+): Cast {
   const seeds = createAmbientSeeds(random);
   const hasHoldFrames = (id: MemberId): boolean => art.sprites.hasHoldFrames(id);
   const crew = createIdleCrew({
@@ -270,8 +291,14 @@ function createCast(
     wallNow: options.wallNow ?? (() => Date.now()),
     onActive: options.onActive,
   });
+  const calls = createCalls(options);
   return {
     crew,
+    calls,
+    receive: (director, party, t) => {
+      calls.setHalted(party.halted);
+      return crew.setSince(director, party.idleSince, t);
+    },
     frame: (director, t, moods) =>
       frameAt(director, t, DEFAULT_SEATS, {
         moods,
@@ -280,6 +307,18 @@ function createCast(
         idle: crew.frame(director, t),
       }),
   };
+}
+
+/** What the stage shows at `t`: the members with the king's call, its words, the small things. */
+function stageAt(
+  cast: Cast,
+  director: Director,
+  t: number,
+  moods: AmbientMoods,
+): CallView & { readonly cues: DecorCues } {
+  // The king woken by the end of a call (onActive) never leaves the throne: `director` stays good.
+  const view = cast.calls.view(() => cast.frame(director, t, moods), t);
+  return { ...view, cues: decorCuesOf(moods, director.bursts, t, view.frame.members) };
 }
 
 export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
@@ -304,11 +343,11 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
 
   function draw(): void {
     const t = stageNow();
-    const frame = cast.frame(director, t, moods);
-    const cues = decorCuesOf(moods, director.bursts, t, frame.members);
-    paint(painter, scale, { now: t, hour: localHour(), frame, bubbles, cues });
+    const { frame, speeches, calling, cues } = stageAt(cast, director, t, moods);
+    paint(painter, scale, { now: t, hour: localHour(), frame, bubbles, speeches, cues });
     director = prune(director, t);
-    const ambient = Object.keys(moods).length > 0 || ANIMATED_DECOR.length > 0;
+    // A call needs no more than the ambient pace: its words and turns change every few hundred ms.
+    const ambient = Object.keys(moods).length > 0 || ANIMATED_DECOR.length > 0 || calling;
     const next = nextDraw({ hidden: paused(), animating: isAnimating(director, t), ambient });
     if (next === 'frame') schedule.now();
     if (next === 'ambient') schedule.later();
@@ -334,9 +373,12 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
       director = playEvent(cast.crew, director, event, { t: stageNow(), context });
       refresh();
     },
+    summon(members) {
+      if (cast.calls.add(members, paused() ? null : stageNow())) schedule.now();
+    },
     setParty(party) {
       ({ bubbles, moods } = party);
-      director = cast.crew.setSince(director, party.idleSince, stageNow());
+      director = cast.receive(director, party, stageNow());
       schedule.now();
     },
     resize(nextCssWidth, pixelRatio) {

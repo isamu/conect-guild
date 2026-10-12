@@ -1,0 +1,9 @@
+{
+  // Read by madge, which scoria runs for its cycle check (scoria passes no tsconfig itself). Issue #44.
+  // Without a tsConfig, madge resolves the imports of a .vue file as JavaScript: it reuses the AST of
+  // whichever .js file it parsed last, or parses the .vue file as JavaScript and stops with a
+  // SyntaxError, and extensionless imports of .ts files from .vue files are dropped from the graph.
+  // With one, they go through TypeScript's resolver, independent of the order files are read in.
+  // The file must start with "{": rc reads anything else as INI.
+  "tsConfig": "apps/web/tsconfig.app.json"
+}

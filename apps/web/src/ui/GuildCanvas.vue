@@ -8,6 +8,7 @@ import {
   type SceneCue,
 } from '../app/guildView';
 import type { KeyValueStore } from '../adapters/storage';
+import type { Summons } from '../app/guildStore';
 import { createLastActiveTracker } from '../app/lastActive';
 import { ambientMoodsOf } from '../render/ambient';
 import type { GuildArt } from '../render/art';
@@ -24,6 +25,10 @@ const props = defineProps<{
   cue: SceneCue | null;
   /** Per-member salts of the idle spells, shared with the narration (Issue #30). */
   idleSeeds: IdleSeeds;
+  /** The president's latest order: the king calls those members when its id changes (Issue #28). */
+  summons: Summons | null;
+  /** The screen is halted: the king's calls stop (to come and playing). */
+  halted: boolean;
   /** Where the idle times are kept; localStorage when absent (the demo keeps them in memory). */
   lastActiveStorage?: KeyValueStore;
 }>();
@@ -33,6 +38,8 @@ const emit = defineEmits<{
   stageShown: [shown: boolean];
   /** Since when each member has had nothing to do, on every change (for the narration). */
   idleSince: [since: IdleSince];
+  /** A call of the king starts on the stage now (its sound rings with it, Issue #28). */
+  callStarted: [];
 }>();
 
 const canvas = useTemplateRef<HTMLCanvasElement>('canvas');
@@ -53,7 +60,7 @@ function setIdleSince(next: IdleSince): void {
 }
 
 function stageParty(rows: readonly PartyRow[]): StageParty {
-  return { bubbles: bubblesOf(rows), moods: ambientMoodsOf(rows), idleSince };
+  return { bubbles: bubblesOf(rows), moods: ambientMoodsOf(rows), idleSince, halted: props.halted };
 }
 
 /**
@@ -78,6 +85,9 @@ function start(element: HTMLCanvasElement, art: GuildArt): void {
     art,
     ...(fixedHour === null ? {} : { localHour: () => fixedHour }),
     idleSeeds: props.idleSeeds,
+    onCallStart: () => {
+      emit('callStarted');
+    },
     onActive: (ids, at) => {
       setIdleSince(lastActive.markActive(ids, at));
       loop?.setParty(stageParty(props.party));
@@ -126,6 +136,21 @@ watch(
   (rows) => {
     setIdleSince(lastActive.observe(rows, Date.now()));
     loop?.setParty(stageParty(rows));
+  },
+);
+
+watch(
+  () => props.halted,
+  () => {
+    loop?.setParty(stageParty(props.party));
+  },
+);
+
+// Not kept for later: an order seen while the pictures load or the canvas is out of sight is past.
+watch(
+  () => props.summons?.id,
+  () => {
+    if (props.summons !== null) loop?.summon(props.summons.members);
   },
 );
 

@@ -25,6 +25,7 @@ const {
   fetchStatus,
   message,
   cue,
+  summons,
   nextMessage,
   clearBaseline,
   setStageShown,
@@ -33,6 +34,7 @@ const {
   settings: soundSettings,
   toggleSound,
   cycleVolume,
+  callStarted,
 } = useSound({ message, party, halted: () => state.halted }, demo?.storage);
 const { narration, next, idleSeeds, setIdleSince } = useNarration({
   message,
@@ -51,8 +53,11 @@ const { narration, next, idleSeeds, setIdleSince } = useNarration({
         :party="party"
         :cue="cue"
         :idle-seeds="idleSeeds"
+        :summons="summons"
+        :halted="state.halted"
         :last-active-storage="demo?.storage"
         @stage-shown="setStageShown"
+        @call-started="callStarted"
         @idle-since="setIdleSince"
       />
       <section v-if="state.halted" class="rpg-window stage__halt" role="alert">

@@ -4,7 +4,7 @@ import type { GuildEvent, GuildEventKind } from '../domain/events';
 import { createSoundController, type SoundScreen } from './controller';
 import type { PartyMember } from './judge';
 import type { TonePlayer } from './player';
-import { SCORES, type Score, type SoundCue } from './scores';
+import { SCORES, scoreLengthMs, type Score, type SoundCue } from './scores';
 import { SOUND_STORAGE_KEY, VOLUME_GAIN } from './settings';
 
 class FakeStorage implements StorageLike {
@@ -25,12 +25,14 @@ class FakeStorage implements StorageLike {
   }
 }
 
-const CUES: readonly SoundCue[] = ['scroll', 'chest', 'clear', 'permission', 'text'];
+const CUES: readonly SoundCue[] = ['scroll', 'chest', 'clear', 'permission', 'summon', 'text'];
 
 /** Records what would ring, by cue name. */
 class FakePlayer implements TonePlayer {
   readonly played: { cue: SoundCue | 'unknown'; volume: number }[] = [];
   unlocks = 0;
+  /** As while the AudioContext is suspended: nothing sounds and play() says so. */
+  suspended = false;
 
   unlock(): Promise<void> {
     this.unlocks += 1;
@@ -38,6 +40,7 @@ class FakePlayer implements TonePlayer {
   }
 
   play(score: Score, volume: number): boolean {
+    if (this.suspended) return false;
     const cue = CUES.find((key) => SCORES[key] === score);
     this.played.push({ cue: cue ?? 'unknown', volume });
     return true;
@@ -66,7 +69,13 @@ function setup(stored?: { enabled: boolean; volume: 1 | 2 | 3 }) {
   const storage = new FakeStorage();
   if (stored !== undefined) storage.items.set(SOUND_STORAGE_KEY, JSON.stringify(stored));
   const player = new FakePlayer();
-  const controller = createSoundController({ player, storage: createKeyValueStore(() => storage) });
+  // A steady clock the tests move by hand (ms).
+  const clock = { now: 0 };
+  const controller = createSoundController({
+    player,
+    storage: createKeyValueStore(() => storage),
+    now: () => clock.now,
+  });
   let screen: SoundScreen = { halted: false, party: [], message: null };
   let nextId = 1;
   /** Hands over the screen with `patch` applied, as the one watcher in app/useSound.ts does. */
@@ -79,7 +88,7 @@ function setup(stored?: { enabled: boolean; volume: 1 | 2 | 3 }) {
     id: nextId++,
     event: kind === null ? null : event(kind),
   });
-  return { storage, player, controller, show, message };
+  return { storage, player, controller, show, message, clock };
 }
 
 describe('createSoundController: settings', () => {
@@ -238,5 +247,77 @@ describe('createSoundController: permissions', () => {
     muted.controller.toggle();
     muted.show({ party: party('minori') });
     expect(cues(muted.player).filter((cue) => cue === 'permission')).toEqual([]);
+  });
+});
+
+describe("createSoundController: the king's call", () => {
+  it('rings each time a call starts on the stage, including calls in a row', () => {
+    const { player, controller, clock } = setup({ enabled: true, volume: 2 });
+    controller.callStarted();
+    // The second order of a row starts once the first call is over (render/summons.ts).
+    clock.now = 3_700;
+    controller.callStarted();
+    expect(cues(player)).toEqual(['summon', 'summon']);
+  });
+
+  it('is silent while muted, hidden or halted, and does not catch up', () => {
+    const { player, controller, show } = setup({ enabled: true, volume: 2 });
+    controller.setHidden(true);
+    controller.callStarted();
+    controller.setHidden(false);
+    show({ halted: true });
+    controller.callStarted();
+    show({ halted: false });
+    expect(player.played).toEqual([]);
+
+    const muted = setup();
+    muted.controller.callStarted();
+    muted.controller.toggle();
+    expect(cues(muted.player).filter((cue) => cue === 'summon')).toEqual([]);
+  });
+});
+
+describe("createSoundController: the king's call gives way", () => {
+  it('gives way to a sound still playing, and rings once it is over', () => {
+    const { player, controller, show, message, clock } = setup({ enabled: true, volume: 2 });
+    show({ message: message('pr-merged') });
+    clock.now = scoreLengthMs(SCORES.chest) - 1;
+    controller.callStarted();
+    expect(cues(player)).toEqual(['chest']);
+    clock.now = scoreLengthMs(SCORES.chest);
+    controller.callStarted();
+    expect(cues(player)).toEqual(['chest', 'summon']);
+  });
+
+  it('waits for the longest of the sounds that started together', () => {
+    const { player, controller, show, message, clock } = setup({ enabled: true, volume: 2 });
+    show({ party: party() });
+    // The permission rings first, then the shorter blips of a notice.
+    show({ party: party('minori'), message: message(null) });
+    const longest = Math.max(scoreLengthMs(SCORES.permission), scoreLengthMs(SCORES.text));
+    clock.now = longest - 1;
+    controller.callStarted();
+    expect(cues(player)).toEqual(['permission', 'text']);
+    clock.now = longest;
+    controller.callStarted();
+    expect(cues(player)).toEqual(['permission', 'text', 'summon']);
+  });
+
+  it('does not give way to a sound that did not ring (the audio was suspended)', () => {
+    const { player, controller, show, message, clock } = setup({ enabled: true, volume: 2 });
+    player.suspended = true;
+    show({ message: message('pr-merged') });
+    player.suspended = false;
+    clock.now = 10;
+    controller.callStarted();
+    expect(cues(player)).toEqual(['summon']);
+  });
+
+  it('does not make other sounds wait (only the call gives way)', () => {
+    const { player, controller, show } = setup({ enabled: true, volume: 2 });
+    show({ party: party() });
+    controller.callStarted();
+    show({ party: party('minori') });
+    expect(cues(player)).toEqual(['summon', 'permission']);
   });
 });
