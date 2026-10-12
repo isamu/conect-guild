@@ -72,6 +72,7 @@ describe('the places', () => {
   it('finds the pet by its one name, in front of it', () => {
     const pet = DECOR_PLACEMENTS.find((item) => item.name === PET_DECOR);
     const tile = petTile();
+    expect(PET_DECOR).toBe('sleeping-poodle');
     expect(pet).toBeDefined();
     expect(tile).toEqual({ col: pet?.col, row: (pet?.row ?? 0) + (pet?.h ?? 0) });
   });
