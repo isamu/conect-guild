@@ -25,9 +25,16 @@ export interface DemoSession {
   readonly guildOptions: GuildStoreOptions;
   /** In memory: the sound settings and the idle times of the demo stay in the page. */
   readonly storage: KeyValueStore;
+  /** False until the canvas has its pictures: はじめる waits for it (and says so). */
+  readonly ready: Readonly<Ref<boolean>>;
   /** False until はじめる: the script waits at its start (an empty board). */
   readonly started: Readonly<Ref<boolean>>;
-  /** はじめる: the script starts now. Only the first call counts. */
+  /**
+   * The canvas runs (GuildCanvas `ready`). Before it, the king's call at the script's head would be
+   * dropped (calls seen while the pictures load are not kept), with its sound.
+   */
+  markReady(): void;
+  /** はじめる: the script starts now. Only the first call once ready counts; before, it does nothing. */
   start(): void;
 }
 
@@ -35,6 +42,7 @@ export function createDemoSession(now: () => number = Date.now): DemoSession {
   const memory = createMemoryStorage();
   const storage = createKeyValueStore(() => memory);
   storage.write(SOUND_STORAGE_KEY, DEMO_SOUND);
+  const ready = shallowRef(false);
   const started = shallowRef(false);
   let startedAt: number | null = null;
   return {
@@ -49,9 +57,13 @@ export function createDemoSession(now: () => number = Date.now): DemoSession {
       refreshIntervalMs: DEMO_REFRESH_INTERVAL_MS,
     },
     storage,
+    ready,
     started,
+    markReady() {
+      ready.value = true;
+    },
     start() {
-      if (startedAt !== null) return;
+      if (!ready.value || startedAt !== null) return;
       startedAt = now();
       started.value = true;
     },

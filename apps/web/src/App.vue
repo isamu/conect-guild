@@ -59,6 +59,7 @@ const { narration, next, idleSeeds, setIdleSince } = useNarration({
         @stage-shown="setStageShown"
         @call-started="callStarted"
         @idle-since="setIdleSince"
+        @ready="demo?.markReady()"
       />
       <section v-if="state.halted" class="rpg-window stage__halt" role="alert">
         <template v-if="state.haltReason === 'repo-mismatch'">
@@ -84,7 +85,12 @@ const { narration, next, idleSeeds, setIdleSince } = useNarration({
           :narration="narration"
           @next="next"
         />
-        <DemoStart v-if="demoWaiting" class="stage__demo" @start="demo?.start()" />
+        <DemoStart
+          v-if="demoWaiting"
+          class="stage__demo"
+          :ready="demo?.ready.value ?? false"
+          @start="demo?.start()"
+        />
       </template>
       <div class="stage__side">
         <PartyStatus v-if="!state.halted" class="stage__party" :rows="party" />

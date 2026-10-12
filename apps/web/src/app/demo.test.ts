@@ -79,6 +79,7 @@ describe('the demo session', () => {
     const { demo, store, heads, run } = setup();
     store.start();
     await run(2_000);
+    demo.markReady();
     demo.start();
     await run(2 * DEMO_LOOP_MS);
     // Two loops: six messages each, all from the fictional script.
@@ -100,6 +101,7 @@ describe('the demo session', () => {
   it('starts once: a second はじめる does not rewind the script', async () => {
     const { demo, store, heads, run } = setup();
     store.start();
+    demo.markReady();
     demo.start();
     await run(15_000);
     const seen = heads.length;
@@ -112,6 +114,27 @@ describe('the demo session', () => {
 });
 
 describe('the demo, alone', () => {
+  it('ignores はじめる before the canvas is ready, so the first call of the king is not lost', async () => {
+    vi.useFakeTimers({ now: START });
+    const { demo, store, run } = setup();
+    store.start();
+    demo.start();
+    await run(10_000);
+    // The script did not start: no order, no scroll, the button still waits.
+    expect(demo.started.value).toBe(false);
+    expect(store.state.summons).toBeNull();
+    expect(store.state.snapshot?.issues).toEqual([]);
+
+    demo.markReady();
+    expect(demo.ready.value).toBe(true);
+    demo.start();
+    await run(2_000);
+    expect(demo.started.value).toBe(true);
+    expect(store.state.summons?.members).toEqual(['kaname']);
+    store.stop();
+    vi.useRealTimers();
+  });
+
   it('reads the script often, so the events follow it closely', async () => {
     vi.useFakeTimers({ now: START });
     const demo = createDemoSession(() => Date.now());

@@ -40,6 +40,8 @@ const emit = defineEmits<{
   idleSince: [since: IdleSince];
   /** A call of the king starts on the stage now (its sound rings with it, Issue #28). */
   callStarted: [];
+  /** The pictures are in and the stage runs: scenes and calls from now on are played. */
+  ready: [];
 }>();
 
 const canvas = useTemplateRef<HTMLCanvasElement>('canvas');
@@ -99,6 +101,7 @@ function start(element: HTMLCanvasElement, art: GuildArt): void {
   running.resize(cssWidth ?? element.clientWidth, globalThis.devicePixelRatio);
   // Messages may have reached the window while the pictures were loading.
   playCues();
+  emit('ready');
 }
 
 /** Follows the displayed width, from mount on, so the message queue knows it before the art. */
