@@ -14,7 +14,7 @@ import {
 } from './director';
 import { linesOf, type LineScene } from './lineBook';
 import { createLinePicker, type PickLine, type Utterance } from './lines';
-import { sceneContext, sceneContextWhile, scenesShown } from './loop';
+import { isQuiet, sceneContext, sceneContextWhile, scenesShown } from './loop';
 import { LINES, TOSS } from './metrics';
 import {
   DEFAULT_SEATS,
@@ -338,5 +338,27 @@ describe('scenes played while halted (sceneContextWhile)', () => {
       sceneContextWhile(ctx, false),
     );
     expect(live.lines).toHaveLength(2);
+  });
+});
+
+describe('isQuiet', () => {
+  it('is quiet while halted or while the canvas has no width, and only then', () => {
+    expect(isQuiet(true, 300)).toBe(true);
+    expect(isQuiet(false, 0)).toBe(true);
+    expect(isQuiet(true, 0)).toBe(true);
+    expect(isQuiet(false, 300)).toBe(false);
+  });
+
+  it('keeps the lines said last those that were seen: a dropped scene picks none', () => {
+    const lines = noted(9);
+    const ctx = sceneContext({ lineRandom: lines.random }, () => 0.5);
+    const hidden = scheduleEvent(
+      EMPTY_DIRECTOR,
+      event('issue-closed', '経理'),
+      0,
+      sceneContextWhile(ctx, isQuiet(false, 0)),
+    );
+    expect(scenesShown(hidden, 0)).toEqual(EMPTY_DIRECTOR);
+    expect(lines.given).toEqual([]);
   });
 });

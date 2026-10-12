@@ -355,9 +355,18 @@ export function sceneContext(
   };
 }
 
-/** While halted no lines are picked: the lines of the scenes are dropped then (StageParty.halted). */
-export function sceneContextWhile(context: SceneContext, halted: boolean): SceneContext {
-  return halted ? { ...context, pickLine: undefined } : context;
+/**
+ * True when a scene played now says nothing: halted (its lines are dropped then: StageParty.halted)
+ * or the canvas is out of sight (the scene itself is dropped: scenesShown). No line is picked for
+ * it, so the lines said last stay those that were seen.
+ */
+export function isQuiet(halted: boolean, cssWidth: number): boolean {
+  return halted || !isShown(cssWidth);
+}
+
+/** The context without the picker while quiet (isQuiet). */
+export function sceneContextWhile(context: SceneContext, quiet: boolean): SceneContext {
+  return quiet ? { ...context, pickLine: undefined } : context;
 }
 
 export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
@@ -406,7 +415,7 @@ export function startRenderLoop(options: RenderLoopOptions): RenderLoop {
   return {
     play(event) {
       // Members out playing come back first; the scene waits for them (idleCrew.playEvent).
-      const quiet = sceneContextWhile(context, party.halted);
+      const quiet = sceneContextWhile(context, isQuiet(party.halted, cssWidth));
       director = playEvent(cast.crew, director, event, { t: stageNow(), context: quiet });
       refresh();
     },
