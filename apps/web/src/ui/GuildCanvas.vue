@@ -68,13 +68,16 @@ function stageParty(rows: readonly PartyRow[]): StageParty {
   return { bubbles: bubblesOf(rows), moods: ambientMoodsOf(rows), idleSince, halted: props.halted };
 }
 
+/** True when the stage could not start: there is no loop to wait for, cues are dropped. */
+let stageFailed = false;
+
 /**
  * Starts the queued scenes in order, once the loop runs. While the canvas is out of sight they are
  * dropped, so they never play late (the message queue does not wait for them either).
  */
 function playCues(): void {
   const hidden = cssWidth !== null && !isShown(cssWidth);
-  if (loop === null && !hidden) return;
+  if (loop === null && !hidden && !stageFailed) return;
   const taken = takeCues(cues);
   cues = taken.queue;
   if (hidden) return;
@@ -131,6 +134,8 @@ onMounted(() => {
       // No 2D context, for one: the windows (board, party, messages, sounds) still work without
       // the room, so the screen and the demo go on.
       globalThis.console.error('the stage could not start', error);
+      stageFailed = true;
+      playCues();
     }
     emit('ready');
   });
