@@ -100,7 +100,7 @@ export const FLOOR_PATCH_DECOR: readonly DecorPlacement[] = DECOR_PLACEMENTS.fil
 /** Drawn once after the furniture, lower ones last so they overlap the ones behind them. */
 export const STILL_DECOR: readonly DecorPlacement[] = DECOR_PLACEMENTS.filter(
   (item) => !isFloorPatch(item) && DECOR_MOTION[item.name] === undefined,
-).sort((a, b) => a.row + a.h - (b.row + b.h));
+).toSorted((a, b) => a.row + a.h - (b.row + b.h));
 
 export interface AnimatedDecor {
   readonly placement: DecorPlacement;
@@ -114,9 +114,10 @@ export interface AnimatedDecor {
 /** Drawn every frame (the lamps, the pet and the things that move at times), under the members. */
 export const ANIMATED_DECOR: readonly AnimatedDecor[] = DECOR_PLACEMENTS.flatMap((placement) => {
   const motion = DECOR_MOTION[placement.name];
-  return motion === undefined ? [] : [{ placement, motion, phaseMs: 0 }];
-}).map((item, index) => ({
-  ...item,
+  return motion === undefined ? [] : [{ placement, motion }];
+}).map(({ placement, motion }, index) => ({
+  placement,
+  motion,
   phaseMs: index * AMBIENT.decorPhaseStepMs,
-  trigger: triggerOf(item.placement),
+  trigger: triggerOf(placement),
 }));

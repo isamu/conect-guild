@@ -98,7 +98,7 @@ export async function latestCompanySessionIds(
 }
 
 /** One entry of activity-state.json. Extra keys are ignored; a missing or mistyped one fails. */
-export const activityEntrySchema = z.object({
+const activityEntrySchema = z.object({
   working: z.boolean(),
   waiting: z.boolean(),
   event: z.string().nullable(),

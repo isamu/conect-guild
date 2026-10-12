@@ -5,7 +5,7 @@ import type { Snapshot } from '@conect-guild/snapshot';
 export const BASELINE_SCHEMA_VERSION = 2;
 
 const isoDateTime = z.iso.datetime({ offset: true });
-const state = z.enum(['open', 'closed']);
+const stateSchema = z.enum(['open', 'closed']);
 const issueNumber = z.number().int().positive();
 
 /**
@@ -26,12 +26,16 @@ export function repoFingerprint(repo: string): string {
  * branch names, because Issue titles can carry client names. The repository is kept as its
  * fingerprint only.
  */
-export const baselineSchema = z.strictObject({
+const baselineSchema = z.strictObject({
   schemaVersion: z.literal(BASELINE_SCHEMA_VERSION),
   fetchedAt: isoDateTime,
   repo: z.string().regex(/^[0-9a-f]{8}$/),
-  issues: z.array(z.strictObject({ number: issueNumber, state, closedAt: isoDateTime.nullable() })),
-  prs: z.array(z.strictObject({ number: issueNumber, state, mergedAt: isoDateTime.nullable() })),
+  issues: z.array(
+    z.strictObject({ number: issueNumber, state: stateSchema, closedAt: isoDateTime.nullable() }),
+  ),
+  prs: z.array(
+    z.strictObject({ number: issueNumber, state: stateSchema, mergedAt: isoDateTime.nullable() }),
+  ),
 });
 
 export type Baseline = z.infer<typeof baselineSchema>;

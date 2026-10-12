@@ -85,10 +85,10 @@ export function createNarrator(options: NarratorOptions): Narrator {
     wake() {
       if (current === null) next();
     },
-    setPaused(next) {
-      if (next === paused) return;
+    setPaused(nextPaused) {
+      if (nextPaused === paused) return;
       disarm();
-      paused = next;
+      paused = nextPaused;
       arm();
     },
     stop() {

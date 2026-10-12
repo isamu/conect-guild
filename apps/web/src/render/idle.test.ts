@@ -146,7 +146,7 @@ describe('plannedOuting', () => {
         expect(stay).toBeGreaterThanOrEqual(IDLE.stayMinMs);
         expect(stay).toBeLessThan(IDLE.stayMaxMs);
         expect(outing.back.end).toBeLessThanOrEqual(start + IDLE.playCycleMs);
-        expect(outing.back.path).toEqual([...outing.out.path].reverse());
+        expect(outing.back.path).toEqual(outing.out.path.toReversed());
       }
     }
   });

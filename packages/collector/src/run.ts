@@ -49,7 +49,7 @@ async function readSessionsSafely(deps: RunDeps): Promise<SessionsReading> {
 }
 
 /** The sessions part of the snapshot. A failed reading becomes `unavailable`. */
-export function toSnapshotSessions(reading: SessionsReading, checkedAt: Date): SnapshotSessions {
+function toSnapshotSessions(reading: SessionsReading, checkedAt: Date): SnapshotSessions {
   const at = checkedAt.toISOString();
   return reading.ok
     ? { status: 'ok', checkedAt: at, members: [...reading.members] }
@@ -110,7 +110,7 @@ function reportCycle(deps: RunDeps, result: CycleResult): void {
 }
 
 /** e.g. `sessions=5 ok` or `sessions unavailable: parse-failed`. */
-export function sessionsSummary(reading: SessionsReading): string {
+function sessionsSummary(reading: SessionsReading): string {
   return reading.ok
     ? `sessions=${String(reading.found)} ok`
     : `sessions unavailable: ${reading.kind}`;
@@ -127,7 +127,7 @@ interface LoopState {
   writeFailing: boolean;
 }
 
-export function isGithubDue(lastAttemptAt: number | null, now: number): boolean {
+function isGithubDue(lastAttemptAt: number | null, now: number): boolean {
   return lastAttemptAt === null || now - lastAttemptAt >= COLLECTOR_CONFIG.intervalMs;
 }
 

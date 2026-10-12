@@ -135,7 +135,7 @@ function besideSeat(from: TilePos, seat: TilePos): TilePos {
       .filter(isWalkable)
       .map((tile) => findPath(from, tile))
       .filter((path) => path !== null)
-      .sort((a, b) => a.length - b.length);
+      .toSorted((a, b) => a.length - b.length);
     const nearest = ways[0]?.at(-1);
     if (nearest !== undefined) return nearest;
   }

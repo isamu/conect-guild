@@ -43,7 +43,7 @@ describe('decorCuesOf', () => {
       yukihiro: 'idle',
     };
     const cues = decorCuesOf(moods, [], 0, AT_SEAT);
-    expect([...cues.working].sort(byName)).toEqual(['hirame', 'minori']);
+    expect([...cues.working].toSorted(byName)).toEqual(['hirame', 'minori']);
     expect(cues.awaitingPresident).toBe(false);
     expect(cues.clearedAt).toEqual({});
   });
@@ -133,7 +133,7 @@ describe('triggerOf', () => {
     }
     const banners = DECOR_PLACEMENTS.filter((p) => p.name === 'banner').map(triggerOf);
     const sides = banners.flatMap((t) => (t?.kind === 'cleared' ? t.members : []));
-    expect([...sides].sort(byName)).toEqual(['hibiki', 'hirame', 'kaname', 'minori', 'sasae']);
+    expect(sides.toSorted(byName)).toEqual(['hibiki', 'hirame', 'kaname', 'minori', 'sasae']);
   });
 });
 
@@ -259,7 +259,7 @@ describe('notesAt', () => {
     for (let index = 0; index < 60; index += 1) {
       for (const note of notesAt(0, index * TRINKETS.noteEveryMs)) kinds.add(note.kind);
     }
-    expect([...kinds].sort(byName)).toEqual(['bang', 'note']);
+    expect([...kinds].toSorted(byName)).toEqual(['bang', 'note']);
   });
 });
 
@@ -351,7 +351,7 @@ describe('petPoseAt', () => {
       expect(pose).toEqual({ name: 'sleeping-poodle', dy: decorPose('breath', 0, t).dy });
       rises.add(pose.dy);
     }
-    expect([...rises].sort((a, b) => a - b)).toEqual([-AMBIENT.breathPx, 0]);
+    expect([...rises].toSorted((a, b) => a - b)).toEqual([-AMBIENT.breathPx, 0]);
   });
 
   it('uses the same phase for waking and for breathing', () => {

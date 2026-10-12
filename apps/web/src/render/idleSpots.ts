@@ -104,7 +104,7 @@ function spot(id: MemberId, kind: PlayKind, tile: TilePos | null): PlaySpot[] {
 function nearestWindow(id: MemberId): PlaySpot[] {
   const spots = windowTiles()
     .flatMap((tile) => spot(id, 'window', tile))
-    .sort((a, b) => a.path.length - b.path.length);
+    .toSorted((a, b) => a.path.length - b.path.length);
   return spots.slice(0, 1);
 }
 
